@@ -6,6 +6,7 @@
 - Phase 3: Database Schema (all 2 tasks)
 - Phase 4.1: Orchestrator Package Setup (all 3 tasks)
 - Phase 4.2: Database & Redis Clients (all 2 tasks)
+- Phase 4.3: Core Components - QueueManager and RateLimiter complete
 
 ## Current
-- Phase 4.3: Core Components - QueueManager complete, RateLimiter next
+- Phase 4.3: Core Components - ConflictDetector next

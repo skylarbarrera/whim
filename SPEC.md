@@ -70,7 +70,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - `list()` - list active work items
   - `getStats()` - get queue statistics
 
-- [ ] Create `packages/orchestrator/src/rate-limits.ts` - RateLimiter class:
+- [x] Create `packages/orchestrator/src/rate-limits.ts` - RateLimiter class:
   - `canSpawnWorker()` - check if spawn allowed
   - `recordSpawn()` - record worker spawn
   - `recordWorkerDone()` - record worker completion
