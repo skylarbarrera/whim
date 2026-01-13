@@ -1,119 +1,139 @@
-# Plan: Implement Lint Validation Hook
+# Plan: Implement Automated Testing Hook
 
 ## Goal
-Create a lint validation review step that checks code quality using ESLint, Prettier, and other linting tools. This step should run as part of the review system, provide actionable error reports, and support multiple linters.
+Create a test execution review step that runs unit tests, integration tests, and validates test coverage as part of the PR review system. This step should provide detailed test failure reports and coverage information.
 
 ## Files to Create/Modify
 
 ### New Files
-1. `packages/review-system/src/steps/lint-step.ts`
-   - LintStep class implementing ReviewStep interface
-   - Support for ESLint, Prettier, and generic linters
-   - Parse lint output and convert to ReviewMessages
-   - Configure severity mapping (error/warning)
+1. `packages/review-system/src/steps/test-step.ts`
+   - TestStep class implementing ReviewStep interface
+   - Support for multiple test runners (Jest, Vitest, Bun, Mocha, custom)
+   - Parse test output and convert to ReviewMessages
+   - Test coverage validation
+   - Test suite execution with timeout handling
 
-2. `packages/review-system/src/steps/index.ts`
-   - Export LintStep and other step implementations
-
-3. `packages/review-system/src/__tests__/lint-step.test.ts`
-   - Test lint detection and reporting
-   - Test ESLint output parsing
-   - Test Prettier output parsing
-   - Test file filtering and patterns
-   - Test error handling
+2. `packages/review-system/src/__tests__/test-step.test.ts`
+   - Test execution scenarios
+   - Test output parsing for different runners
+   - Test coverage validation
+   - Error handling
+   - Timeout scenarios
 
 ### Existing Files to Modify
-1. `packages/review-system/package.json`
-   - Add dev dependencies: eslint, prettier (for testing)
+1. `packages/review-system/src/steps/index.ts`
+   - Export TestStep class
 
-2. `packages/review-system/src/index.ts`
-   - Export steps module
+2. `packages/review-system/package.json`
+   - Add dev dependencies for testing (if needed)
 
 ## Implementation Steps
 
-1. **Create LintStep class**
+1. **Create TestStep class**
    - Implement ReviewStep interface (initialize, execute, cleanup, validateConfig)
-   - Support multiple linters: eslint, prettier, custom commands
-   - Run linters on changed files only (filter by context.changedFiles)
-   - Parse stdout/stderr from linter commands
-   - Convert lint errors/warnings to ReviewMessages with file/line/severity
-   - Include fix suggestions when available
+   - Support multiple test runners: jest, vitest, bun, mocha, custom
+   - Run tests on commit-level (all affected tests)
+   - Parse stdout/stderr from test commands
+   - Convert test failures to ReviewMessages with file/line/test name
+   - Include stack traces and error details
+   - Track test counts: run, passed, failed, skipped
 
-2. **ESLint integration**
-   - Run: `eslint --format json [files]`
-   - Parse JSON output format
-   - Extract: filePath, line, column, message, severity, ruleId
-   - Map severity: 2=error, 1=warning, 0=info
+2. **Test runner integration**
+   - Jest: `npm test -- --json` or `jest --json`
+   - Vitest: `vitest run --reporter=json`
+   - Bun: `bun test --reporter json`
+   - Mocha: `mocha --reporter json`
+   - Custom: configurable command with output parser
 
-3. **Prettier integration**
-   - Run: `prettier --check [files]`
-   - Parse output for unparsed files
-   - Generate "needs formatting" messages
-   - Support --write for auto-fix
+3. **Output parsing**
+   - Parse JSON output from test runners
+   - Extract: test name, file path, line number, error message, stack trace
+   - Handle different JSON formats per runner
+   - Fallback to text parsing if JSON unavailable
 
-4. **Configuration**
-   - linters: Array of linter configs (type, command, args, filePatterns)
-   - autoFix: boolean (run fix commands like eslint --fix)
-   - failOn: "error" | "warning" (minimum severity to fail step)
-   - timeout: number (per-linter timeout)
+4. **Coverage validation**
+   - Run with coverage flags (--coverage)
+   - Parse coverage reports (lcov, json-summary)
+   - Check against thresholds: lines, functions, branches, statements
+   - Generate coverage messages if below threshold
+   - Support coverage config from project (jest.config, vitest.config)
 
-5. **Result formatting**
-   - Group errors by file
-   - Include line numbers and columns
-   - Add actionable suggestions (e.g., "Run: eslint --fix src/foo.ts")
-   - Count total errors/warnings
+5. **Configuration**
+   - runner: "jest" | "vitest" | "bun" | "mocha" | "custom"
+   - command: string (custom command override)
+   - args: string[] (additional arguments)
+   - testScript: string (package.json script name, default: "test")
+   - coverage: boolean (enable coverage checking)
+   - coverageThresholds: { lines, functions, branches, statements }
+   - timeout: number (test suite timeout in ms)
+   - failOn: "error" | "failure" (fail on test errors only or any failure)
 
-6. **Testing**
-   - Mock file system with test files
-   - Mock linter command execution
-   - Test ESLint JSON parsing with real examples
-   - Test Prettier output parsing
-   - Test file filtering (only run on changed files)
-   - Test severity mapping
+6. **Result formatting**
+   - Group failures by test file
+   - Include test names and error messages
+   - Add stack traces for debugging
+   - Show test counts: X passed, Y failed, Z total
+   - Coverage summary: X% lines, Y% branches, etc.
+   - Actionable suggestions (e.g., "Fix failing test: should validate input")
+
+7. **Testing**
+   - Mock test command execution
+   - Test Jest output parsing
+   - Test Vitest output parsing
+   - Test Bun output parsing
+   - Test coverage threshold validation
    - Test timeout handling
-   - Test error cases (linter not found, invalid config)
+   - Test error scenarios (test runner not found, invalid config)
 
 ## Tests to Write
 
-1. **Basic lint detection**
-   - Detect ESLint errors in files
-   - Detect Prettier formatting issues
-   - Pass when no issues found
+1. **Basic test execution**
+   - Detect test failures
+   - Pass when all tests pass
+   - Count test results correctly
 
 2. **Output parsing**
-   - Parse ESLint JSON format correctly
-   - Parse Prettier output correctly
-   - Handle empty output
+   - Parse Jest JSON format correctly
+   - Parse Vitest JSON format correctly
+   - Parse Bun output correctly
+   - Handle text output as fallback
 
-3. **File filtering**
-   - Only lint changed files from context
-   - Apply file patterns (*.ts, *.js, etc.)
-   - Skip excluded patterns
+3. **Test failure reporting**
+   - Extract test name and file
+   - Include error messages
+   - Include stack traces
+   - Format as ReviewMessages
 
-4. **Severity handling**
-   - Map ESLint severity correctly
-   - Fail on errors by default
-   - Continue on warnings
+4. **Coverage validation**
+   - Parse coverage reports
+   - Check against thresholds
+   - Generate coverage warnings
+   - Pass when coverage meets thresholds
 
 5. **Configuration validation**
-   - Reject invalid linter types
+   - Reject invalid runner types
    - Reject invalid failOn values
-   - Require command for custom linters
+   - Validate coverage thresholds
 
 6. **Error handling**
-   - Handle missing linter binaries
+   - Handle missing test runner
    - Handle invalid JSON output
-   - Handle linter crashes
+   - Handle test suite crashes
    - Handle timeouts
+
+7. **Test runner detection**
+   - Auto-detect runner from package.json
+   - Use configured test script
+   - Fallback to npm test
 
 ## Exit Criteria
 
-- [ ] LintStep class implements all ReviewStep interface methods
-- [ ] ESLint integration works with JSON output parsing
-- [ ] Prettier integration detects formatting issues
-- [ ] Only changed files are linted (respects context.changedFiles)
-- [ ] Lint errors/warnings converted to ReviewMessages with correct severity
-- [ ] Configuration validates linter setup
+- [ ] TestStep class implements all ReviewStep interface methods
+- [ ] Support for Jest, Vitest, Bun test runners
+- [ ] Test failures converted to ReviewMessages with file/line/test name
+- [ ] Test coverage validation with configurable thresholds
+- [ ] Detailed test failure reports with stack traces
+- [ ] Configuration validates test setup
 - [ ] At least 20 tests covering all scenarios
 - [ ] Package builds successfully with no type errors
 - [ ] Tests pass with `bun test`

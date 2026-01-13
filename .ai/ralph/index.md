@@ -1742,3 +1742,146 @@ Features:
 - Ready for integration with ReviewOrchestrator
 - Task 4 of 8 complete in SPEC.md
 
+---
+
+## Session 34 - 2026-01-13
+
+### Task: Implement Automated Testing Hook
+
+**Commit:** (pending)
+
+**Files Created:**
+- `packages/review-system/src/steps/test-step.ts` - TestStep class
+- `packages/review-system/src/__tests__/test-step.test.ts` - Comprehensive test suite (26 tests)
+
+**Files Modified:**
+- `packages/review-system/src/steps/index.ts` - Added TestStep export
+
+**TestStep Implementation:**
+
+Configuration:
+- TestStepOptions interface with runner, command, args, testScript, coverage, coverageThresholds, timeout, failOn
+- TestRunner type: 'jest' | 'vitest' | 'bun' | 'mocha' | 'custom'
+- CoverageThresholds interface: lines, functions, branches, statements (0-100%)
+
+Features:
+1. **Multi-Runner Support:**
+   - Jest: `npm test -- --json --coverage`
+   - Vitest: `npm test -- run --reporter=json --coverage`
+   - Bun: `bun test --coverage`
+   - Mocha: `npm test -- --reporter json`
+   - Custom: configurable command with args
+
+2. **Test Execution:**
+   - Checks for test script in package.json
+   - Skips if no test script found
+   - Runs with CI=true and FORCE_COLOR=0 env vars
+   - Configurable timeout (default 5 minutes)
+   - Captures stdout and stderr
+
+3. **Output Parsing:**
+   - Parses Jest format: "Tests: X passed, Y failed, Z total"
+   - Parses Vitest format: "X passed | Y failed | Z total"
+   - Parses Bun format: "X pass, Y fail, Z total"
+   - Generic fallback: counts PASS/FAIL occurrences
+   - Extracts test counts: total, passed, failed
+
+4. **Test Failure Reporting:**
+   - Attempts to parse JSON output from Jest/Vitest
+   - Extracts test name, file path, failure messages
+   - Includes stack trace extraction with file:line:column
+   - Creates ReviewMessages with ERROR severity
+   - Provides suggestions from stack traces
+   - Fallback to text parsing if JSON unavailable
+
+5. **Coverage Validation:**
+   - Reads coverage-summary.json from coverage directory
+   - Checks thresholds for lines, functions, branches, statements
+   - Generates WARNING messages for below-threshold coverage
+   - Includes current vs required percentages in suggestions
+   - Graceful handling of missing coverage files
+
+6. **Result Handling:**
+   - Converts test failures to ReviewMessages
+   - Maps exit codes to ReviewStatus
+   - Tracks test counts in metadata
+   - Configurable failOn: 'error' (execution errors) or 'failure' (test failures)
+   - Coverage warnings don't fail by default
+
+7. **Error Handling:**
+   - Handles missing test runner (exit code 127)
+   - Handles test suite crashes
+   - Handles invalid JSON output
+   - Handles timeouts
+   - Returns ERROR status for execution failures
+
+**Test Coverage (26 tests):**
+
+1. Initialization (2 tests):
+   - Valid config initialization
+   - Default values set correctly
+
+2. Configuration Validation (5 tests):
+   - Valid config accepted
+   - Invalid runner type rejected
+   - Custom runner requires command
+   - Invalid failOn value rejected
+   - Coverage thresholds validated (0-100 range)
+
+3. Test Execution (3 tests):
+   - Pass when all tests pass
+   - Fail when tests fail
+   - Skip when no test script found
+
+4. Output Parsing (4 tests):
+   - Parse Jest format correctly
+   - Parse Vitest format correctly
+   - Parse Bun format correctly
+   - Handle text output as fallback
+
+5. Test Failure Reporting (3 tests):
+   - Extract failure messages from JSON
+   - Include file and line information
+   - Handle generic test failures
+
+6. Coverage Validation (3 tests):
+   - Check coverage against thresholds
+   - Pass when coverage meets thresholds
+   - Handle missing coverage file gracefully
+
+7. Error Handling (4 tests):
+   - Handle missing test runner
+   - Handle test suite crashes
+   - Handle invalid JSON output
+   - Handle timeout gracefully
+
+8. Test Runner Detection (4 tests):
+   - Use Jest by default
+   - Support Vitest
+   - Support Bun
+   - Support custom commands
+
+9. Cleanup (1 test):
+   - Cleanup without errors
+
+10. Metadata (3 tests):
+    - Include test counts
+    - Include runner name
+    - Include coverage flag
+
+**Technical Details:**
+- Uses Node.js child_process.exec with promisify
+- Reads package.json to check for test scripts
+- Builds test commands dynamically based on runner
+- Parses multiple output formats with regex
+- Type-safe with TypeScript strict mode
+- Fixed type errors with regex match group checks
+
+**Notes:**
+- All source code type-checks successfully (npx tsc --noEmit)
+- Package builds successfully with npm run build
+- test-step.js and test-step.d.ts generated in dist/steps/
+- Tests require bun test runner (not executed in this session)
+- Ready for integration with ReviewOrchestrator
+- Task 5 of 8 complete in SPEC.md
+
