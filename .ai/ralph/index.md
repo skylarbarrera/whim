@@ -144,3 +144,33 @@
 - Types align with @factory/shared package
 - Build and type checks pass successfully
 - All Phase 4.2 tasks completed in single iteration
+
+---
+
+## Session 6 - 2025-01-12
+
+### Task: Phase 4.3 - QueueManager (Core Components)
+
+**Commit:** ed4d7fa
+
+**Files Created:**
+- `packages/orchestrator/src/queue.ts` - QueueManager class
+
+**QueueManager Methods:**
+1. `add(input)` - Add work item to queue with priority/metadata
+2. `get(id)` - Get work item by ID
+3. `getNext()` - Get highest priority queued item (FOR UPDATE SKIP LOCKED)
+4. `cancel(id)` - Cancel work item (only if queued/assigned)
+5. `list()` - List active work items ordered by priority
+6. `getStats()` - Get queue statistics by status and priority
+
+**Features:**
+- Priority ordering: critical > high > medium > low, then FIFO by created_at
+- Row locking with SKIP LOCKED for safe concurrent access
+- Transaction support for atomic getNext operation
+- Status transitions: queued → assigned (via getNext), queued/assigned → cancelled (via cancel)
+
+**Notes:**
+- Uses Database.transaction() for getNext to ensure atomicity
+- QueueStatsResponse matches @factory/shared types
+- First of 5 core components in Phase 4.3

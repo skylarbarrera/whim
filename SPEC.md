@@ -62,7 +62,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 - [x] Create `packages/orchestrator/src/redis.ts` - Redis client wrapper
 
 ### 4.3 Core Components
-- [ ] Create `packages/orchestrator/src/queue.ts` - QueueManager class:
+- [x] Create `packages/orchestrator/src/queue.ts` - QueueManager class:
   - `add(input)` - add work item to queue
   - `get(id)` - get work item by ID
   - `getNext()` - get highest priority queued item (with row locking)
