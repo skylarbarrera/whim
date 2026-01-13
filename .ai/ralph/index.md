@@ -1159,3 +1159,56 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - Unit tests created for RalphSpecGenerator formatting logic
 - Full integration testing requires Claude Code CLI authentication
 - All existing functionality preserved with fallback to Anthropic SDK
+
+---
+
+## Session 29 - 2026-01-13
+
+### Task: Implement Interactive Spec Creation Flow
+
+**Commit:** 8e6ece8
+
+**Files Created:**
+- `scripts/create-spec.sh` - Interactive spec creation wrapper
+
+**Files Modified:**
+- `README.md` - Added wrapper script documentation with submission examples
+- `.ai/new-learnings.md` - Documented design decision and usage
+- `.ai/ralph/plan.md` - Updated with implementation plan
+- `SPEC.md` - Marked task 2 as complete
+
+**Implementation Approach:**
+
+Created a local wrapper script instead of API integration:
+- Leverages Ralph's existing `/create-spec` skill
+- Maintains separation between spec creation and execution
+- Simpler than HTTP streaming for interactive Q&A
+- Better terminal UX
+
+**Script Features:**
+- Prerequisite checks (Claude CLI, git repo, ANTHROPIC_API_KEY)
+- Colored output with clear info/success/error messages
+- Configurable output path (--output flag)
+- Help message with examples (--help flag)
+- Prevents overwriting existing SPEC.md without confirmation
+- Shows next steps for factory submission
+
+**Documentation Updates:**
+- README.md: Added Option A (wrapper script) and Option B (direct CLI)
+- Included factory submission examples with curl
+- Explained the interview process and validation
+- Referenced good SPEC.md practices
+
+**Design Decision:**
+Wrapper script approach provides:
+- Simple integration with existing Ralph tooling
+- Works with local repos before factory submission
+- Clear separation of concerns
+- Easy to maintain and understand
+- Better UX than trying to stream Q&A through HTTP
+
+**Notes:**
+- Script syntax validated with bash -n
+- Prerequisite checks tested (git repo, API key)
+- Help message displays correctly
+- All sub-bullets of task 2 completed (UI design, flow logic, spec generation, error handling)

@@ -44,6 +44,13 @@ The AI Software Factory implementation is complete.
   - Configuration options added (USE_RALPH_SPEC environment variable)
   - Backwards compatible with existing Anthropic SDK approach
 
+- [x] Task 2: Implement interactive spec creation flow (Session 29)
+  - Created scripts/create-spec.sh wrapper for /create-spec skill
+  - Added prerequisite checks (Claude CLI, git repo, API key)
+  - Updated README with wrapper script documentation
+  - Documented factory submission workflow
+  - Added learnings about design decision (local wrapper vs API integration)
+
 ## Bug Fix Phase - In Progress
 - Phase 1.1: Fixed createPullRequest to check for unpushed commits instead of uncommitted changes
   - Function now properly detects commits ahead of origin using `git rev-list`
