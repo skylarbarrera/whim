@@ -1,113 +1,49 @@
-# AI Factory Pipeline Fixes
+# Update Ralph Instance and Pull in New Spec Tooling
 
 ## Goal
-Fix the worker pipeline to reliably push commits and create PRs, and ensure tests actually run.
-
-## Critical Issues
-
-### 1. PR Creation Logic Bug
-The `createPullRequest` function in `packages/worker/src/setup.ts` checks for uncommitted changes, but Ralph already commits. This causes the function to exit early without pushing.
-
-### 2. Tests Not Actually Running
-Claude marks "tests pass" but the worker container lacks test infrastructure (jest, vitest not installed). Tests are being faked/skipped.
+Integrate the latest Ralph repository changes including updated spec tooling and headless spec creation capabilities, then implement two distinct spec creation flows: interactive user questioning and autonomous GitHub issue-based generation.
 
 ## Tasks
-
-### Phase 1: Fix PR Creation Flow
-- [x] Fix `createPullRequest` in `setup.ts` to check for unpushed commits instead of uncommitted changes
-  - Use `git log origin/main..HEAD --oneline` or similar to detect unpushed commits
-  - Always attempt push if there are commits ahead of origin
-  - Remove the misleading "No changes to commit" early return
-- [x] Add better error logging to show exactly which step failed (stage, commit, push, pr create)
-- [x] Pass `GH_TOKEN` properly to `gh` command (currently only sets env, may need `--token` flag)
-  - Now passes both `GH_TOKEN` and `GITHUB_TOKEN` for maximum compatibility
-  - Logs masked token presence for debugging
-  - Preserves `GH_HOST` for GitHub Enterprise scenarios
-
-### Phase 2: Add Test Infrastructure to Worker
-- [x] Install Node.js test runners in worker Dockerfile
-  - Added `npm install -g jest ts-jest typescript @types/jest @types/node vitest`
-  - TypeScript compilation now available via global `tsc`
-- [x] Consider adding a validation step that actually runs `npm test` after Ralph completes
-  - Added `testing.ts` module with `runTests()` function
-  - Supports Jest, Vitest, and Bun test output parsing
-  - Integrated in `index.ts` after Ralph completes
-- [x] Add timeout for test execution to prevent hung workers
-  - Default 5-minute timeout with configurable option
-  - Graceful SIGTERM followed by SIGKILL after 5s
-
-### Phase 3: Improve Error Handling
-- [x] In `index.ts`, wrap PR creation in try/catch and report partial success
-  - Wraps createPullRequest() in try/catch for unexpected errors
-  - Logs error message and stack trace on exception
-  - Reports partial success (work done, PR failed) to orchestrator
-  - Adds stdout/stderr logging for PRResult error cases
-- [x] Log full stderr/stdout from failed git/gh commands
-  - Added logSetupCommandResult() helper for setup step failures
-  - All git commands in setupWorkspace() now log full output on failure
-  - git config, git add, git commit, git clone, git checkout all covered
-  - ralph init logs full output on warning/failure
-  - Git clone URL sanitized in logs (token masked)
-- [x] Add retry logic for transient network failures (push, gh api)
-  - Added execWithRetry() function with exponential backoff + jitter
-  - isRetryableError() detects: connection errors, 5xx HTTP, rate limiting
-  - Default: 3 retries, 1s base delay, 10s max delay
-  - Applied to git push and gh pr create commands
-  - Logs retry attempts with truncated error preview
-
-### Phase 4: Observability
-- [x] Add logging to show git commit history before push attempt
-  - Already implemented: git log --oneline -5 shown before push
-- [x] Log the actual `gh pr create` command being run
-  - Already implemented: "[PR] Running: gh pr create ..." logged
-- [x] Track and report test execution results in worker metrics
-  - Added testsFailed and testStatus to WorkerMetrics
-  - Added testsFailed and testStatus to WorkerCompleteRequest
-  - Worker now reports complete test metrics to orchestrator
+- [x] Update Ralph repository integration
+  - Pull latest changes from Ralph repo
+  - Review and integrate updated spec tooling
+  - Test headless spec creation functionality
+  - Update dependencies and configurations as needed
+- [x] Implement interactive spec creation flow
+  - Design user interface for spec creation via questioning
+  - Create question flow logic and validation
+  - Implement spec generation from user responses
+  - Add error handling and user feedback mechanisms
+- [x] Implement autonomous GitHub issue spec creation
+  - Set up GitHub webhook/API integration for issue monitoring
+  - Create issue parsing and content extraction logic
+  - Implement automatic spec generation from issue content
+  - Add spec validation and quality checks
+- [x] Create flow routing and management system
+  - Implement flow selection mechanism
+  - Add configuration options for different creation modes
+  - Create shared spec output formatting and storage
+- [x] Add comprehensive testing
+  - Unit tests for both creation flows
+  - Integration tests with Ralph tooling
+  - GitHub API integration tests
+  - End-to-end flow validation
 
 ## Acceptance Criteria
-- [x] Worker successfully pushes Ralph's commits to GitHub
-  - Fixed: createPullRequest checks for unpushed commits, not uncommitted changes
-  - Retry logic handles transient network failures
-- [x] PR is created with link returned to orchestrator
-  - Fixed: gh pr create runs with proper token environment
-  - Retry logic handles GitHub API failures
-- [x] Tests actually execute (not just marked as passed)
-  - Added: testing.ts module with runTests() function
-  - Worker runs npm test and parses output for real test counts
-- [x] Failed steps produce actionable error messages
-  - Added: Comprehensive logging with [SETUP], [PR], [RETRY] prefixes
-  - All git/gh commands log full stdout/stderr on failure
-- [x] Work item status updated to 'completed' with prUrl populated
-  - Fixed: client.complete() called with prUrl after successful PR creation
-  - Metrics include testsFailed and testStatus
+- [x] Ralph repository is successfully updated with all new tooling integrated
+- [x] Interactive questioning flow allows users to create complete specs through guided prompts
+- [x] GitHub issues automatically trigger spec creation without manual intervention
+- [x] Both flows produce consistently formatted, valid specification documents
+- [x] System gracefully handles errors in both creation flows
+- [x] All new functionality is covered by automated tests
+- [x] Documentation exists for both spec creation flows
 
-## Technical Notes
-
-### Current PR Flow Bug (setup.ts:150-156)
-```typescript
-// BUG: This checks for uncommitted changes, but Ralph already committed
-const statusResult = await exec("git", ["status", "--porcelain"], { cwd: repoDir });
-if (statusResult.stdout.trim() === "") {
-  console.log("No changes to commit");  // Wrong - commits exist, just already staged
-  return null;
-}
-```
-
-### Fix Approach
-```typescript
-// Check for unpushed commits instead
-const unpushedResult = await exec("git", ["rev-list", "--count", "origin/HEAD..HEAD"], { cwd: repoDir });
-const unpushedCount = parseInt(unpushedResult.stdout.trim(), 10);
-if (unpushedCount === 0) {
-  console.log("No commits to push");
-  return null;
-}
-// Skip the commit step (Ralph already did it), go straight to push
-```
-
-### Test Infrastructure
-The current Dockerfile installs `nodejs` and `npm` from debian repos but no test frameworks. Need to add:
-```dockerfile
-RUN npm install -g jest ts-jest typescript @types/jest @types/node
-```
+## Notes
+- Ensure backward compatibility with existing Ralph integrations during the update
+- Consider rate limiting and authentication for GitHub API interactions
+- The autonomous flow should handle various GitHub issue formats and extract relevant information intelligently
+- Both flows should produce specs that are compatible with existing tooling and workflows
+- Consider adding configuration options to customize the questioning flow based on project types
+- Implement proper logging and monitoring for the autonomous GitHub issue processing
+- Edge case: Handle malformed or insufficient GitHub issues gracefully
+- Edge case: Ensure the questioning flow can handle incomplete or invalid user responses

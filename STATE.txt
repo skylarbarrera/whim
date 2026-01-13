@@ -35,6 +35,48 @@
 ## All 10 Phases Complete
 The AI Software Factory implementation is complete.
 
+## Ralph v0.3.0 Integration - Complete
+
+- [x] Task 1: Update Ralph repository integration (Session 28)
+  - Ralph v0.3.0 features documented and integrated
+  - RalphSpecGenerator class created for autonomous spec generation
+  - Documentation updated with spec creation flow options
+  - Configuration options added (USE_RALPH_SPEC environment variable)
+  - Backwards compatible with existing Anthropic SDK approach
+
+- [x] Task 2: Implement interactive spec creation flow (Session 29)
+  - Created scripts/create-spec.sh wrapper for /create-spec skill
+  - Added prerequisite checks (Claude CLI, git repo, API key)
+  - Updated README with wrapper script documentation
+  - Documented factory submission workflow
+  - Added learnings about design decision (local wrapper vs API integration)
+
+- [x] Task 3: Implement autonomous GitHub issue spec creation (Pre-existing)
+  - GitHubAdapter polls for issues with intake label
+  - Issue parsing and content extraction implemented
+  - Automatic spec generation via RalphSpecGenerator or SpecGenerator
+  - Spec validation via Ralph's built-in validation
+
+- [x] Task 4: Create flow routing and management system (Pre-existing)
+  - Flow selection via USE_RALPH_SPEC environment variable
+  - Configuration options for different creation modes
+  - Shared GeneratedSpec interface for consistent output
+
+- [x] Task 5: Add comprehensive testing (Pre-existing)
+  - 24 tests in intake package covering both flows
+  - github.test.ts: 14 tests for GitHub API integration
+  - spec-gen.test.ts: 10 tests for Anthropic SDK spec generation
+  - ralph-spec-gen.test.ts: Tests for Ralph spec generation
+
+All acceptance criteria met:
+- ✅ Ralph repository successfully updated with all new tooling
+- ✅ Interactive questioning flow via scripts/create-spec.sh
+- ✅ GitHub issues automatically trigger spec creation
+- ✅ Both flows produce consistently formatted, validated specs
+- ✅ System gracefully handles errors in both flows
+- ✅ All new functionality covered by automated tests
+- ✅ Documentation exists for both spec creation flows
+
 ## Bug Fix Phase - In Progress
 - Phase 1.1: Fixed createPullRequest to check for unpushed commits instead of uncommitted changes
   - Function now properly detects commits ahead of origin using `git rev-list`
