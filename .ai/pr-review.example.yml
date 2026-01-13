@@ -1,0 +1,57 @@
+# PR Review Configuration
+# Place this file at .ai/pr-review.yml in your repository root
+
+# Lint check configuration
+lint:
+  # Whether lint checks are enabled
+  enabled: true
+
+  # Whether lint checks are required to pass for merge
+  required: true
+
+  # Maximum execution time in milliseconds
+  timeout: 60000
+
+  # List of lint tools to run
+  tools:
+    - name: eslint
+      command: "npx eslint . --format json"
+      enabled: true
+
+    - name: prettier
+      command: "npx prettier --check ."
+      enabled: true
+
+    # Example: Add more tools
+    # - name: biome
+    #   command: "npx biome check ."
+    #   enabled: true
+
+  # Number of errors required to fail the check
+  # 0 = any violation fails
+  # N = allow up to N-1 violations
+  failureThreshold: 0
+
+# Test check configuration
+test:
+  # Whether test checks are enabled
+  enabled: true
+
+  # Whether test checks are required to pass for merge
+  required: true
+
+  # Maximum execution time in milliseconds (5 minutes)
+  timeout: 300000
+
+  # Command to run tests
+  command: "npm test"
+
+  # Minimum percentage of tests that must pass (0-100)
+  minPassPercentage: 100
+
+# Additional check types (typecheck, security, etc.) can be added here
+# typecheck:
+#   enabled: true
+#   required: true
+#   timeout: 60000
+#   command: "npx tsc --noEmit"

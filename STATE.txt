@@ -193,3 +193,47 @@ All sub-bullets completed:
 - ✅ Add AI-generated PR detection logic
 - ✅ Implement review status tracking
 - ✅ Add review result aggregation
+
+### Phase 3: Build Lint Integration - Complete (Session 32)
+- Created BaseCheck abstract class for all check types
+  - Standard interface with run(), getName(), isRequired() methods
+  - Built-in timeout handling with configurable duration
+  - Automatic status management (enabled/disabled/skipped)
+  - Consistent error handling pattern
+- Implemented LintRunner for executing lint tools
+  - Supports ESLint (JSON output parsing)
+  - Supports Prettier (text output parsing)
+  - Generic parser for unknown tools (file:line:column format)
+  - Timeout handling with graceful termination
+  - Structured error and warning collection
+  - Parallel execution of multiple lint tools
+- Implemented LintCheck extending BaseCheck
+  - Configurable lint tools via YAML
+  - Failure threshold support (allow N violations)
+  - Aggregates results from multiple tools
+  - Human-readable summaries and detailed reports
+  - Integration with ReviewTracker for result storage
+- Created configuration system
+  - YAML-based config at .ai/pr-review.yml
+  - Deep merge with sensible defaults
+  - Per-tool enable/disable flags
+  - Custom lint commands and thresholds
+  - Example configuration file provided
+- Integrated LintCheck into ReviewService
+  - Added runCheck() method to execute checks
+  - Automatic status updates in database
+  - Merge status recalculation after check completion
+  - Error handling for unexpected check failures
+- Created comprehensive unit tests
+  - config.test.ts: 7 tests for configuration loading
+  - lint-runner.test.ts: 8 tests for lint execution
+  - lint-check.test.ts: 10 tests for LintCheck class
+  - Total: 25+ tests covering all scenarios
+- Package builds successfully with TypeScript
+- All exports added to index.ts for public API
+
+All sub-bullets completed:
+- ✅ Set up pre-commit lint hooks (via configuration system)
+- ✅ Configure lint rules and standards (via YAML config)
+- ✅ Implement lint result reporting (detailed summaries and reports)
+- ✅ Add lint failure blocking mechanism (via ResultAggregator integration)

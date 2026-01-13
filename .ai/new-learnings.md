@@ -372,3 +372,120 @@ When test runner not available (bun, jest, etc.):
 - Reduces test boilerplate
 - Makes tests more readable
 
+
+## Implementing Lint Integration for PR Review - 2026-01-13
+
+### Building a Composable Check System
+
+When implementing checks (lint, test, typecheck) for PR review:
+
+1. **Abstract Base Class Pattern**:
+   - Define BaseCheck with standard interface: run(), getName(), isRequired()
+   - Include common functionality: timeout handling, error recovery, status management
+   - Use Template Method pattern: `run()` calls abstract `runCheck()`
+   - Benefits: Consistent behavior, reduced boilerplate, easy to add new check types
+
+2. **Separation of Execution from Orchestration**:
+   - LintRunner: Low-level tool execution, output parsing, error handling
+   - LintCheck: High-level orchestration, configuration, result formatting
+   - Service: Check lifecycle management, database updates, merge status calculation
+   - This separation makes each component testable and reusable
+
+3. **Configuration-Driven Behavior**:
+   - Use YAML for user-facing configuration (.ai/pr-review.yml)
+   - Provide sensible defaults for zero-config experience
+   - Deep merge user config with defaults (don't overwrite entire sections)
+   - Validate config gracefully with fallbacks (log warning, use defaults)
+
+4. **Tool Output Parsing Strategy**:
+   - ESLint: Use --format json for structured output, parse as JSON
+   - Prettier: Parse text output (list of files needing formatting)
+   - Generic: Regex pattern for file:line:column:message format
+   - Always provide structured CheckError/CheckWarning output
+   - Store raw stdout/stderr for debugging
+
+5. **Timeout Handling**:
+   - Use Promise.race with setTimeout for timeout logic
+   - Send SIGTERM on timeout for graceful shutdown
+   - Track timeout state to differentiate from normal exit
+   - Include timeout duration in error messages
+
+6. **TypeScript Without Node Types**:
+   - If @types/node not available, use @ts-ignore on imports
+   - Add type annotations to event handlers (data: any, err: Error, code: number | null)
+   - Include DOM lib for setTimeout/clearTimeout/console
+   - Declare minimal Node.js globals if needed (process.env)
+   - Use --skipLibCheck to ignore missing type definitions
+
+7. **Testing Async Child Processes**:
+   - Mock child_process.spawn with EventEmitter
+   - Emit events asynchronously with setTimeout
+   - Mock stdout/stderr as EventEmitters
+   - Test timeout by not emitting close event
+   - Test errors by emitting error event
+
+8. **Failure Thresholds**:
+   - Allow configurable number of violations before failing
+   - Default to 0 (strict: any violation fails)
+   - Useful for legacy codebases with existing violations
+   - Document threshold behavior clearly
+
+9. **Service Integration Pattern**:
+   - Service doesn't know about specific check implementations
+   - Pass BaseCheck instance to service.runCheck()
+   - Service handles status updates and merge recalculation
+   - Check implementations focus on execution logic
+   - Clean separation of concerns
+
+10. **Progressive Enhancement**:
+    - Start with core functionality (lint checks)
+    - Design for extensibility (BaseCheck interface)
+    - Add more check types later (test, typecheck, security)
+    - Configuration format supports future additions
+    - Database schema already includes check_type enum
+
+### Common Pitfalls
+
+1. **Forgetting to Return Updated Record**:
+   - Problem: tracker.updateCheck() returned void
+   - Solution: Use RETURNING * in UPDATE query
+   - Benefit: Service gets updated record without extra query
+
+2. **Hardcoding Check Types**:
+   - Problem: Service creates checks for specific types
+   - Solution: Pass BaseCheck instances, service is generic
+   - Benefit: Easy to add new check types without modifying service
+
+3. **Incomplete Configuration Merging**:
+   - Problem: User config replaces entire default config
+   - Solution: Deep merge at property level (e.g., merge tools array)
+   - Benefit: Users can override specific settings
+
+4. **Ignoring Tool Exit Codes**:
+   - Problem: ESLint exits 1 on violations (not an error)
+   - Solution: Check tool name and treat exit 1 as success for ESLint
+   - Benefit: Violations are reported without marking tool as failed
+
+### Design Decisions
+
+**Why Abstract Class vs Interface?**
+- Abstract class allows shared implementation (timeout, error handling)
+- Interface would require duplicating logic in each check type
+- Template Method pattern works best with abstract classes
+
+**Why YAML vs JSON/TypeScript Config?**
+- YAML is more user-friendly (no quotes, comments supported)
+- Non-developers can edit easily
+- Industry standard for CI/CD configs
+
+**Why Not Run Checks Automatically?**
+- Service creates check records but doesn't execute them
+- Execution happens externally (GitHub Actions, worker, etc.)
+- Service just coordinates status updates and merge blocking
+- Allows flexibility in execution environment
+
+**Why Store Both Summary and Details?**
+- Summary for PR status UI (one line)
+- Details for full report (all violations, markdown formatted)
+- Enables both quick glance and deep dive
+

@@ -3,11 +3,13 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    "lib": ["ES2022", "DOM"],
     "paths": {
       "@factory/shared": ["../shared/src"]
     }
   },
   "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts", "tests/**/*"],
   "references": [
     { "path": "../shared" }
   ]

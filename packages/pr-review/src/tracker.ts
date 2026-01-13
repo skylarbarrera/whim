@@ -175,10 +175,15 @@ export class ReviewTracker {
     errorCount?: number;
     warningCount?: number;
     duration?: number;
-  }): Promise<void> {
-    const completedAt = params.status === 'success' || params.status === 'failure' ? 'NOW()' : 'NULL';
+    startedAt?: Date;
+    completedAt?: Date;
+    metadata?: Record<string, unknown>;
+  }): Promise<PRReviewCheck> {
+    const completedAt = params.status === 'success' || params.status === 'failure' || params.status === 'error'
+      ? (params.completedAt ? '$8' : 'NOW()')
+      : 'NULL';
 
-    await this.db.execute(
+    const result = await this.db.queryOne<PRReviewCheckRow>(
       `UPDATE pr_review_checks
        SET status = $1,
            summary = COALESCE($2, summary),
@@ -186,8 +191,10 @@ export class ReviewTracker {
            error_count = COALESCE($4, error_count),
            warning_count = COALESCE($5, warning_count),
            duration = COALESCE($6, duration),
+           metadata = COALESCE($7, metadata),
            completed_at = ${completedAt}
-       WHERE id = $7`,
+       WHERE id = $9
+       RETURNING *`,
       [
         params.status,
         params.summary,
@@ -195,9 +202,17 @@ export class ReviewTracker {
         params.errorCount,
         params.warningCount,
         params.duration,
+        params.metadata ? JSON.stringify(params.metadata) : null,
+        params.completedAt,
         checkId,
       ]
     );
+
+    if (!result) {
+      throw new Error(`Check ${checkId} not found`);
+    }
+
+    return rowToCamelCase<PRReviewCheck>(result);
   }
 
   /**

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@factory/shared": "workspace:*"
+    "@factory/shared": "workspace:*",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

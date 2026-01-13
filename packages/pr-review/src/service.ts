@@ -1,7 +1,8 @@
-import type { PRReview, PRReviewCheck, PRContext, CheckType } from '@factory/shared';
+import type { PRReview, PRReviewCheck, PRContext, CheckType, CheckResult } from '@factory/shared';
 import { PRDetector } from './detector.js';
 import { ReviewTracker, type DatabaseClient } from './tracker.js';
 import { ResultAggregator, type AggregatedResult } from './aggregator.js';
+import { BaseCheck } from './checks/base-check.js';
 
 /**
  * Check configuration
@@ -163,5 +164,67 @@ export class ReviewService {
     mergeBlocked?: boolean;
   }): Promise<PRReview[]> {
     return this.tracker.listReviews(filters);
+  }
+
+  /**
+   * Run a check and update its result in the database
+   *
+   * @param reviewId - Review ID
+   * @param checkId - Check ID
+   * @param check - Check instance to run
+   * @param context - PR context
+   * @param workdir - Working directory where repo is checked out
+   * @returns Updated check record
+   */
+  async runCheck(
+    reviewId: string,
+    checkId: string,
+    check: BaseCheck,
+    context: PRContext,
+    workdir: string
+  ): Promise<PRReviewCheck> {
+    // Update check status to running
+    await this.tracker.updateCheck(checkId, {
+      status: 'running',
+      startedAt: new Date(),
+    });
+
+    try {
+      // Run the check
+      const result: CheckResult = await check.run(context, workdir);
+
+      // Update check with result
+      const updatedCheck = await this.tracker.updateCheck(checkId, {
+        status: result.status,
+        summary: result.summary,
+        details: result.details,
+        errorCount: result.errors?.length || 0,
+        warningCount: result.warnings?.length || 0,
+        duration: result.duration,
+        completedAt: new Date(),
+        metadata: result.metadata,
+      });
+
+      // Update merge status after check completes
+      await this.updateMergeStatus(reviewId);
+
+      return updatedCheck;
+    } catch (error) {
+      // Handle unexpected errors
+      const message = error instanceof Error ? error.message : String(error);
+
+      const updatedCheck = await this.tracker.updateCheck(checkId, {
+        status: 'error',
+        summary: 'Check failed with unexpected error',
+        details: message,
+        errorCount: 1,
+        completedAt: new Date(),
+        metadata: { error: message },
+      });
+
+      await this.updateMergeStatus(reviewId);
+
+      return updatedCheck;
+    }
   }
 }
