@@ -229,6 +229,129 @@ function logSetupCommandResult(
 }
 
 /**
+ * Retry configuration for network operations
+ */
+interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+};
+
+/**
+ * Check if a command result indicates a transient/retryable error
+ * Common patterns:
+ * - Network errors (connection reset, timeout)
+ * - Server errors (5xx HTTP status)
+ * - Rate limiting (429)
+ */
+export function isRetryableError(result: { stdout: string; stderr: string; code: number }): boolean {
+  const output = (result.stdout + result.stderr).toLowerCase();
+
+  // Network connectivity issues
+  if (output.includes("connection reset") ||
+      output.includes("connection refused") ||
+      output.includes("connection timed out") ||
+      output.includes("network is unreachable") ||
+      output.includes("temporary failure") ||
+      output.includes("could not resolve host") ||
+      output.includes("ssl connect error") ||
+      output.includes("unable to access")) {
+    return true;
+  }
+
+  // Server-side errors (5xx)
+  if (output.includes("500") ||
+      output.includes("502") ||
+      output.includes("503") ||
+      output.includes("504") ||
+      output.includes("internal server error") ||
+      output.includes("service unavailable") ||
+      output.includes("bad gateway")) {
+    return true;
+  }
+
+  // Rate limiting
+  if (output.includes("rate limit") ||
+      output.includes("429") ||
+      output.includes("too many requests")) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Sleep for a specified duration with exponential backoff + jitter
+ */
+function sleep(attempt: number, config: RetryConfig): Promise<void> {
+  // Exponential backoff: base * 2^attempt
+  const exponentialDelay = config.baseDelayMs * Math.pow(2, attempt);
+  // Add jitter: ±25% randomness
+  const jitter = exponentialDelay * (0.75 + Math.random() * 0.5);
+  // Cap at max delay
+  const delay = Math.min(jitter, config.maxDelayMs);
+
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+/**
+ * Execute a command with retry logic for transient failures
+ */
+async function execWithRetry(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  config: RetryConfig = DEFAULT_RETRY_CONFIG
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  let lastResult: { stdout: string; stderr: string; code: number } | null = null;
+
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    if (attempt > 0) {
+      console.log(`[RETRY] Attempt ${attempt + 1}/${config.maxRetries + 1} for: ${command} ${args.join(" ")}`);
+      await sleep(attempt - 1, config);
+    }
+
+    lastResult = await exec(command, args, options);
+
+    // Success - return immediately
+    if (lastResult.code === 0) {
+      if (attempt > 0) {
+        console.log(`[RETRY] Succeeded on attempt ${attempt + 1}`);
+      }
+      return lastResult;
+    }
+
+    // Check if this is a retryable error
+    if (!isRetryableError(lastResult)) {
+      // Not retryable, return immediately
+      if (attempt > 0) {
+        console.log(`[RETRY] Non-retryable error, giving up after ${attempt + 1} attempts`);
+      }
+      return lastResult;
+    }
+
+    // Log retry attempt
+    console.log(`[RETRY] Transient error detected, will retry...`);
+    console.log(`[RETRY]   Exit code: ${lastResult.code}`);
+    if (lastResult.stderr.trim()) {
+      // Truncate to first 200 chars for logging
+      const stderrPreview = lastResult.stderr.trim().slice(0, 200);
+      console.log(`[RETRY]   stderr: ${stderrPreview}${lastResult.stderr.length > 200 ? "..." : ""}`);
+    }
+  }
+
+  // All retries exhausted
+  console.log(`[RETRY] All ${config.maxRetries + 1} attempts failed`);
+  return lastResult!;
+}
+
+/**
  * Create a PRError from a command result
  */
 function createPRError(
@@ -341,10 +464,10 @@ export async function createPullRequest(
   }
   console.log("[PR] Step 3/5: Found commits to push");
 
-  // Step 4: Push to remote
+  // Step 4: Push to remote (with retry for transient failures)
   console.log(`[PR] Step 4/5: Pushing ${unpushedCount} commits to origin/${workItem.branch}...`);
   const pushArgs = ["push", "-u", "origin", workItem.branch];
-  const pushResult = await exec("git", pushArgs, { cwd: repoDir });
+  const pushResult = await execWithRetry("git", pushArgs, { cwd: repoDir });
 
   if (pushResult.code !== 0) {
     logCommandFailure(PRStep.PUSH, "git", pushArgs, pushResult);
@@ -389,7 +512,8 @@ export async function createPullRequest(
   }
 
   console.log("[PR] Running: gh", prArgs.join(" "));
-  const prResult = await exec("gh", prArgs, {
+  // Use retry for PR creation (GitHub API can have transient failures)
+  const prResult = await execWithRetry("gh", prArgs, {
     cwd: repoDir,
     env: ghEnv,
   });

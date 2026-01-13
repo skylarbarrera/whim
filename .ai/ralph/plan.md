@@ -1,42 +1,52 @@
-# Plan: Phase 3.2 - Log Full stderr/stdout from Failed Git/GH Commands
+# Plan: Phase 3.3 - Add Retry Logic for Transient Network Failures
 
 ## Goal
-Ensure all git and gh command failures log full stdout/stderr for debugging.
-
-## Current State
-- `createPullRequest()` already uses `logCommandFailure()` helper for all git/gh commands
-- `setupWorkspace()` has several git commands that don't log errors properly:
-  - Line 128: `ralph init` - only logs stderr as warning
-  - Line 134-135: `git add -A` and `git commit` - no error logging (fail silently)
-  - Line 141, 144: `git config` - no error checking
+Add retry logic for git push and gh pr create to handle transient network failures.
 
 ## Files to Modify
 - `packages/worker/src/setup.ts`
 
 ## Changes
 
-### 1. Add Error Logging to setupWorkspace()
-The following commands currently fail silently or don't log complete info:
+### 1. Create retry helper function
+```typescript
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    delayMs?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  } = {}
+): Promise<T>
+```
 
-**git config commands (lines 141-146):**
-- Add error logging for git config failures
-- These are critical - if they fail, commits will fail later
+Features:
+- Configurable max retries (default: 3)
+- Exponential backoff with jitter
+- Custom retry predicate for error types
+- Logs retry attempts
 
-**Initial git add and commit (lines 134-135):**
-- Add error logging for the initial workspace commit
-- Use same pattern as createPullRequest()
+### 2. Apply retry to git push
+In `createPullRequest()`, wrap the push command with retry logic:
+- Retry on network errors (connection reset, timeout)
+- Retry on HTTP 5xx errors from GitHub
+- Max 3 retries with exponential backoff
 
-**ralph init (line 128-131):**
-- Currently only logs stderr on warning
-- Should also log stdout and exit code for debugging
+### 3. Apply retry to gh pr create
+In `createPullRequest()`, wrap the PR creation with retry logic:
+- Retry on network errors
+- Retry on API rate limiting (HTTP 429)
+- Retry on HTTP 5xx errors
+- Max 3 retries with exponential backoff
 
 ## Tests
-- Existing tests should continue to pass
-- Run `bun test` in packages/worker
+- Add unit tests for withRetry helper
+- Add tests for retry behavior in push/pr scenarios
 
 ## Exit Criteria
-- [ ] All git commands in setupWorkspace() log errors on failure
-- [ ] ralph init logs full output on warning/failure
-- [ ] git config failures are logged
+- [ ] withRetry helper implemented and tested
+- [ ] git push uses retry logic
+- [ ] gh pr create uses retry logic
+- [ ] Retries logged for debugging
 - [ ] Type checks pass
-- [ ] Existing tests pass
+- [ ] All tests pass
