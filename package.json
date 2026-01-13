@@ -2,6 +2,7 @@
   "name": "ai-software-factory",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.2.15",
   "description": "Autonomous AI development system that takes GitHub issues, converts them to specs, and produces PRs",
   "workspaces": ["packages/*"],
   "scripts": {

@@ -29,6 +29,13 @@ credentials.json
 dist/
 build/
 *.egg-info/
+*.tsbuildinfo
 
 # TLDR cache
 .tldr/
+
+# Turbo
+.turbo/
+
+# Bun
+bun.lockb
