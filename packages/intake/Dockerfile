@@ -9,14 +9,14 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 # Copy root package files
-COPY package.json bun.lock turbo.json ./
+COPY package.json bun.lock turbo.json tsconfig.json ./
 
 # Copy workspace packages
 COPY packages/shared ./packages/shared
 COPY packages/intake ./packages/intake
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Build all packages (shared first, then intake)
 RUN bun run build
@@ -28,17 +28,17 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
-# Install only production dependencies
-COPY package.json bun.lock ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/intake/package.json ./packages/intake/
+# Copy package files and lockfile from builder (lockfile may have been updated)
+COPY --from=builder /app/package.json /app/bun.lock ./
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/intake/package.json ./packages/intake/
 
 # Copy built artifacts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/intake/dist ./packages/intake/dist
 
 # Install production dependencies only
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 
 # Set working directory to intake package
 WORKDIR /app/packages/intake

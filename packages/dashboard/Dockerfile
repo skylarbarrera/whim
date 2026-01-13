@@ -16,7 +16,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/dashboard/package.json ./packages/dashboard/
 
 # Install bun for dependency installation
-RUN npm install -g bun && bun install --frozen-lockfile
+RUN npm install -g bun && bun install
 
 # =============================================================================
 # Stage 2: Builder

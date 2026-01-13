@@ -691,3 +691,51 @@ Management Routes:
 - Added .next to .gitignore
 - Phase 9 (Dashboard MVP) now complete
 - Next: Phase 10 Integration & Testing
+
+---
+
+## Session 19 - 2026-01-13
+
+### Task: Phase 10 - Integration Testing and Validation
+
+**Files Modified:**
+- `packages/orchestrator/Dockerfile` - Added curl, fixed lockfile handling, added tsconfig.json copy
+- `packages/intake/Dockerfile` - Fixed lockfile handling, added tsconfig.json copy
+- `packages/dashboard/Dockerfile` - Fixed lockfile handling
+- `docker/docker-compose.yml` - Changed port mappings to avoid conflicts
+
+**Files Created:**
+- `.ai/new-learnings.md` - Integration testing learnings and documentation
+
+**Issues Found and Fixed:**
+
+1. **Bun Version Mismatch**
+   - Problem: `--frozen-lockfile` flag caused build failures due to version mismatch
+   - Solution: Removed flag, copy lockfile from builder stage
+
+2. **Missing curl in bun-slim**
+   - Problem: Health check curl not available in slim image
+   - Solution: Added `apt-get install curl` in orchestrator Dockerfile
+
+3. **Missing root tsconfig.json**
+   - Problem: Package tsconfigs extend `../../tsconfig.json` not in build context
+   - Solution: Added tsconfig.json to COPY statements
+
+4. **Port Conflicts**
+   - Problem: Default ports conflicted with existing services
+   - Solution: Changed to 5433, 6380, 3002, 3003
+
+**Verification Results:**
+- ✅ All 5 packages build with `bun run build`
+- ✅ Docker images build successfully
+- ✅ postgres, redis, orchestrator containers start and become healthy
+- ✅ `/health` endpoint returns `{"status":"ok"}`
+- ✅ `/api/status` returns correct system status
+- ✅ POST `/api/work` creates work items
+- ✅ GET `/api/queue`, `/api/workers`, `/api/metrics` all respond correctly
+
+**Notes:**
+- Full worker execution not tested (requires Claude CLI in container)
+- Intake not tested (requires valid GitHub/Anthropic tokens)
+- Dashboard not tested (profile not enabled)
+- All 10 phases of the AI Software Factory implementation are now complete

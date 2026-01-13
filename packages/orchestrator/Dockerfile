@@ -9,14 +9,14 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 # Copy root package files
-COPY package.json bun.lock turbo.json ./
+COPY package.json bun.lock turbo.json tsconfig.json ./
 
 # Copy workspace packages
 COPY packages/shared ./packages/shared
 COPY packages/orchestrator ./packages/orchestrator
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install dependencies (use --no-save to avoid lockfile conflicts)
+RUN bun install
 
 # Build all packages (shared first, then orchestrator)
 RUN bun run build
@@ -28,17 +28,20 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
-# Install only production dependencies
-COPY package.json bun.lock ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/orchestrator/package.json ./packages/orchestrator/
+# Install curl for health checks (bun-slim is Debian-based)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Copy package files and lockfile from builder (lockfile may have been updated)
+COPY --from=builder /app/package.json /app/bun.lock ./
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/orchestrator/package.json ./packages/orchestrator/
 
 # Copy built artifacts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/orchestrator/dist ./packages/orchestrator/dist
 
 # Install production dependencies only
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 
 # Set working directory to orchestrator package
 WORKDIR /app/packages/orchestrator

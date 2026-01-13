@@ -1,29 +1,39 @@
-# Plan: Phase 9.2 - Dashboard Pages and Components
+# Plan: Phase 10 - Integration Testing and Validation
 
 ## Goal
-Implement dashboard pages and shared components for monitoring the AI Factory.
+Verify all packages build correctly and the full system works end-to-end via docker-compose.
 
-## Files to Create/Modify
-1. `packages/dashboard/app/page.tsx` - Overview/factory status summary
-2. `packages/dashboard/app/workers/page.tsx` - List workers, kill button
-3. `packages/dashboard/app/queue/page.tsx` - List queue, cancel button
-4. `packages/dashboard/app/learnings/page.tsx` - Browse learnings
-5. `packages/dashboard/app/metrics/page.tsx` - Basic metrics display
-6. `packages/dashboard/components/StatusCard.tsx` - Reusable status card
-7. `packages/dashboard/components/DataTable.tsx` - Reusable data table
-8. `packages/dashboard/components/Navigation.tsx` - Navigation component
-9. `packages/dashboard/app/layout.tsx` - Update with navigation
+## Tasks
+1. **Verify all packages build with `bun build`**
+   - Run `bun install` at root
+   - Run `bun run build` to build all packages
+   - Fix any TypeScript or build errors
 
-## Tests
-- Build verification with `bun run build`
-- Type checking with `bun run typecheck`
+2. **Test docker-compose brings all services online**
+   - Run `docker compose up` and verify:
+     - postgres starts and accepts connections
+     - redis starts and accepts connections
+     - orchestrator starts and serves API
+     - intake starts (may fail without GITHUB_TOKEN, expected)
+     - dashboard starts and serves UI
+
+3. **Test end-to-end flow**
+   - Create work item via API
+   - Verify queue status shows item
+   - (Worker spawn would need real Claude CLI - document limitation)
+
+4. **Document issues in `.ai/new-learnings.md`**
+   - Record any issues found
+   - Note fixes applied
+   - Document limitations
+
+## Files to Modify/Create
+- Fix any build errors in packages/*
+- `.ai/new-learnings.md` - Document findings
 
 ## Exit Criteria
-- [ ] Overview page with status summary
-- [ ] Workers page with list and kill button
-- [ ] Queue page with list and cancel button
-- [ ] Learnings page for browsing
-- [ ] Metrics page with basic display
-- [ ] Shared components (StatusCard, DataTable, Navigation)
-- [ ] All type checks pass
-- [ ] Build succeeds
+- All packages build without errors
+- docker-compose up starts all services
+- Orchestrator API responds at /api/status
+- Dashboard UI loads at http://localhost:3000
+- Issues documented in `.ai/new-learnings.md`
