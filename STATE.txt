@@ -138,3 +138,13 @@ All acceptance criteria met:
 - Tests execute with real output parsing (Jest, Vitest, Bun)
 - Failed steps produce actionable error messages
 - Work item status properly updated with prUrl and metrics
+
+## Pre-Review Step for AI Generated PRs - In Progress
+
+- [x] Task 1: Design composable PR review system architecture (Session 30)
+  - Created @factory/review-system package
+  - Defined ReviewStep, ReviewContext, ReviewStepResult type interfaces
+  - Designed configuration schema for workflows and steps
+  - Implemented ReviewStepRegistry for plugin management
+  - 62 tests passing, package builds successfully
+  - Support for sequential/parallel execution, conditional steps, blocking/non-blocking modes

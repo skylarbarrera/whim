@@ -1273,3 +1273,97 @@ This integration provides:
 2. **Flexibility** - Users can choose autonomous or interactive creation
 3. **Cost efficiency** - Ralph CLI reduces API costs vs direct SDK usage
 4. **Maintainability** - Clear separation between spec creation and execution
+
+---
+
+## Session 30 - 2026-01-13
+
+### Task: Design Composable PR Review System Architecture
+
+**Commit:** c8de579
+
+**Files Created:**
+- `packages/review-system/package.json` - Package config with name @factory/review-system
+- `packages/review-system/tsconfig.json` - Extends root config
+- `packages/review-system/src/types/review-step.ts` - ReviewStep interface and metadata
+- `packages/review-system/src/types/review-context.ts` - ReviewContext and PR info types
+- `packages/review-system/src/types/review-result.ts` - ReviewStepResult and status enums
+- `packages/review-system/src/types/config.ts` - Configuration schema for workflows
+- `packages/review-system/src/plugin/registry.ts` - ReviewStepRegistry for plugin management
+- `packages/review-system/src/__tests__/registry.test.ts` - Registry tests (21 tests)
+- `packages/review-system/src/__tests__/types.test.ts` - Type definition tests (41 tests)
+
+**Type Interfaces Defined:**
+
+1. **ReviewStep Interface:**
+   - type, name, description - Step metadata
+   - initialize(config) - Setup with configuration
+   - execute(context) - Run the review step
+   - cleanup() - Resource cleanup
+   - validateConfig(config) - Configuration validation
+
+2. **ReviewContext Interface:**
+   - PullRequestInfo - PR metadata, AI generation context
+   - ChangedFile[] - Files modified in the PR
+   - workingDirectory, githubToken, env - Execution environment
+   - sharedData - Cross-step communication
+   - logger - Structured logging
+
+3. **ReviewStepResult Interface:**
+   - status - PASS, FAIL, ERROR, SKIPPED, PENDING
+   - messages - Array of ReviewMessage with severity, file, line, suggestion
+   - durationMs, startedAt, completedAt - Timing data
+   - metadata - Step-specific data
+   - error - Error details on failure
+
+4. **Configuration Schema:**
+   - ReviewWorkflowConfig - Complete workflow definition
+   - ReviewStepGroup - Groups of steps with execution mode
+   - ExecutionMode - SEQUENTIAL or PARALLEL
+   - RepositoryConfig - Repo-specific overrides
+   - OrganizationConfig - Org-level defaults
+   - EnvironmentConfig - Environment-specific overrides
+
+**ReviewStepRegistry Features:**
+- register(metadata) - Register new step type
+- unregister(type) - Remove step type
+- has(type) - Check if registered
+- getMetadata(type) - Get step metadata
+- getTypes() / getAllMetadata() - List registered steps
+- create(type, config) - Create and initialize step instance
+  - Merges defaults with config
+  - Validates configuration
+  - Initializes step
+
+**Architecture Decisions:**
+
+1. **Plugin System:**
+   - Factory pattern for step creation
+   - Metadata-driven registration
+   - Default configuration merging
+   - Configuration validation at creation time
+
+2. **Step Lifecycle:**
+   - initialize() - One-time setup with config
+   - execute() - Run review with context
+   - cleanup() - Resource teardown
+
+3. **Configuration:**
+   - Hierarchical: Organization → Repository → Workflow → Step Group → Step
+   - Conditional execution based on labels, files, AI context
+   - Blocking and non-blocking steps
+   - Sequential and parallel execution modes
+
+4. **Result Aggregation:**
+   - Structured messages with severity, location, suggestions
+   - Timing and metadata for observability
+   - Error details for debugging
+
+**Notes:**
+- 62 tests passing (21 registry + 41 types)
+- Package builds successfully with TypeScript strict mode
+- All interfaces fully documented with JSDoc
+- Support for AI-generated PR detection and tagging
+- Foundation for lint, test, and custom review steps
+- Task 1 of 8 complete in SPEC.md
+
