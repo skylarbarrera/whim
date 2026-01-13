@@ -1,101 +1,95 @@
-# Plan: Design PR Review System Architecture
+# Plan: Implement Core PR Review Functionality
 
 ## Goal
-Design a composable PR review system specifically for AI-generated pull requests, including automated lint and testing hooks that block merging on failure.
+Implement the core PR review system with detection, tracking, and aggregation capabilities.
 
 ## Context
-The AI Software Factory automatically generates code changes through Ralph instances. We need a review system that:
-1. Detects AI-generated PRs
-2. Runs automated checks (lint, tests)
-3. Blocks merging on failures
-4. Provides clear feedback
-5. Is composable and configurable
+Phase 1 (Design PR Review System Architecture) is complete. We have:
+- Architecture document with component design
+- Database schema (migrations/002_pr_reviews.sql)
+- TypeScript types in shared package
+- Integration points documented
+
+Now we need to implement the core functionality:
+1. PR review service/handler - Main orchestrator
+2. AI-generated PR detection logic - Identify AI PRs
+3. Review status tracking - Manage review lifecycle
+4. Review result aggregation - Combine check results
 
 ## Approach
 
-### 1. PR Detection Strategy
-AI-generated PRs can be identified by:
-- Commit messages containing "Co-Authored-By: Claude Sonnet 4.5"
-- Branch name patterns (e.g., `ai/issue-*`)
-- Labels applied by the intake service
-- Metadata in PR description
+### 1. Package Structure
+Create new `packages/pr-review` with:
+- detector.ts - AI PR detection
+- tracker.ts - Review status tracking
+- aggregator.ts - Result aggregation
+- service.ts - Main review service
+- types.ts - Local types (re-export from shared)
 
-### 2. Review Workflow
-```
-GitHub Issue → Intake → Orchestrator → Worker (Ralph) → PR Created
-                                                            ↓
-                                              PR Review System Triggered
-                                                            ↓
-                                    [Detect AI-generated] → Apply label
-                                                            ↓
-                                         [Run automated checks]
-                                    ┌─────────────┬────────────┐
-                                    ↓             ↓            ↓
-                                 Lint         Tests      Code Quality
-                                    ↓             ↓            ↓
-                                [Collect results and report]
-                                    ↓
-                    [Block merge if failures] OR [Allow merge if pass]
-```
+### 2. PR Detector
+Implement detection based on:
+- Co-author pattern: "Co-Authored-By: Claude Sonnet 4.5"
+- Branch name pattern: "ai/issue-*"
+- Labels: "ai-generated"
+- Return confidence score + reasons
 
-### 3. Composable Architecture
-Use a modular design with:
-- **Core**: PR detection, status tracking, result aggregation
-- **Checks**: Pluggable check modules (lint, test, quality)
-- **Reporters**: Feedback mechanisms (GitHub status, comments)
-- **Config**: YAML-based rules and check selection
+### 3. Review Tracker
+Implement lifecycle management:
+- createReview() - Insert pr_reviews row
+- updateReviewStatus() - State transitions
+- recordCheck() - Insert pr_review_checks row
+- updateCheck() - Update check result
+- getReview() - Fetch review with checks
+- markOverridden() - Record manual override
 
-### 4. Integration Points
-- **GitHub Actions**: Main execution environment
-- **GitHub Status API**: Report check results
-- **GitHub Checks API**: Create detailed check runs
-- **Worker**: Post-PR creation hook to trigger review
-- **Orchestrator**: Track review status in database
+### 4. Result Aggregator
+Implement logic to:
+- Collect all check results
+- Determine if required checks passed
+- Calculate merge_blocked status
+- Generate summary message
+- Return AggregatedResult
 
-## Files to Create/Modify
+### 5. Review Service
+Tie it all together:
+- detectAndCreateReview() - Entry point for new PRs
+- runChecks() - Coordinate check execution (placeholder)
+- aggregateResults() - Call aggregator
+- updateMergeStatus() - Report to GitHub
+- getReviewStatus() - Query review state
 
-### New Package: `packages/pr-review`
-- `package.json` - Package config
-- `tsconfig.json` - TypeScript config
-- `src/detector.ts` - AI PR detection logic
-- `src/tracker.ts` - Review status tracking
-- `src/aggregator.ts` - Result aggregation
-- `src/checks/base.ts` - Base check interface
-- `src/checks/lint.ts` - Lint check implementation
-- `src/checks/test.ts` - Test check implementation
-- `src/reporters/github-status.ts` - GitHub status reporter
-- `src/config.ts` - Configuration loading
-- `src/index.ts` - Main entry point
+## Files to Create
 
-### GitHub Actions Workflows
-- `.github/workflows/pr-review.yml` - Main workflow
-- `.github/workflows/lint.yml` - Lint job
-- `.github/workflows/test.yml` - Test job
+### New Package
+- `packages/pr-review/package.json`
+- `packages/pr-review/tsconfig.json`
+- `packages/pr-review/src/index.ts` - Exports
+- `packages/pr-review/src/detector.ts` - Detection logic
+- `packages/pr-review/src/tracker.ts` - Status tracking
+- `packages/pr-review/src/aggregator.ts` - Result aggregation
+- `packages/pr-review/src/service.ts` - Main service
 
-### Database Schema
-- Add `pr_reviews` table to migrations
-- Add `pr_review_checks` table for individual check results
+### Tests
+- `packages/pr-review/src/detector.test.ts`
+- `packages/pr-review/src/tracker.test.ts`
+- `packages/pr-review/src/aggregator.test.ts`
+- `packages/pr-review/src/service.test.ts`
 
-### Shared Types
-- Update `packages/shared/src/types.ts` with PR review types
-
-### Worker Integration
-- Update `packages/worker/src/index.ts` to trigger review after PR creation
-
-## Tests
-- Unit tests for each module
-- Integration tests for workflow
-- Mock GitHub API responses
+## Files to Modify
+- Root `package.json` - Add pr-review to workspaces (already included via packages/*)
 
 ## Exit Criteria
-- [ ] Architecture document created
-- [ ] Component interfaces defined
-- [ ] Integration points documented
-- [ ] Database schema designed
-- [ ] All sub-bullets of task completed
+- [ ] Package builds successfully
+- [ ] All 4 components implemented with interfaces
+- [ ] Detector identifies AI PRs with confidence scores
+- [ ] Tracker manages review lifecycle in database
+- [ ] Aggregator combines check results correctly
+- [ ] Service ties components together
+- [ ] All unit tests pass
+- [ ] Type checks pass
 
 ## Notes
-- Use GitHub Actions for execution (already in CI/CD)
-- Keep checks composable and configurable
-- Support emergency override mechanism
-- Maintain audit trail of decisions
+- Use Database class from orchestrator (import pattern)
+- Focus on core logic, not GitHub API integration (that's Phase 6)
+- Checks will be placeholder/stub for now (detailed in Phase 3-4)
+- This creates the foundation for the review system

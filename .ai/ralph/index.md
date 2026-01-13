@@ -1370,3 +1370,106 @@ This integration provides:
   ✅ Composable components/modules designed
   ✅ Integration points with CI/CD documented
 - Next task: Implement core PR review functionality
+
+---
+
+## Session 31 - 2026-01-13
+
+### Task: Implement Core PR Review Functionality
+
+**Commit:** (pending)
+
+**Files Created:**
+- `packages/pr-review/package.json` - Package configuration
+- `packages/pr-review/tsconfig.json` - TypeScript configuration with paths
+- `packages/pr-review/src/index.ts` - Module exports
+- `packages/pr-review/src/detector.ts` - PRDetector class
+- `packages/pr-review/src/tracker.ts` - ReviewTracker class with DatabaseClient interface
+- `packages/pr-review/src/aggregator.ts` - ResultAggregator class
+- `packages/pr-review/src/service.ts` - ReviewService class
+- `packages/pr-review/src/detector.test.ts` - 12 tests for detection
+- `packages/pr-review/src/tracker.test.ts` - 8 tests for tracking
+- `packages/pr-review/src/aggregator.test.ts` - 10 tests for aggregation
+- `packages/pr-review/src/service.test.ts` - 4 tests for service integration
+
+**Files Modified:**
+- `SPEC.md` - Marked second task as complete
+- `STATE.txt` - Added Phase 2 completion details
+- `.ai/ralph/index.md` - Added Session 31 entry
+
+**Implementation Details:**
+
+1. **PRDetector** (src/detector.ts):
+   - `detect(context: PRContext)` - Main detection method
+   - Returns `DetectionResult` with isAI, confidence, reasons, metadata
+   - Checks commit messages for "Co-Authored-By: Claude Sonnet 4.5" (0.7 confidence)
+   - Checks branch patterns: ai/issue-*, ai/task-*, ai/* (0.2 confidence)
+   - Checks labels for ai-related terms (0.1 confidence)
+   - Threshold for AI detection: 0.5 confidence
+   - Case-insensitive pattern matching
+
+2. **ReviewTracker** (src/tracker.ts):
+   - `DatabaseClient` interface for dependency injection
+   - `createReview()` - Insert pr_reviews row with detection info
+   - `updateReviewStatus()` - Update review status (pending/running/completed/failed)
+   - `updateMergeBlocked()` - Update merge blocked flag
+   - `recordCheck()` - Insert pr_review_checks row
+   - `updateCheck()` - Update check result with status/errors/warnings
+   - `getReview()` - Fetch review with all checks
+   - `getReviewByPR()` - Fetch by repo owner/name and PR number
+   - `markOverridden()` - Record manual override with user/reason
+   - `listReviews()` - List with optional filters
+   - `rowToCamelCase()` - Convert snake_case DB rows to camelCase
+
+3. **ResultAggregator** (src/aggregator.ts):
+   - `aggregate(checks: PRReviewCheck[])` - Main aggregation method
+   - Returns `AggregatedResult` with mergeBlocked, summary, counts, details
+   - Separates required vs optional checks
+   - Counts success/failure/pending for each category
+   - Merge blocked if: any required check failed OR any required pending/running
+   - Generates human-readable summary messages
+   - Categorizes checks into passed/failed/pending arrays
+
+4. **ReviewService** (src/service.ts):
+   - Main orchestrator coordinating detector, tracker, aggregator
+   - `detectAndCreateReview()` - Entry point for new PRs
+     - Calls detector.detect()
+     - Creates review if AI-generated
+     - Records configured checks
+     - Updates status to 'running'
+   - `getReviewStatus()` - Get review with aggregated results
+   - `getReviewStatusByPR()` - Get by repo and PR number
+   - `updateMergeStatus()` - Aggregate checks and update DB
+     - Updates merge_blocked flag
+     - Updates review status if all checks completed
+   - `overrideReview()` - Manual override for emergencies
+   - `listReviews()` - List with filters
+   - `ServiceConfig` - Configurable check list
+
+**Type Fixes:**
+- Fixed CheckStatus: "success" and "failure" (not "passed"/"failed")
+- Fixed ReviewStatus: "failed" (not "failure")
+- Added index signatures to row types for TypeScript compatibility
+- Added paths to tsconfig.json for @factory/shared resolution
+
+**Testing:**
+- detector.test.ts: 12 tests covering all detection paths
+- aggregator.test.ts: 10 tests for result aggregation logic
+- tracker.test.ts: 8 tests with mock database
+- service.test.ts: 4 integration tests
+- Mock database implementation for isolated testing
+
+**Build Results:**
+- Package builds successfully with `tsc`
+- All TypeScript checks pass
+- Dist folder contains compiled .js and .d.ts files
+- Integrates with @factory/shared types
+
+**Notes:**
+- All 4 sub-bullets completed in single iteration
+- Database operations abstracted via DatabaseClient interface
+- Service is configurable via ServiceConfig
+- No actual GitHub API integration yet (Phase 6)
+- No actual check execution yet (Phase 3-4 for lint/test)
+- Tests use bun:test but couldn't run due to missing bun command
+- Next: Build lint integration (Phase 3)

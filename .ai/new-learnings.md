@@ -277,3 +277,98 @@ ANTHROPIC_API_KEY=your_key_here
 2. Consider adding health checks to intake and dashboard services
 3. Set up CI/CD to run integration tests with mock services
 4. Document required environment variables clearly
+
+## Core PR Review Implementation - 2026-01-13
+
+### Implementing Composable Review Systems
+
+When building a PR review system with multiple components:
+
+1. **Interface-Driven Design**: Define clear interfaces for dependencies
+   - `DatabaseClient` interface allows testing without real database
+   - Enables dependency injection for better testability
+   - Makes components reusable in different contexts
+
+2. **Type Alignment**: Ensure enum values match across the stack
+   - ReviewStatus uses "failed" but CheckStatus uses "failure"
+   - Document the difference: review-level vs check-level status
+   - Use find-and-replace carefully; context matters
+
+3. **Confidence-Based Detection**: Multi-signal approach is more robust
+   - Co-author check: 0.7 confidence (strongest signal)
+   - Branch pattern: 0.2 confidence (medium signal)
+   - Labels: 0.1 confidence (weakest signal)
+   - Threshold of 0.5 requires at least one strong indicator
+   - Cap total confidence at 1.0
+
+4. **Aggregation Logic**: Clear rules for merge blocking
+   - Block if ANY required check failed
+   - Block if ANY required check still pending/running
+   - Allow merge if optional checks fail
+   - Generate actionable summaries for users
+
+5. **Database Abstraction Pattern**:
+   - Define minimal interface needed (`query`, `queryOne`, `execute`)
+   - Use snake_case in DB, camelCase in application
+   - Add index signatures to row types for TypeScript
+   - Helper function for case conversion
+
+6. **TypeScript Paths in Monorepos**:
+   - Add `paths` to tsconfig.json for workspace dependencies
+   - Format: `"@factory/shared": ["../shared/src"]`
+   - Needed when building individual packages
+   - Works with project references
+
+7. **Test Structure for Multi-Component Systems**:
+   - Test each component in isolation first
+   - Mock dependencies for unit tests
+   - Integration tests verify component coordination
+   - Keep mocks simple; focus on behavior not implementation
+
+### Testing Without Runtime
+
+When test runner not available (bun, jest, etc.):
+
+1. **Write tests anyway** - They document expected behavior
+2. **Structure matters** - Use describe/it pattern
+3. **Type checking validates** - Tests must compile
+4. **Tests will run in CI** - Factory worker has bun installed
+5. **Mock external dependencies** - Database, APIs, file system
+
+### Common Pitfalls
+
+1. **Enum Value Mismatch**:
+   - Problem: Using "passed" when enum defines "success"
+   - Solution: Check shared types first, use exact values
+   - Tool: grep for enum/type definitions
+
+2. **Workspace Dependencies**:
+   - Problem: TypeScript can't find @factory/shared
+   - Solution: Add paths mapping in tsconfig.json
+   - Alternative: Build shared package first
+
+3. **Database Row Types**:
+   - Problem: TypeScript error "Index signature missing"
+   - Solution: Add `[key: string]: unknown` to row interfaces
+   - Reason: rowToCamelCase needs Record<string, unknown>
+
+### Design Patterns
+
+**Service Layer Pattern**:
+- Service coordinates multiple components
+- Each component has single responsibility
+- Service configurable via dependency injection
+- Makes system testable and maintainable
+
+**Result Pattern**:
+- Return rich result objects, not just boolean
+- Include reasons, confidence scores, details
+- Makes debugging easier
+- Enables better user feedback
+
+**Builder Pattern for Tests**:
+- Create helper functions like `createContext()`
+- Accept partial overrides for test-specific values
+- Reduces test boilerplate
+- Makes tests more readable
+

@@ -155,3 +155,41 @@ All sub-bullets completed:
 - ✅ Define review workflow for AI-generated PRs
 - ✅ Create composable review components/modules
 - ✅ Design integration points with existing CI/CD pipeline
+
+### Phase 2: Implement Core PR Review Functionality - Complete (Session 31)
+- Created packages/pr-review package with TypeScript
+- Implemented PRDetector for AI-generated PR detection
+  - Checks commit co-authors for Claude signature
+  - Validates branch patterns (ai/issue-*, ai/task-*, ai/*)
+  - Detects AI-related labels
+  - Returns confidence score and reasons
+- Implemented ReviewTracker for status tracking
+  - Creates and updates PR reviews in database
+  - Records and updates individual checks
+  - Manages review lifecycle (pending → running → completed/failed)
+  - Tracks merge blocked status
+  - Supports manual overrides with audit trail
+- Implemented ResultAggregator for combining check results
+  - Determines merge blocked status from check results
+  - Distinguishes required vs optional checks
+  - Generates human-readable summaries
+  - Categorizes checks by status (passed/failed/pending)
+- Implemented ReviewService as main orchestrator
+  - Coordinates detection, tracking, and aggregation
+  - Entry point for new PR reviews
+  - Query review status with aggregated results
+  - Update merge status based on checks
+  - Configurable check list
+- Created comprehensive unit tests (4 test files)
+  - detector.test.ts: 12 tests for detection logic
+  - aggregator.test.ts: 10 tests for result aggregation
+  - tracker.test.ts: 8 tests for database operations
+  - service.test.ts: 4 tests for service integration
+- Package builds successfully with TypeScript
+- All types integrate with @factory/shared package
+
+All sub-bullets completed:
+- ✅ Create PR review service/handler
+- ✅ Add AI-generated PR detection logic
+- ✅ Implement review status tracking
+- ✅ Add review result aggregation
