@@ -125,7 +125,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 8: Scripts
 
-- [ ] Create setup and dev scripts
+- [x] Create setup and dev scripts
   - `scripts/setup.sh` - Check prerequisites (docker, bun), create .env, install deps, build worker image, start postgres/redis, run migrations
   - `scripts/migrate.sh` - Run SQL migrations
   - `scripts/dev.sh` - Start dev environment

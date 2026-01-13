@@ -592,3 +592,49 @@ Management Routes:
 - All build and type checks pass
 - Phase 7 (Docker Infrastructure) now complete
 - Next: Phase 8 Scripts
+
+---
+
+## Session 17 - 2025-01-13
+
+### Task: Phase 8 - Scripts
+
+**Commit:** bd2d14c
+
+**Files Created:**
+- `scripts/setup.sh` - One-time project setup script
+- `scripts/migrate.sh` - Database migration runner
+- `scripts/dev.sh` - Development environment launcher
+
+**setup.sh Features:**
+1. Check prerequisites (docker, bun)
+2. Check Docker is running
+3. Create .env from .env.example if missing
+4. Install dependencies (bun install)
+5. Build packages (bun run build)
+6. Build worker Docker image
+7. Start postgres and redis via docker-compose
+8. Wait for services to be healthy
+9. Run migrations
+
+**migrate.sh Features:**
+1. Parse DATABASE_URL for connection parameters
+2. Find and sort migration files
+3. Run migrations via docker exec or local psql
+4. Handle already-applied migrations gracefully
+
+**dev.sh Features:**
+1. Parse options: --dashboard, --rebuild, --detach, --help
+2. Validate prerequisites and .env
+3. Start services via docker-compose
+4. Support dashboard profile (--dashboard)
+5. Support image rebuild (--rebuild)
+6. Support detached mode (--detach)
+7. Display service URLs
+
+**Notes:**
+- All scripts made executable (chmod +x)
+- All 224 existing tests pass
+- Type checks pass
+- Phase 8 (Scripts) now complete
+- Next: Phase 9 Dashboard MVP
