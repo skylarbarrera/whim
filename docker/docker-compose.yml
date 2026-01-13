@@ -108,6 +108,22 @@ services:
     profiles:
       - with-dashboard
 
+  # Review Dashboard - UI for PR review system
+  review-dashboard:
+    build:
+      context: ..
+      dockerfile: packages/review-dashboard/Dockerfile
+    container_name: factory-review-dashboard
+    restart: unless-stopped
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    environment:
+      ORCHESTRATOR_URL: http://orchestrator:3000
+      PORT: 3001
+    ports:
+      - "3004:3001"
+
 volumes:
   postgres_data:
     name: factory-postgres-data

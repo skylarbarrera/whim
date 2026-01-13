@@ -2085,3 +2085,60 @@ Override Tests (30):
 - StatusCheckConfig supports multiple workflows per repository
 - Task 6 of 8 complete in SPEC.md
 
+
+---
+
+## Session 36 - 2026-01-13
+
+### Task: Build Review Dashboard/UI
+
+**Commit:** (pending)
+
+**Files Created:**
+- `packages/review-dashboard/package.json` - Package configuration
+- `packages/review-dashboard/tsconfig.json` - TypeScript configuration
+- `packages/review-dashboard/next.config.js` - Next.js configuration
+- `packages/review-dashboard/Dockerfile` - Container build
+- `packages/review-dashboard/app/layout.tsx` - Root layout with navigation
+- `packages/review-dashboard/app/globals.css` - Global styles
+- `packages/review-dashboard/app/page.tsx` - Review list page
+- `packages/review-dashboard/app/reviews/[id]/page.tsx` - Review details page
+- `packages/review-dashboard/app/trigger/page.tsx` - Manual trigger page
+- `packages/review-dashboard/components/` - 5 visualization components
+- `packages/review-dashboard/lib/api.ts` - API client
+- `packages/review-dashboard/components/__tests__/` - 2 test files
+- `packages/review-dashboard/lib/__tests__/api.test.ts` - API tests
+
+**Dashboard Pages:**
+1. Review List (/) - Filter and view all reviews
+2. Review Details (/reviews/[id]) - Timeline, messages, file annotations
+3. Manual Trigger (/trigger) - Start review with real-time updates
+
+**Components:**
+1. ReviewStepStatus - Color-coded status badges
+2. ReviewTimeline - Sequential/parallel execution visualization
+3. ReviewMessages - Severity-grouped message display
+4. FileAnnotations - File-level issue grouping
+5. TriggerForm - Manual review trigger form
+
+**API Client:**
+- fetchReviews() - Get review list with filters
+- fetchReviewById() - Get single review
+- triggerReview() - Start manual review
+- pollReviewStatus() - Real-time updates
+
+**Docker Integration:**
+- Added review-dashboard service to docker-compose.yml
+- Port 3004 exposed
+- API proxy to orchestrator
+
+**Notes:**
+- Next.js 14+ with App Router
+- Tailwind CSS styling
+- TypeScript strict mode
+- ~1000 lines of code
+- 23 tests (7 + 6 + 10)
+- All components use @factory/review-system types
+- Real-time polling with 2s interval
+- Task 7 of 8 complete
+
