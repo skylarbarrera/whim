@@ -1,43 +1,55 @@
-# Plan: Phase 4.3 - QueueManager Implementation
+# Plan: RateLimiter Class
 
 ## Goal
-Create `packages/orchestrator/src/queue.ts` with the QueueManager class that handles all work item queue operations.
+Create `packages/orchestrator/src/rate-limits.ts` with RateLimiter class that manages worker spawn rate limiting and daily iteration budgets.
 
-## Files to Create/Modify
-- `packages/orchestrator/src/queue.ts` (CREATE)
-
-## API Methods (from SPEC)
-1. `add(input)` - Add work item to queue
-2. `get(id)` - Get work item by ID
-3. `getNext()` - Get highest priority queued item (with row locking)
-4. `cancel(id)` - Cancel work item
-5. `list()` - List active work items
-6. `getStats()` - Get queue statistics
+## Methods Required (from SPEC.md)
+- `canSpawnWorker()` - check if spawn allowed (based on cooldown and max workers)
+- `recordSpawn()` - record worker spawn timestamp
+- `recordWorkerDone()` - record worker completion (decrement active count)
+- `recordIteration()` - record iteration for daily budget tracking
+- `checkDailyReset()` - reset daily limits at midnight
+- `getStatus()` - get current rate limit status
 
 ## Implementation Details
 
-### Dependencies
-- Database class from `./db.ts`
-- Types from `@factory/shared`
+### Redis Keys (with factory: prefix)
+- `rate:active_workers` - current count of active workers
+- `rate:last_spawn` - timestamp of last spawn
+- `rate:daily_iterations` - iteration count for today
+- `rate:daily_reset_date` - date string for tracking daily reset
 
-### Priority Logic
-- Queue ordered by: priority DESC (critical > high > medium > low), then created_at ASC (FIFO within same priority)
-- Use FOR UPDATE SKIP LOCKED for safe concurrent access
+### Configuration
+- MAX_WORKERS (env, default: 2)
+- DAILY_BUDGET (env, default: 200)
+- COOLDOWN_SECONDS (env, default: 60)
 
-### Status Transitions
-- `add()`: Creates with status "queued"
-- `getNext()`: Sets status to "assigned" atomically
-- `cancel()`: Sets status to "cancelled" (only if not yet in_progress)
+### Status Response (matches StatusResponse.rateLimits)
+```typescript
+{
+  iterationsToday: number;
+  dailyBudget: number;
+  lastSpawn: Date | null;
+  cooldownSeconds: number;
+}
+```
 
-### Statistics
-- Total count
-- Count by status
-- Count by priority
+## Files to Create/Modify
+- CREATE: `packages/orchestrator/src/rate-limits.ts`
+- CREATE: `packages/orchestrator/src/rate-limits.test.ts`
 
 ## Tests
-No tests required per iteration policy (type checks verify correctness).
+1. canSpawnWorker returns true when under limits
+2. canSpawnWorker returns false during cooldown
+3. canSpawnWorker returns false when at max workers
+4. canSpawnWorker returns false when daily budget exhausted
+5. recordSpawn increments active workers and sets timestamp
+6. recordWorkerDone decrements active workers
+7. recordIteration increments daily count
+8. checkDailyReset resets counters on new day
+9. getStatus returns correct values
 
 ## Exit Criteria
-1. File compiles without errors
-2. All methods from SPEC implemented
-3. Types match @factory/shared
+- TypeScript compiles without errors
+- All tests pass
+- Integrates with existing RedisClient pattern
