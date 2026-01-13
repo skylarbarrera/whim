@@ -1,5 +1,116 @@
 # Learnings
 
+## PR Review System Architecture Design - 2026-01-13
+
+### Designing a Composable Review System
+
+When designing a PR review system for AI-generated code:
+
+1. **Separation of Concerns**: Keep detection, checking, aggregation, and reporting as distinct modules
+   - Detector: Identifies AI-generated PRs
+   - Checks: Pluggable modules for lint, test, typecheck, etc.
+   - Aggregator: Combines results to determine merge status
+   - Reporter: Communicates results to GitHub
+
+2. **Plugin Architecture**: Use base interfaces for extensibility
+   - Define a `Check` interface with `run()` method
+   - Each check type implements the interface
+   - Easy to add new checks without modifying core
+   - Configuration controls which checks run
+
+3. **Database-First Design**: Plan schema before implementation
+   - Two tables: `pr_reviews` (lifecycle) and `pr_review_checks` (individual checks)
+   - Enums for status values ensure consistency
+   - Foreign keys maintain referential integrity
+   - Indexes on frequently queried columns
+
+4. **Configuration-Driven Behavior**: Use YAML for flexibility
+   - Per-repository overrides via `.ai/pr-review.yml`
+   - Define which checks are required vs optional
+   - Configure check-specific settings (timeouts, thresholds)
+   - Supports different rules for different projects
+
+5. **Integration Points**: Document all touch points early
+   - GitHub Actions for execution environment
+   - Worker triggers via repository_dispatch events
+   - Orchestrator API for state management
+   - Database for persistence
+   - Dashboard for monitoring
+   - GitHub API for reporting
+
+6. **Comprehensive Types**: Define interfaces upfront
+   - Use TypeScript for type safety
+   - Share types across packages via @factory/shared
+   - Include API request/response types
+   - Document with JSDoc comments
+
+7. **Emergency Overrides**: Plan for exceptions
+   - Track override user, reason, and timestamp
+   - Require admin role for overrides
+   - Maintain audit trail
+   - Allow merge despite check failures for critical hotfixes
+
+### GitHub Integration Best Practices
+
+1. **Use Repository Dispatch**: Best way to trigger workflows from external systems
+   - Native GitHub integration
+   - Automatic retries via Actions
+   - Visible in Actions tab for debugging
+   - No need to expose orchestrator publicly
+
+2. **Status API vs Checks API**:
+   - Status API: Simple pass/fail, shown in PR UI
+   - Checks API: Detailed results with annotations
+   - Use both for comprehensive feedback
+
+3. **Branch Protection**: Enforce merge blocking
+   - Configure required status checks
+   - Context must match reported status
+   - Prevents merging on check failures
+
+### Documentation Strategy
+
+1. **Architecture Document**: High-level design with diagrams
+   - System components and responsibilities
+   - Data flow and interactions
+   - Key design decisions and trade-offs
+
+2. **Integration Document**: Detailed implementation guide
+   - Code examples for each integration point
+   - API endpoint specifications
+   - Configuration examples
+   - Error handling patterns
+
+3. **Database Schema**: Inline documentation
+   - COMMENT ON TABLE/COLUMN for context
+   - Clear naming conventions (snake_case)
+   - Index documentation (why each index exists)
+
+### Lessons Learned
+
+1. **Design Before Code**: Thorough design prevents rework
+   - Identify all components and interfaces
+   - Document integration points
+   - Define database schema
+   - Get architectural approval before implementation
+
+2. **Type Safety First**: Add types to shared package early
+   - Ensures consistency across packages
+   - Catches errors at compile time
+   - Serves as documentation
+
+3. **Think About Monitoring**: Plan observability from the start
+   - What metrics to track
+   - What logs to emit
+   - What alerts to configure
+   - Dashboard widgets needed
+
+4. **Plan for Failure**: Design error handling upfront
+   - Transient vs permanent failures
+   - Retry strategies
+   - Fallback mechanisms
+   - User-friendly error messages
+
 ## Ralph v0.3.0 Integration - 2026-01-13
 
 ### Ralph Spec Generation Capabilities
