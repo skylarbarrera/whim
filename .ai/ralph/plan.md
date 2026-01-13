@@ -1,35 +1,42 @@
-# Plan: Phase 3.1 - Wrap PR Creation in Try/Catch
+# Plan: Phase 3.2 - Log Full stderr/stdout from Failed Git/GH Commands
 
 ## Goal
-Wrap PR creation in `index.ts` with try/catch to handle unexpected errors and report partial success when the work was done but PR creation failed.
+Ensure all git and gh command failures log full stdout/stderr for debugging.
+
+## Current State
+- `createPullRequest()` already uses `logCommandFailure()` helper for all git/gh commands
+- `setupWorkspace()` has several git commands that don't log errors properly:
+  - Line 128: `ralph init` - only logs stderr as warning
+  - Line 134-135: `git add -A` and `git commit` - no error logging (fail silently)
+  - Line 141, 144: `git config` - no error checking
 
 ## Files to Modify
-- `packages/worker/src/index.ts` - Add try/catch around PR creation, report partial success
+- `packages/worker/src/setup.ts`
 
 ## Changes
 
-### 1. Wrap PR Creation in Try/Catch
-The current code already handles PRResult status cases, but unexpected errors (like network failures, gh command not found, etc.) could throw exceptions that aren't caught.
+### 1. Add Error Logging to setupWorkspace()
+The following commands currently fail silently or don't log complete info:
 
-Changes:
-- Wrap `createPullRequest()` call in try/catch
-- If exception is thrown, log detailed error message
-- Report to orchestrator with partial success indicator
-- Distinguish between "work done, PR failed" vs "work failed"
+**git config commands (lines 141-146):**
+- Add error logging for git config failures
+- These are critical - if they fail, commits will fail later
 
-### 2. Report Partial Success
-When Ralph succeeds but PR creation throws an exception:
-- Log the full error with stack trace
-- Still call `client.complete()` but with `null` prUrl
-- Mark the work as partially successful (code done, PR failed)
+**Initial git add and commit (lines 134-135):**
+- Add error logging for the initial workspace commit
+- Use same pattern as createPullRequest()
+
+**ralph init (line 128-131):**
+- Currently only logs stderr on warning
+- Should also log stdout and exit code for debugging
 
 ## Tests
-- Existing tests in `setup.test.ts` cover the PRResult cases
-- Manual testing: The try/catch handles unexpected errors
+- Existing tests should continue to pass
+- Run `bun test` in packages/worker
 
 ## Exit Criteria
-- [x] PR creation wrapped in try/catch
-- [x] Unexpected errors logged with full details
-- [x] Partial success reported when PR creation throws
-- [x] Type checks pass
-- [x] Existing tests pass
+- [ ] All git commands in setupWorkspace() log errors on failure
+- [ ] ralph init logs full output on warning/failure
+- [ ] git config failures are logged
+- [ ] Type checks pass
+- [ ] Existing tests pass

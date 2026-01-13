@@ -92,25 +92,22 @@ export async function setupWorkspace(
   await mkdir(config.workDir, { recursive: true });
 
   const repoUrl = `https://x-access-token:${config.githubToken}@github.com/${workItem.repo}.git`;
-  const cloneResult = await exec("git", [
-    "clone",
-    "--depth",
-    "1",
-    repoUrl,
-    repoDir,
-  ]);
+  // Note: We don't log the full URL since it contains the token
+  const cloneArgs = ["clone", "--depth", "1", repoUrl, repoDir];
+  const cloneResult = await exec("git", cloneArgs);
 
   if (cloneResult.code !== 0) {
+    // Log with sanitized URL (don't expose token)
+    const safeArgs = ["clone", "--depth", "1", `https://***@github.com/${workItem.repo}.git`, repoDir];
+    logSetupCommandResult("git clone", "git", safeArgs, cloneResult);
     throw new Error(`Failed to clone repo: ${cloneResult.stderr}`);
   }
 
-  const checkoutResult = await exec(
-    "git",
-    ["checkout", "-b", workItem.branch],
-    { cwd: repoDir }
-  );
+  const checkoutArgs = ["checkout", "-b", workItem.branch];
+  const checkoutResult = await exec("git", checkoutArgs, { cwd: repoDir });
 
   if (checkoutResult.code !== 0) {
+    logSetupCommandResult("git checkout", "git", checkoutArgs, checkoutResult);
     throw new Error(`Failed to create branch: ${checkoutResult.stderr}`);
   }
 
@@ -125,25 +122,45 @@ export async function setupWorkspace(
   }
 
   // Initialize Ralph (creates .claude/ralph.md and .ai/ralph/)
-  const initResult = await exec("ralph", ["init"], { cwd: repoDir });
+  const ralphInitArgs = ["init"];
+  const initResult = await exec("ralph", ralphInitArgs, { cwd: repoDir });
   if (initResult.code !== 0) {
-    console.warn("Ralph init warning:", initResult.stderr);
+    logSetupCommandResult("ralph init", "ralph", ralphInitArgs, initResult);
+    console.warn("[SETUP] Ralph init failed but continuing (may not be fatal)");
   }
 
   // Commit the initial setup so Ralph doesn't complain about uncommitted changes
-  await exec("git", ["add", "-A"], { cwd: repoDir });
-  await exec("git", ["commit", "-m", "chore: initialize workspace for AI Factory"], { cwd: repoDir });
+  const addArgs = ["add", "-A"];
+  const addResult = await exec("git", addArgs, { cwd: repoDir });
+  if (addResult.code !== 0) {
+    logSetupCommandResult("git add (initial)", "git", addArgs, addResult);
+    throw new Error(`Failed to stage initial files: ${addResult.stderr}`);
+  }
+
+  const commitArgs = ["commit", "-m", "chore: initialize workspace for AI Factory"];
+  const commitResult = await exec("git", commitArgs, { cwd: repoDir });
+  if (commitResult.code !== 0) {
+    logSetupCommandResult("git commit (initial)", "git", commitArgs, commitResult);
+    throw new Error(`Failed to commit initial setup: ${commitResult.stderr}`);
+  }
 
   return repoDir;
 }
 
 async function configureGit(repoDir: string): Promise<void> {
-  await exec("git", ["config", "user.email", "factory@ai.local"], {
-    cwd: repoDir,
-  });
-  await exec("git", ["config", "user.name", "AI Factory Worker"], {
-    cwd: repoDir,
-  });
+  const emailArgs = ["config", "user.email", "factory@ai.local"];
+  const emailResult = await exec("git", emailArgs, { cwd: repoDir });
+  if (emailResult.code !== 0) {
+    logSetupCommandResult("git config user.email", "git", emailArgs, emailResult);
+    throw new Error(`Failed to configure git email: ${emailResult.stderr}`);
+  }
+
+  const nameArgs = ["config", "user.name", "AI Factory Worker"];
+  const nameResult = await exec("git", nameArgs, { cwd: repoDir });
+  if (nameResult.code !== 0) {
+    logSetupCommandResult("git config user.name", "git", nameArgs, nameResult);
+    throw new Error(`Failed to configure git name: ${nameResult.stderr}`);
+  }
 }
 
 async function copyClaudeConfig(
@@ -169,7 +186,7 @@ async function copyClaudeConfig(
 }
 
 /**
- * Log detailed command failure information
+ * Log detailed command failure information for PR steps
  */
 function logCommandFailure(
   step: PRStep,
@@ -186,6 +203,28 @@ function logCommandFailure(
   }
   if (result.stderr.trim()) {
     console.error(`[PR]   stderr: ${result.stderr.trim()}`);
+  }
+}
+
+/**
+ * Log command result for setup steps (non-PR commands)
+ * Used for debugging failed setup operations
+ */
+function logSetupCommandResult(
+  context: string,
+  command: string,
+  args: string[],
+  result: { stdout: string; stderr: string; code: number }
+): void {
+  const fullCommand = `${command} ${args.join(" ")}`;
+  console.error(`[SETUP] ${context} FAILED`);
+  console.error(`[SETUP]   Command: ${fullCommand}`);
+  console.error(`[SETUP]   Exit code: ${result.code}`);
+  if (result.stdout.trim()) {
+    console.error(`[SETUP]   stdout: ${result.stdout.trim()}`);
+  }
+  if (result.stderr.trim()) {
+    console.error(`[SETUP]   stderr: ${result.stderr.trim()}`);
   }
 }
 
