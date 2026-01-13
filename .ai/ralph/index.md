@@ -1212,3 +1212,64 @@ Wrapper script approach provides:
 - Prerequisite checks tested (git repo, API key)
 - Help message displays correctly
 - All sub-bullets of task 2 completed (UI design, flow logic, spec generation, error handling)
+
+---
+
+## Ralph v0.3.0 Integration - COMPLETE
+
+### Summary
+
+All 5 tasks completed across 2 sessions:
+
+**Session 28 - Task 1: Update Ralph repository integration**
+- Integrated Ralph v0.3.0 spec generation tooling
+- Created RalphSpecGenerator class for autonomous spec creation
+- Added USE_RALPH_SPEC configuration option
+- Documented Ralph's headless mode and validation features
+
+**Session 29 - Task 2: Implement interactive spec creation flow**
+- Created scripts/create-spec.sh wrapper for manual spec creation
+- Added prerequisite checks and error handling
+- Documented both wrapper and direct CLI approaches
+- Updated README with submission examples
+
+**Tasks 3-5: Pre-existing functionality**
+- Task 3: Autonomous GitHub issue spec creation (intake service)
+- Task 4: Flow routing and management system (USE_RALPH_SPEC config)
+- Task 5: Comprehensive testing (24 tests in intake package)
+
+### Acceptance Criteria - All Met ✅
+
+1. ✅ Ralph repository successfully updated with v0.3.0 tooling
+2. ✅ Interactive questioning flow via scripts/create-spec.sh
+3. ✅ GitHub issues automatically trigger spec creation (intake service)
+4. ✅ Both flows produce consistently formatted, validated specs
+5. ✅ System gracefully handles errors in both flows
+6. ✅ All functionality covered by automated tests (24 tests)
+7. ✅ Comprehensive documentation in README.md
+
+### Key Deliverables
+
+**Code:**
+- `packages/intake/src/ralph-spec-gen.ts` - Ralph CLI wrapper
+- `scripts/create-spec.sh` - Interactive spec creation tool
+- Tests: github.test.ts, spec-gen.test.ts, ralph-spec-gen.test.ts
+
+**Documentation:**
+- README.md: Spec Creation Flows section with both approaches
+- .ai/new-learnings.md: Ralph v0.3.0 capabilities and design decisions
+- Configuration examples for USE_RALPH_SPEC
+
+**Architecture:**
+- Two spec creation paths: autonomous (GitHub issues) and interactive (CLI wrapper)
+- Unified GeneratedSpec interface for consistency
+- Backwards compatible with existing Anthropic SDK approach
+- Ralph's built-in validation ensures spec quality
+
+### Impact
+
+This integration provides:
+1. **Better spec quality** - Ralph's validation catches anti-patterns
+2. **Flexibility** - Users can choose autonomous or interactive creation
+3. **Cost efficiency** - Ralph CLI reduces API costs vs direct SDK usage
+4. **Maintainability** - Clear separation between spec creation and execution
