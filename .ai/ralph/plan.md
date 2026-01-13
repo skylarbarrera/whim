@@ -1,44 +1,29 @@
-# Task: Phase 1 - Project Scaffolding (All Tasks)
+# Plan: Phase 2 - Shared Package
 
 ## Goal
-Complete all Phase 1 tasks for the AI Software Factory monorepo scaffolding.
+Create the `packages/shared` package with all shared types for the AI Software Factory.
 
-## Tasks
-- [x] Initialize Bun monorepo with `package.json` (already exists)
-- [ ] Configure Turborepo with `turbo.json`
-- [ ] Create root `tsconfig.json` with base TypeScript config
-- [ ] Update `.gitignore` for Node.js/TypeScript project (already exists, needs enhancements)
-- [ ] Create `.env.example` with all required environment variables
+## Files to Create
 
-## Files to Create/Modify
-- `turbo.json` - Turborepo configuration
-- `tsconfig.json` - Base TypeScript config
-- `.gitignore` - Add Turbo-specific entries
-- `.env.example` - Environment variables template
+1. `packages/shared/package.json` - Package config with name `@factory/shared`
+2. `packages/shared/tsconfig.json` - Extends root tsconfig
+3. `packages/shared/src/types.ts` - All shared type definitions
+4. `packages/shared/src/index.ts` - Re-exports all types
 
-## Implementation Details
+## Types to Define (from SPEC.md)
 
-### turbo.json
-- pipeline for build, dev, test, lint, typecheck, clean
-- Proper caching and dependency configuration
-
-### tsconfig.json
-- Strict mode
-- ES2022 target
-- Node module resolution
-- Composite for monorepo
-
-### .gitignore additions
-- .turbo/ cache
-- Bun lockfile handling
-- Additional TypeScript artifacts
-
-### .env.example
-Copy all variables from SPEC.md Environment Variables Reference section
+- `WorkItem`, `WorkItemStatus`, `Priority`
+- `Worker`, `WorkerStatus`
+- `Learning`
+- `WorkerMetrics`, `FactoryMetrics`
+- API request/response types:
+  - `WorkerRegisterRequest`
+  - `WorkerHeartbeatRequest`
+  - etc.
 
 ## Exit Criteria
-- [ ] `turbo.json` exists with proper pipeline config
-- [ ] `tsconfig.json` exists with base config
-- [ ] `.gitignore` includes Turbo cache
-- [ ] `.env.example` has all required variables
-- [ ] `bun run build` works (even if no packages yet)
+
+1. `bun install` succeeds at root
+2. `bun run typecheck` passes
+3. Package exports all types correctly
+4. All 4 tasks in SPEC Phase 2 marked complete
