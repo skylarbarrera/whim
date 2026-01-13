@@ -1,39 +1,23 @@
-# Plan: Phase 10 - Integration Testing and Validation
+# Plan: Fix PR Creation Flow
 
 ## Goal
-Verify all packages build correctly and the full system works end-to-end via docker-compose.
+Fix the `createPullRequest` function in `packages/worker/src/setup.ts` to correctly detect unpushed commits instead of uncommitted changes.
 
-## Tasks
-1. **Verify all packages build with `bun build`**
-   - Run `bun install` at root
-   - Run `bun run build` to build all packages
-   - Fix any TypeScript or build errors
+## Problem
+The current implementation checks for uncommitted changes using `git status --porcelain`, but Ralph already commits his work. This causes the function to return early with "No changes to commit" when there are actually committed but unpushed changes.
 
-2. **Test docker-compose brings all services online**
-   - Run `docker compose up` and verify:
-     - postgres starts and accepts connections
-     - redis starts and accepts connections
-     - orchestrator starts and serves API
-     - intake starts (may fail without GITHUB_TOKEN, expected)
-     - dashboard starts and serves UI
+## Files to Modify
+- `packages/worker/src/setup.ts` - Main fix
+- `packages/worker/src/setup.test.ts` - Add/update tests (create if needed)
 
-3. **Test end-to-end flow**
-   - Create work item via API
-   - Verify queue status shows item
-   - (Worker spawn would need real Claude CLI - document limitation)
-
-4. **Document issues in `.ai/new-learnings.md`**
-   - Record any issues found
-   - Note fixes applied
-   - Document limitations
-
-## Files to Modify/Create
-- Fix any build errors in packages/*
-- `.ai/new-learnings.md` - Document findings
+## Implementation
+1. Replace the `git status --porcelain` check with `git rev-list --count origin/HEAD..HEAD`
+2. Skip the commit step if no uncommitted changes (Ralph already committed)
+3. Only push and create PR if there are unpushed commits
+4. Add better logging for each step
 
 ## Exit Criteria
-- All packages build without errors
-- docker-compose up starts all services
-- Orchestrator API responds at /api/status
-- Dashboard UI loads at http://localhost:3000
-- Issues documented in `.ai/new-learnings.md`
+- [ ] Function correctly detects unpushed commits
+- [ ] Tests pass
+- [ ] Type checks pass
+- [ ] Worker can successfully push Ralph's commits and create PRs

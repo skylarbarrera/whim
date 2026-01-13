@@ -739,3 +739,38 @@ Management Routes:
 - Intake not tested (requires valid GitHub/Anthropic tokens)
 - Dashboard not tested (profile not enabled)
 - All 10 phases of the AI Software Factory implementation are now complete
+
+---
+
+## Session 20 - 2026-01-13
+
+### Task: Bug Fix Phase 1.1 - Fix PR Creation Flow
+
+**Files Modified:**
+- `packages/worker/src/setup.ts` - Fixed createPullRequest function
+
+**Bug Fixed:**
+The `createPullRequest` function was checking for uncommitted changes using `git status --porcelain`, but Ralph already commits his work. This caused the function to return early with "No changes to commit" when there were actually committed but unpushed changes.
+
+**Changes Made:**
+1. Reordered logic: first check for uncommitted changes and commit if present (optional)
+2. Added check for unpushed commits using `git rev-list --count origin/HEAD..HEAD`
+3. Falls back to origin/main and origin/master if origin/HEAD is unavailable
+4. Checks if branch exists on remote (forces push for new branches)
+5. Added extensive logging with `[PR]` prefix for each step:
+   - Step 1: Stage changes
+   - Step 2: Check and commit uncommitted changes
+   - Step 3: Check for unpushed commits
+   - Step 4: Push to remote
+   - Step 5: Create PR
+
+**Technical Details:**
+- Uses `git rev-list --count ref..HEAD` to count unpushed commits
+- Logs recent 5 commits for debugging
+- Logs both stderr and stdout on failures
+- Returns PR URL on success
+
+**Notes:**
+- All 224+ tests pass
+- Build and type checks pass
+- This also addresses part of the second task (better error logging)

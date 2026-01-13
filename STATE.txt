@@ -34,3 +34,11 @@
 
 ## All 10 Phases Complete
 The AI Software Factory implementation is complete.
+
+## Bug Fix Phase - In Progress
+- Phase 1.1: Fixed createPullRequest to check for unpushed commits instead of uncommitted changes
+  - Function now properly detects commits ahead of origin using `git rev-list`
+  - Skips commit step if Ralph already committed (no uncommitted changes)
+  - Adds extensive logging with [PR] prefix for debugging
+  - Falls back to multiple refs (origin/HEAD, origin/main, origin/master)
+  - Forces push attempt for new branches not yet on remote

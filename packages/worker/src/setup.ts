@@ -141,31 +141,84 @@ export async function createPullRequest(
   workItem: WorkItem,
   githubToken: string
 ): Promise<string | null> {
+  console.log("[PR] Starting PR creation for branch:", workItem.branch);
+
+  // Step 1: Stage any uncommitted changes (Ralph may have left some)
   const addResult = await exec("git", ["add", "-A"], { cwd: repoDir });
   if (addResult.code !== 0) {
-    console.error("Failed to stage changes:", addResult.stderr);
+    console.error("[PR] Failed to stage changes:", addResult.stderr);
     return null;
   }
 
+  // Step 2: Check for uncommitted changes and commit if present
   const statusResult = await exec("git", ["status", "--porcelain"], {
     cwd: repoDir,
   });
-  if (statusResult.stdout.trim() === "") {
-    console.log("No changes to commit");
-    return null;
+  if (statusResult.stdout.trim() !== "") {
+    console.log("[PR] Found uncommitted changes, committing...");
+    const commitResult = await exec(
+      "git",
+      ["commit", "-m", `feat: ${workItem.branch}\n\nImplemented by AI Factory`],
+      { cwd: repoDir }
+    );
+
+    if (commitResult.code !== 0) {
+      console.error("[PR] Failed to commit:", commitResult.stderr);
+      return null;
+    }
+    console.log("[PR] Committed successfully");
+  } else {
+    console.log("[PR] No uncommitted changes (Ralph already committed)");
   }
 
-  const commitResult = await exec(
+  // Step 3: Check for unpushed commits
+  // Use origin/HEAD if available, otherwise try origin/main or origin/master
+  let unpushedCount = 0;
+  const refs = ["origin/HEAD", "origin/main", "origin/master"];
+
+  for (const ref of refs) {
+    const unpushedResult = await exec(
+      "git",
+      ["rev-list", "--count", `${ref}..HEAD`],
+      { cwd: repoDir }
+    );
+    if (unpushedResult.code === 0) {
+      unpushedCount = parseInt(unpushedResult.stdout.trim(), 10) || 0;
+      console.log(`[PR] Found ${unpushedCount} unpushed commits (vs ${ref})`);
+      break;
+    }
+  }
+
+  // Also check git log to show what commits exist
+  const logResult = await exec(
     "git",
-    ["commit", "-m", `feat: ${workItem.branch}\n\nImplemented by AI Factory`],
+    ["log", "--oneline", "-5"],
     { cwd: repoDir }
   );
+  console.log("[PR] Recent commits:\n" + logResult.stdout);
 
-  if (commitResult.code !== 0) {
-    console.error("Failed to commit:", commitResult.stderr);
+  if (unpushedCount === 0) {
+    // Fallback: check if branch exists on remote
+    const branchCheckResult = await exec(
+      "git",
+      ["ls-remote", "--heads", "origin", workItem.branch],
+      { cwd: repoDir }
+    );
+    if (branchCheckResult.stdout.trim() !== "") {
+      console.log("[PR] Branch already exists on remote, checking for PR...");
+    } else {
+      console.log("[PR] Branch not on remote, will attempt push anyway");
+      unpushedCount = 1; // Force push attempt for new branches
+    }
+  }
+
+  if (unpushedCount === 0) {
+    console.log("[PR] No commits to push");
     return null;
   }
 
+  // Step 4: Push to remote
+  console.log(`[PR] Pushing ${unpushedCount} commits to origin/${workItem.branch}...`);
   const pushResult = await exec(
     "git",
     ["push", "-u", "origin", workItem.branch],
@@ -173,10 +226,14 @@ export async function createPullRequest(
   );
 
   if (pushResult.code !== 0) {
-    console.error("Failed to push:", pushResult.stderr);
+    console.error("[PR] Failed to push:", pushResult.stderr);
+    console.error("[PR] Push stdout:", pushResult.stdout);
     return null;
   }
+  console.log("[PR] Push successful");
 
+  // Step 5: Create PR
+  console.log("[PR] Creating pull request...");
   const prResult = await exec(
     "gh",
     [
@@ -196,9 +253,12 @@ export async function createPullRequest(
   );
 
   if (prResult.code !== 0) {
-    console.error("Failed to create PR:", prResult.stderr);
+    console.error("[PR] Failed to create PR:", prResult.stderr);
+    console.error("[PR] gh stdout:", prResult.stdout);
     return null;
   }
 
-  return prResult.stdout.trim();
+  const prUrl = prResult.stdout.trim();
+  console.log("[PR] Created PR:", prUrl);
+  return prUrl;
 }

@@ -14,7 +14,7 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
 ## Tasks
 
 ### Phase 1: Fix PR Creation Flow
-- [ ] Fix `createPullRequest` in `setup.ts` to check for unpushed commits instead of uncommitted changes
+- [x] Fix `createPullRequest` in `setup.ts` to check for unpushed commits instead of uncommitted changes
   - Use `git log origin/main..HEAD --oneline` or similar to detect unpushed commits
   - Always attempt push if there are commits ahead of origin
   - Remove the misleading "No changes to commit" early return
