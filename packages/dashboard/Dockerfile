@@ -66,7 +66,8 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy standalone output
 COPY --from=builder /app/packages/dashboard/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/dashboard/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/packages/dashboard/.next/static ./packages/dashboard/.next/static
+# Static files must be at .next/static (not packages/dashboard/.next/static)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/dashboard/.next/static ./.next/static
 
 USER nextjs
 
