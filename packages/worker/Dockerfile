@@ -6,12 +6,12 @@ FROM oven/bun:1-debian AS builder
 WORKDIR /app
 
 # Copy package files for dependency resolution
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/worker/package.json ./packages/worker/
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source code
 COPY packages/shared ./packages/shared
@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     nodejs \
     npm \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -55,8 +56,16 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
-# Create workspace directory
-RUN mkdir -p /workspace
+# Install Ralph from GitHub
+RUN git clone https://github.com/skylarbarrera/ralph.git /opt/ralph \
+    && cd /opt/ralph \
+    && npm install \
+    && npm link
+ENV PATH="/opt/ralph/bin:${PATH}"
+
+# Create non-root user for security (Claude blocks --dangerously-skip-permissions for root)
+RUN useradd -m -s /bin/bash worker
+RUN mkdir -p /workspace && chown worker:worker /workspace
 
 # Set working directory
 WORKDIR /app
@@ -67,12 +76,22 @@ COPY --from=builder /app/packages/worker/package.json ./
 COPY --from=builder /app/packages/shared/dist ./node_modules/@factory/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./node_modules/@factory/shared/
 
-# Copy Claude configuration
-COPY packages/worker/.claude /root/.claude
+# Copy Claude configuration to worker user's home
+COPY --chown=worker:worker packages/worker/.claude /home/worker/.claude
+
+# Create required Claude directories
+RUN mkdir -p /home/worker/.claude/todos /home/worker/.claude/debug
+
+# Set ownership of app directory and Claude config
+RUN chown -R worker:worker /app /opt/ralph /home/worker/.claude
+
+# Switch to non-root user
+USER worker
 
 # Set environment defaults
 ENV WORK_DIR=/workspace
 ENV NODE_ENV=production
+ENV HOME=/home/worker
 
 # Entry point runs the worker
 CMD ["node", "dist/index.js"]

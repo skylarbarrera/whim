@@ -92,6 +92,16 @@ export async function setupWorkspace(
     await copyClaudeConfig(config.claudeConfigDir, destClaudeDir);
   }
 
+  // Initialize Ralph (creates .claude/ralph.md and .ai/ralph/)
+  const initResult = await exec("ralph", ["init"], { cwd: repoDir });
+  if (initResult.code !== 0) {
+    console.warn("Ralph init warning:", initResult.stderr);
+  }
+
+  // Commit the initial setup so Ralph doesn't complain about uncommitted changes
+  await exec("git", ["add", "-A"], { cwd: repoDir });
+  await exec("git", ["commit", "-m", "chore: initialize workspace for AI Factory"], { cwd: repoDir });
+
   return repoDir;
 }
 

@@ -99,9 +99,11 @@ export class WorkerManager {
         `WORKER_ID=${workerId}`,
         `WORK_ITEM=${JSON.stringify(workItem)}`,
         `ORCHESTRATOR_URL=${this.config.orchestratorUrl}`,
+        `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
+        `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
       ],
       HostConfig: {
-        AutoRemove: true,
+        AutoRemove: false,  // Keep for debugging
         NetworkMode: "factory-network",
       },
     });
@@ -238,8 +240,8 @@ export class WorkerManager {
     // Release all file locks
     await this.conflictDetector.releaseAllLocks(workerId);
 
-    // Record metrics if provided
-    if (data.metrics) {
+    // Record metrics if provided and we have a valid work item
+    if (data.metrics && worker.workItemId) {
       await this.db.execute(
         `INSERT INTO worker_metrics
          (worker_id, work_item_id, iteration, tokens_in, tokens_out, duration, files_modified, tests_run, tests_passed)

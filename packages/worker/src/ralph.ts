@@ -1,17 +1,23 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { OrchestratorClient } from "./client.js";
 
+/**
+ * Ralph headless event types (JSON from stdout)
+ */
 export type RalphEventType =
-  | "ITERATION"
-  | "FILE_EDIT"
-  | "STUCK"
-  | "COMPLETE"
-  | "FAILED";
+  | "started"
+  | "iteration"
+  | "tool"
+  | "commit"
+  | "task_complete"
+  | "iteration_done"
+  | "stuck"
+  | "complete"
+  | "failed";
 
 export interface RalphEvent {
-  type: RalphEventType;
-  data: Record<string, unknown>;
-  raw: string;
+  event: RalphEventType;
+  [key: string]: unknown;
 }
 
 export interface RalphMetrics {
@@ -30,35 +36,30 @@ export interface RalphResult {
   iteration: number;
 }
 
-const EVENT_PATTERN = /\[RALPH:(\w+)\](?:\s*(.*))?/;
-
+/**
+ * Parse a JSON event line from Ralph's headless output
+ */
 export function parseRalphEvent(line: string): RalphEvent | null {
-  const match = line.match(EVENT_PATTERN);
-  if (!match) {
+  try {
+    const event = JSON.parse(line);
+    if (event && typeof event.event === "string") {
+      return event as RalphEvent;
+    }
+    return null;
+  } catch {
     return null;
   }
-
-  const type = match[1] as RalphEventType;
-  const dataStr = match[2]?.trim() || "";
-
-  let data: Record<string, unknown> = {};
-
-  if (dataStr) {
-    try {
-      data = JSON.parse(dataStr);
-    } catch {
-      data = { message: dataStr };
-    }
-  }
-
-  return { type, data, raw: line };
 }
 
+/**
+ * Run Ralph in headless mode
+ */
 export async function runRalph(
   repoDir: string,
   client: OrchestratorClient,
   options: {
     maxIterations?: number;
+    stuckThreshold?: number;
     onEvent?: (event: RalphEvent) => void;
     onOutput?: (line: string) => void;
   } = {}
@@ -78,13 +79,25 @@ export async function runRalph(
 
   const startTime = Date.now();
 
-  const proc = spawn("claude", ["--dangerously-skip-permissions"], {
+  // Spawn Ralph in headless mode
+  const args = [
+    "run",
+    "--headless",
+    "--all",
+  ];
+
+  if (options.maxIterations) {
+    args.push("-n", String(options.maxIterations));
+  }
+
+  if (options.stuckThreshold) {
+    args.push("--stuck-threshold", String(options.stuckThreshold));
+  }
+
+  const proc = spawn("ralph", args, {
     cwd: repoDir,
     shell: false,
-    env: {
-      ...process.env,
-      CLAUDE_MAX_ITERATIONS: String(options.maxIterations ?? 100),
-    },
+    env: process.env,
   });
 
   const processLine = async (line: string): Promise<void> => {
@@ -97,16 +110,14 @@ export async function runRalph(
 
     options.onEvent?.(event);
 
-    switch (event.type) {
-      case "ITERATION": {
-        iteration = (event.data.iteration as number) ?? iteration + 1;
-        const tokens = event.data.tokens as
-          | { in?: number; out?: number }
-          | undefined;
-        if (tokens) {
-          metrics.tokensIn += tokens.in ?? 0;
-          metrics.tokensOut += tokens.out ?? 0;
-        }
+    switch (event.event) {
+      case "started": {
+        console.log(`Ralph started: ${event.tasks} tasks`);
+        break;
+      }
+
+      case "iteration": {
+        iteration = (event.n as number) ?? iteration + 1;
         await client.heartbeat(iteration, "running", {
           in: metrics.tokensIn,
           out: metrics.tokensOut,
@@ -114,36 +125,40 @@ export async function runRalph(
         break;
       }
 
-      case "FILE_EDIT": {
-        const files = event.data.files as string[] | undefined;
-        if (files && files.length > 0) {
-          metrics.filesModified += files.length;
-          await client.lockFile(files);
+      case "tool": {
+        if (event.type === "write" && event.path) {
+          metrics.filesModified++;
+          await client.lockFile([event.path as string]);
         }
         break;
       }
 
-      case "STUCK": {
-        const reason = (event.data.reason as string) ?? "Unknown reason";
-        const attempts = (event.data.attempts as number) ?? 1;
+      case "iteration_done": {
+        const stats = event.stats as Record<string, number> | undefined;
+        if (stats) {
+          metrics.tokensIn += stats.tokensIn ?? 0;
+          metrics.tokensOut += stats.tokensOut ?? 0;
+        }
+        break;
+      }
+
+      case "stuck": {
+        const reason = (event.reason as string) ?? "Unknown reason";
+        const attempts = (event.iterations_without_progress as number) ?? 1;
         await client.stuck(reason, attempts);
         break;
       }
 
-      case "COMPLETE": {
+      case "complete": {
         success = true;
-        if (event.data.testsRun !== undefined) {
-          metrics.testsRun = event.data.testsRun as number;
-        }
-        if (event.data.testsPassed !== undefined) {
-          metrics.testsPassed = event.data.testsPassed as number;
-        }
+        metrics.testsRun = (event.tests_run as number) ?? 0;
+        metrics.testsPassed = (event.tests_passed as number) ?? 0;
         break;
       }
 
-      case "FAILED": {
+      case "failed": {
         success = false;
-        error = (event.data.error as string) ?? "Unknown error";
+        error = (event.error as string) ?? "Unknown error";
         await client.fail(error, iteration);
         break;
       }
@@ -179,7 +194,14 @@ export async function runRalph(
 
       metrics.duration = Date.now() - startTime;
 
-      if (code !== 0 && !success && !error) {
+      // Ralph exit codes: 0=complete, 1=stuck, 2=max iterations, 3=error
+      if (code === 0) {
+        success = true;
+      } else if (code === 1) {
+        error = error ?? "Stuck: no progress";
+      } else if (code === 2) {
+        error = error ?? "Max iterations reached";
+      } else if (!success && !error) {
         error = `Process exited with code ${code}`;
       }
 
@@ -209,8 +231,7 @@ export function createMockRalphProcess(
   return {
     process: proc,
     emitEvent: (event: RalphEvent) => {
-      const line = `[RALPH:${event.type}] ${JSON.stringify(event.data)}`;
-      proc.stdout?.emit("data", Buffer.from(line + "\n"));
+      proc.stdout?.emit("data", Buffer.from(JSON.stringify(event) + "\n"));
     },
     close: (code: number) => {
       proc.emit("close", code);
