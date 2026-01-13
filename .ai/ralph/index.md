@@ -994,3 +994,55 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All 98 tests pass
 - Build and type checks pass
 - Second task of Phase 3 (Improve Error Handling) complete
+
+---
+
+## Session 26 - 2026-01-13
+
+### Task: Bug Fix Phase 3.3 - Add Retry Logic for Transient Network Failures
+
+**Commit:** 8a79097
+
+**Files Modified:**
+- `packages/worker/src/setup.ts` - Added retry logic
+- `packages/worker/src/setup.test.ts` - Added retry tests
+
+**Changes Made:**
+
+1. **Added retry configuration:**
+   - RetryConfig interface: maxRetries, baseDelayMs, maxDelayMs
+   - DEFAULT_RETRY_CONFIG: 3 retries, 1s base, 10s max
+
+2. **Added isRetryableError() function (exported):**
+   - Detects network errors: connection reset, refused, timeout
+   - Detects server errors: 500, 502, 503, 504
+   - Detects rate limiting: 429, "too many requests"
+   - Case-insensitive, checks both stdout and stderr
+
+3. **Added sleep() helper:**
+   - Exponential backoff: base * 2^attempt
+   - Jitter: ±25% randomness
+   - Capped at maxDelayMs
+
+4. **Added execWithRetry() function:**
+   - Wraps exec() with retry logic
+   - Logs retry attempts with [RETRY] prefix
+   - Shows truncated stderr preview (200 chars)
+   - Returns immediately on success or non-retryable error
+
+5. **Applied retry to network operations:**
+   - git push: Now uses execWithRetry
+   - gh pr create: Now uses execWithRetry
+
+**Tests Added (6):**
+- Network connectivity error detection
+- Server-side error (5xx) detection
+- Rate limiting detection
+- stdout/stderr checking
+- Non-retryable error rejection
+- Success result handling
+
+**Notes:**
+- All 110 tests pass (12 new: 6 in src/, 6 in dist/)
+- Build and type checks pass
+- Phase 3 (Improve Error Handling) now complete

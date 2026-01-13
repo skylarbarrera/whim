@@ -48,11 +48,18 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - git config, git add, git commit, git clone, git checkout all covered
   - ralph init logs full output on warning/failure
   - Git clone URL sanitized in logs (token masked)
-- [ ] Add retry logic for transient network failures (push, gh api)
+- [x] Add retry logic for transient network failures (push, gh api)
+  - Added execWithRetry() function with exponential backoff + jitter
+  - isRetryableError() detects: connection errors, 5xx HTTP, rate limiting
+  - Default: 3 retries, 1s base delay, 10s max delay
+  - Applied to git push and gh pr create commands
+  - Logs retry attempts with truncated error preview
 
 ### Phase 4: Observability
-- [ ] Add logging to show git commit history before push attempt
-- [ ] Log the actual `gh pr create` command being run
+- [x] Add logging to show git commit history before push attempt
+  - Already implemented: git log --oneline -5 shown before push
+- [x] Log the actual `gh pr create` command being run
+  - Already implemented: "[PR] Running: gh pr create ..." logged
 - [ ] Track and report test execution results in worker metrics
 
 ## Acceptance Criteria

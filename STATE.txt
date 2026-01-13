@@ -70,3 +70,9 @@ The AI Software Factory implementation is complete.
   - git config, git add, git commit, git clone, git checkout all covered
   - ralph init logs full output on warning/failure
   - Git clone URL sanitized in logs (token masked)
+- Phase 3.3: Add retry logic for transient network failures
+  - Added execWithRetry() with exponential backoff + jitter
+  - isRetryableError() detects: connection errors, 5xx HTTP, rate limiting
+  - Default: 3 retries, 1s base delay, 10s max delay
+  - Applied to git push and gh pr create commands
+  - 6 new tests for isRetryableError (110 total tests)
