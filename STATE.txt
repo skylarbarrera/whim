@@ -2,6 +2,7 @@
 
 ## Completed
 - Phase 1: Project Scaffolding (all 5 tasks)
+- Phase 2: Shared Package (all 4 tasks)
 
 ## Current
-- Phase 2: Shared Package (next iteration)
+- Phase 3: Database Schema (next iteration)
