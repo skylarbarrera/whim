@@ -27,6 +27,8 @@ export interface RalphMetrics {
   filesModified: number;
   testsRun: number;
   testsPassed: number;
+  testsFailed: number;
+  testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error";
 }
 
 export interface RalphResult {
@@ -71,6 +73,8 @@ export async function runRalph(
     filesModified: 0,
     testsRun: 0,
     testsPassed: 0,
+    testsFailed: 0,
+    testStatus: undefined,
   };
 
   let iteration = 0;

@@ -1,52 +1,43 @@
-# Plan: Phase 3.3 - Add Retry Logic for Transient Network Failures
+# Plan: Phase 4.3 - Track and Report Test Execution Results in Worker Metrics
 
 ## Goal
-Add retry logic for git push and gh pr create to handle transient network failures.
+Enhance worker metrics to include testsFailed and testStatus for better observability.
+
+## Current State
+- Test results are already captured by runTests() in testing.ts
+- testsRun and testsPassed are already sent in WorkerCompleteRequest
+- testsFailed is available but not sent
+- testStatus (passed/failed/timeout/skipped/error) not tracked in metrics
 
 ## Files to Modify
-- `packages/worker/src/setup.ts`
+- `packages/shared/src/types.ts` - Add testsFailed and testStatus to metrics
+- `packages/worker/src/ralph.ts` - Add testsFailed to RalphMetrics
+- `packages/worker/src/index.ts` - Include testsFailed and testStatus in metrics
 
 ## Changes
 
-### 1. Create retry helper function
-```typescript
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: {
-    maxRetries?: number;
-    delayMs?: number;
-    shouldRetry?: (error: unknown) => boolean;
-  } = {}
-): Promise<T>
-```
+### 1. Update shared types
+Add to WorkerCompleteRequest.metrics:
+- testsFailed: number
+- testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error"
 
-Features:
-- Configurable max retries (default: 3)
-- Exponential backoff with jitter
-- Custom retry predicate for error types
-- Logs retry attempts
+Add to WorkerMetrics:
+- testsFailed: number
+- testStatus?: string
 
-### 2. Apply retry to git push
-In `createPullRequest()`, wrap the push command with retry logic:
-- Retry on network errors (connection reset, timeout)
-- Retry on HTTP 5xx errors from GitHub
-- Max 3 retries with exponential backoff
+### 2. Update ralph.ts RalphMetrics
+Add testsFailed field
 
-### 3. Apply retry to gh pr create
-In `createPullRequest()`, wrap the PR creation with retry logic:
-- Retry on network errors
-- Retry on API rate limiting (HTTP 429)
-- Retry on HTTP 5xx errors
-- Max 3 retries with exponential backoff
+### 3. Update index.ts
+Include testsFailed and testStatus in the metrics sent to orchestrator
 
 ## Tests
-- Add unit tests for withRetry helper
-- Add tests for retry behavior in push/pr scenarios
+- Existing tests should pass
+- Update client.test.ts to include new fields
 
 ## Exit Criteria
-- [ ] withRetry helper implemented and tested
-- [ ] git push uses retry logic
-- [ ] gh pr create uses retry logic
-- [ ] Retries logged for debugging
+- [ ] testsFailed added to metrics types
+- [ ] testStatus added to metrics types
+- [ ] Worker sends complete test metrics to orchestrator
 - [ ] Type checks pass
 - [ ] All tests pass

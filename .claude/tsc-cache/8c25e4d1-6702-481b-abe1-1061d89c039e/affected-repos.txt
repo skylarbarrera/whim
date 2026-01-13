@@ -1,2 +1,4 @@
 packages/worker
 root
+packages/shared
+packages/orchestrator

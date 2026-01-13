@@ -107,6 +107,8 @@ interface WorkerMetricsRow {
   files_modified: number;
   tests_run: number;
   tests_passed: number;
+  tests_failed?: number;
+  test_status?: string;
   timestamp: Date;
 }
 
@@ -289,6 +291,8 @@ export class Database {
       filesModified: row.files_modified,
       testsRun: row.tests_run,
       testsPassed: row.tests_passed,
+      testsFailed: row.tests_failed ?? 0,
+      testStatus: row.test_status as WorkerMetrics["testStatus"],
       timestamp: row.timestamp,
     };
   }

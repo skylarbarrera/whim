@@ -532,6 +532,8 @@ describe("WorkerManager", () => {
           filesModified: 5,
           testsRun: 10,
           testsPassed: 10,
+          testsFailed: 0,
+          testStatus: "passed",
         },
       });
 

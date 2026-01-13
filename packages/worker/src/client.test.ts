@@ -123,6 +123,8 @@ describe("OrchestratorClient", () => {
           filesModified: 3,
           testsRun: 10,
           testsPassed: 10,
+          testsFailed: 0,
+          testStatus: "passed",
         },
         [{ content: "Learned something", spec: "spec text" }]
       );

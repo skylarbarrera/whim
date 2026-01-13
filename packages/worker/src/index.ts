@@ -124,6 +124,8 @@ async function main(): Promise<void> {
     // Update metrics with actual test results
     result.metrics.testsRun = testResult.testsRun;
     result.metrics.testsPassed = testResult.testsPassed;
+    result.metrics.testsFailed = testResult.testsFailed;
+    result.metrics.testStatus = testResult.status;
 
     console.log("Extracting new learnings...");
     const newLearningsPath = getNewLearningsPath(repoDir);

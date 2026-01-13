@@ -75,6 +75,8 @@ export interface WorkerMetrics {
   filesModified: number;
   testsRun: number;
   testsPassed: number;
+  testsFailed: number;
+  testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error";
   timestamp: Date;
 }
 
@@ -124,6 +126,8 @@ export interface WorkerCompleteRequest {
     filesModified: number;
     testsRun: number;
     testsPassed: number;
+    testsFailed: number;
+    testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error";
   };
   learnings?: Array<{
     content: string;
