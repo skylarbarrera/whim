@@ -193,6 +193,167 @@ export interface WorkerStatsResponse {
   avgDuration: number;
 }
 
+// PR Review Types
+
+export type ReviewStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export type CheckStatus = "pending" | "running" | "success" | "failure" | "skipped" | "error";
+
+export type CheckType = "lint" | "test" | "typecheck" | "build" | "security" | "quality";
+
+export interface PRReview {
+  id: string;
+  repoOwner: string;
+  repoName: string;
+  prNumber: number;
+  status: ReviewStatus;
+  isAIGenerated: boolean;
+  detectionConfidence: number;
+  detectionReasons: string[];
+  startedAt: Date;
+  completedAt: Date | null;
+  mergeBlocked: boolean;
+  overrideUser: string | null;
+  overrideReason: string | null;
+  overrideAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PRReviewCheck {
+  id: string;
+  reviewId: string;
+  checkName: string;
+  checkType: CheckType;
+  status: CheckStatus;
+  required: boolean;
+  summary: string | null;
+  details: string | null;
+  errorCount: number;
+  warningCount: number;
+  duration: number | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface CheckError {
+  file?: string;
+  line?: number;
+  column?: number;
+  message: string;
+  rule?: string;
+  severity: "error";
+}
+
+export interface CheckWarning {
+  file?: string;
+  line?: number;
+  column?: number;
+  message: string;
+  rule?: string;
+  severity: "warning";
+}
+
+export interface DetectionResult {
+  isAI: boolean;
+  confidence: number;
+  reasons: string[];
+  metadata: Record<string, unknown>;
+}
+
+export interface PRContext {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  commits: Array<{
+    sha: string;
+    message: string;
+    author: string;
+  }>;
+  branch: string;
+  baseBranch: string;
+  labels: string[];
+  description: string;
+  changedFiles: string[];
+}
+
+export interface CheckResult {
+  status: CheckStatus;
+  summary: string;
+  details: string;
+  errors?: CheckError[];
+  warnings?: CheckWarning[];
+  duration: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface AggregatedResult {
+  overallStatus: "pass" | "fail" | "error";
+  mergeBlocked: boolean;
+  passedChecks: number;
+  failedChecks: number;
+  skippedChecks: number;
+  totalErrors: number;
+  totalWarnings: number;
+  summary: string;
+  checkResults: Array<{
+    name: string;
+    status: CheckStatus;
+    required: boolean;
+    errorCount: number;
+    warningCount: number;
+  }>;
+}
+
+// PR Review API Types
+
+export interface CreateReviewRequest {
+  repoOwner: string;
+  repoName: string;
+  prNumber: number;
+  isAIGenerated: boolean;
+  detectionConfidence: number;
+  detectionReasons: string[];
+}
+
+export interface UpdateReviewRequest {
+  status?: ReviewStatus;
+  mergeBlocked?: boolean;
+  overrideUser?: string;
+  overrideReason?: string;
+}
+
+export interface CreateCheckRequest {
+  reviewId: string;
+  checkName: string;
+  checkType: CheckType;
+  required: boolean;
+}
+
+export interface UpdateCheckRequest {
+  status?: CheckStatus;
+  summary?: string;
+  details?: string;
+  errorCount?: number;
+  warningCount?: number;
+  duration?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ListReviewsRequest {
+  repoOwner?: string;
+  repoName?: string;
+  status?: ReviewStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export interface OverrideReviewRequest {
+  reason: string;
+}
+
 // Error Response
 
 export interface ErrorResponse {

@@ -1,77 +1,101 @@
-# Task 2: Implement Interactive Spec Creation Flow
+# Plan: Design PR Review System Architecture
 
 ## Goal
-Implement a user interface for spec creation through guided questioning, allowing users to manually create specifications through an interactive process.
+Design a composable PR review system specifically for AI-generated pull requests, including automated lint and testing hooks that block merging on failure.
 
-## Current State
-- Ralph v0.3.0 already includes `/create-spec` skill for interactive spec creation
-- This skill uses LLM-powered interview and review process
-- Skill is available in Claude Code CLI
-- Documentation exists in Ralph repository
-- No integration with factory system yet
+## Context
+The AI Software Factory automatically generates code changes through Ralph instances. We need a review system that:
+1. Detects AI-generated PRs
+2. Runs automated checks (lint, tests)
+3. Blocks merging on failures
+4. Provides clear feedback
+5. Is composable and configurable
 
-## Implementation Approach
+## Approach
 
-### Option 1: Expose Ralph's /create-spec skill via API
-- Add new API endpoint to orchestrator: POST /api/spec/interactive
-- Endpoint spawns a Claude Code session with /create-spec skill
-- Captures Q&A interaction and returns generated spec
-- Challenges: Complex to stream Q&A through HTTP API
+### 1. PR Detection Strategy
+AI-generated PRs can be identified by:
+- Commit messages containing "Co-Authored-By: Claude Sonnet 4.5"
+- Branch name patterns (e.g., `ai/issue-*`)
+- Labels applied by the intake service
+- Metadata in PR description
 
-### Option 2: CLI-based interactive workflow (RECOMMENDED)
-- Document how users can run `/create-spec` skill locally
-- User runs `claude` CLI with `/create-spec` in their repo
-- Generated SPEC.md can be submitted to factory via existing API
-- Simpler, leverages existing Ralph tooling
-- No factory code changes needed
+### 2. Review Workflow
+```
+GitHub Issue → Intake → Orchestrator → Worker (Ralph) → PR Created
+                                                            ↓
+                                              PR Review System Triggered
+                                                            ↓
+                                    [Detect AI-generated] → Apply label
+                                                            ↓
+                                         [Run automated checks]
+                                    ┌─────────────┬────────────┐
+                                    ↓             ↓            ↓
+                                 Lint         Tests      Code Quality
+                                    ↓             ↓            ↓
+                                [Collect results and report]
+                                    ↓
+                    [Block merge if failures] OR [Allow merge if pass]
+```
 
-### Option 3: Wrapper script for local usage
-- Create `scripts/create-spec.sh` wrapper
-- Script runs Claude CLI with appropriate settings
-- Guides user through the interview process
-- Outputs SPEC.md that can be submitted to factory
-- Provides better UX than raw CLI
+### 3. Composable Architecture
+Use a modular design with:
+- **Core**: PR detection, status tracking, result aggregation
+- **Checks**: Pluggable check modules (lint, test, quality)
+- **Reporters**: Feedback mechanisms (GitHub status, comments)
+- **Config**: YAML-based rules and check selection
 
-## Recommendation: Option 3 (Wrapper Script)
-
-This approach:
-- Leverages Ralph's existing `/create-spec` skill
-- Provides simple UX without complex API streaming
-- Works with local repos before submission to factory
-- Maintains separation between spec creation and execution
-- Easy to document and use
-
-## Implementation Plan
-
-### 1. Create wrapper script
-- `scripts/create-spec.sh` - Bash script for interactive spec creation
-- Checks prerequisites (Claude CLI installed)
-- Validates repo context
-- Runs Claude CLI with /create-spec skill
-- Saves SPEC.md to specified location
-
-### 2. Add configuration
-- `.env.example` - Add any needed config vars
-- Document ANTHROPIC_API_KEY requirement
-
-### 3. Update documentation
-- README.md - Add section on interactive spec creation
-- Document the workflow: create spec → submit to factory
-- Add examples and screenshots if possible
-
-### 4. Test the workflow
-- Run the script manually
-- Verify SPEC.md generation
-- Ensure it works with factory submission
+### 4. Integration Points
+- **GitHub Actions**: Main execution environment
+- **GitHub Status API**: Report check results
+- **GitHub Checks API**: Create detailed check runs
+- **Worker**: Post-PR creation hook to trigger review
+- **Orchestrator**: Track review status in database
 
 ## Files to Create/Modify
-- `scripts/create-spec.sh` (NEW) - Interactive spec creation wrapper
-- `README.md` - Document interactive workflow
-- `.env.example` - Add ANTHROPIC_API_KEY if not present
+
+### New Package: `packages/pr-review`
+- `package.json` - Package config
+- `tsconfig.json` - TypeScript config
+- `src/detector.ts` - AI PR detection logic
+- `src/tracker.ts` - Review status tracking
+- `src/aggregator.ts` - Result aggregation
+- `src/checks/base.ts` - Base check interface
+- `src/checks/lint.ts` - Lint check implementation
+- `src/checks/test.ts` - Test check implementation
+- `src/reporters/github-status.ts` - GitHub status reporter
+- `src/config.ts` - Configuration loading
+- `src/index.ts` - Main entry point
+
+### GitHub Actions Workflows
+- `.github/workflows/pr-review.yml` - Main workflow
+- `.github/workflows/lint.yml` - Lint job
+- `.github/workflows/test.yml` - Test job
+
+### Database Schema
+- Add `pr_reviews` table to migrations
+- Add `pr_review_checks` table for individual check results
+
+### Shared Types
+- Update `packages/shared/src/types.ts` with PR review types
+
+### Worker Integration
+- Update `packages/worker/src/index.ts` to trigger review after PR creation
+
+## Tests
+- Unit tests for each module
+- Integration tests for workflow
+- Mock GitHub API responses
 
 ## Exit Criteria
-- [ ] Wrapper script created and executable
-- [ ] Script checks prerequisites and provides helpful errors
-- [ ] Documentation explains interactive workflow
-- [ ] Users can create specs interactively and submit to factory
-- [ ] Integration with existing factory submission API confirmed
+- [ ] Architecture document created
+- [ ] Component interfaces defined
+- [ ] Integration points documented
+- [ ] Database schema designed
+- [ ] All sub-bullets of task completed
+
+## Notes
+- Use GitHub Actions for execution (already in CI/CD)
+- Keep checks composable and configurable
+- Support emergency override mechanism
+- Maintain audit trail of decisions

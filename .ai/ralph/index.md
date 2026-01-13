@@ -1273,3 +1273,100 @@ This integration provides:
 2. **Flexibility** - Users can choose autonomous or interactive creation
 3. **Cost efficiency** - Ralph CLI reduces API costs vs direct SDK usage
 4. **Maintainability** - Clear separation between spec creation and execution
+
+---
+
+## Session 30 - 2026-01-13
+
+### Task: Design PR Review System Architecture
+
+**Commit:** (pending)
+
+**Files Created:**
+- `docs/pr-review-architecture.md` - Comprehensive architecture document
+- `docs/pr-review-integration.md` - Integration points documentation
+- `migrations/002_pr_reviews.sql` - Database schema for PR reviews
+
+**Files Modified:**
+- `packages/shared/src/types.ts` - Added PR review types
+- `SPEC.md` - Marked first task as complete
+
+**Architecture Components Designed:**
+
+1. **PR Detector**
+   - Identifies AI-generated PRs via commit co-authors, branch patterns, labels
+   - Returns DetectionResult with confidence score and reasons
+   - Interface defined in shared types
+
+2. **Check Framework**
+   - Base Check interface for pluggable checks
+   - Built-in checks: lint, test, typecheck, build, security, quality
+   - CheckResult interface with errors/warnings/metadata
+
+3. **Review Tracker**
+   - State machine: pending → running → completed/failed/cancelled
+   - Database tables: pr_reviews, pr_review_checks
+   - Full audit trail with override tracking
+
+4. **Result Aggregator**
+   - Combines check results to determine merge status
+   - Required checks must pass to allow merge
+   - Returns AggregatedResult with summary
+
+5. **GitHub Reporter**
+   - Reports via Status API, Checks API, and PR comments
+   - Creates annotations for lint errors
+   - Links to dashboard for details
+
+6. **Configuration System**
+   - YAML-based config per repository (.ai/pr-review.yml)
+   - Configurable checks, rules, and merge protection
+   - Defaults with repository overrides
+
+**Database Schema:**
+- `pr_reviews` table with status, detection info, override tracking
+- `pr_review_checks` table for individual check results
+- Enums: review_status, check_status, check_type
+- Indexes for performance on status, repo+pr, merge_blocked
+- Foreign key from work_items to pr_reviews
+
+**Integration Points:**
+
+1. **GitHub Actions** - Workflow triggered on PR events
+2. **Worker** - Triggers review via repository_dispatch after PR creation
+3. **Orchestrator API** - New endpoints for review CRUD operations
+4. **Database** - Shared PostgreSQL with orchestrator
+5. **Dashboard** - New pages for review list, details, and stats
+6. **GitHub API** - Status/Checks/Comments for reporting
+7. **Branch Protection** - Required status checks enforce merge blocking
+
+**TypeScript Types Added:**
+- ReviewStatus, CheckStatus, CheckType enums
+- PRReview, PRReviewCheck interfaces
+- DetectionResult, PRContext, CheckResult interfaces
+- AggregatedResult interface
+- API request/response types for review operations
+
+**Key Design Decisions:**
+
+1. **Separation of Concerns**: Distinct modules for detect/track/check/aggregate/report
+2. **Plugin Architecture**: Composable checks with base interface
+3. **Configuration-Driven**: YAML config for flexibility
+4. **GitHub-Native**: Leverage existing GitHub Actions and APIs
+5. **Audit Trail**: Track all decisions and overrides
+6. **Emergency Override**: Support critical hotfix scenarios
+
+**Documentation:**
+- 300+ line architecture document with diagrams
+- 600+ line integration document with code examples
+- Database schema with comments
+- Complete TypeScript interface definitions
+
+**Notes:**
+- All types compile successfully (verified with tsc --noEmit)
+- Migration ready for database deployment
+- Architecture covers all sub-bullets:
+  ✅ Review workflow defined
+  ✅ Composable components/modules designed
+  ✅ Integration points with CI/CD documented
+- Next task: Implement core PR review functionality
