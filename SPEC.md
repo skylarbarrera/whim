@@ -1,49 +1,58 @@
-# Update Ralph Instance and Pull in New Spec Tooling
+# Pre Review Step for AI Generated PRs
 
 ## Goal
-Integrate the latest Ralph repository changes including updated spec tooling and headless spec creation capabilities, then implement two distinct spec creation flows: interactive user questioning and autonomous GitHub issue-based generation.
+Implement a composable PR review system specifically for AI-generated PRs with automated lint and testing hooks that prevent merging until quality gates are met.
 
 ## Tasks
-- [x] Update Ralph repository integration
-  - Pull latest changes from Ralph repo
-  - Review and integrate updated spec tooling
-  - Test headless spec creation functionality
-  - Update dependencies and configurations as needed
-- [x] Implement interactive spec creation flow
-  - Design user interface for spec creation via questioning
-  - Create question flow logic and validation
-  - Implement spec generation from user responses
-  - Add error handling and user feedback mechanisms
-- [x] Implement autonomous GitHub issue spec creation
-  - Set up GitHub webhook/API integration for issue monitoring
-  - Create issue parsing and content extraction logic
-  - Implement automatic spec generation from issue content
-  - Add spec validation and quality checks
-- [x] Create flow routing and management system
-  - Implement flow selection mechanism
-  - Add configuration options for different creation modes
-  - Create shared spec output formatting and storage
-- [x] Add comprehensive testing
-  - Unit tests for both creation flows
-  - Integration tests with Ralph tooling
-  - GitHub API integration tests
-  - End-to-end flow validation
+- [ ] Design composable PR review system architecture
+  - Define review step interfaces and contracts
+  - Create plugin system for custom review steps
+  - Design configuration schema for review workflows
+- [ ] Implement AI PR detection mechanism
+  - Add metadata tagging for AI-generated PRs
+  - Create PR classification logic
+  - Store AI generation context/prompts for reviewers
+- [ ] Build core review orchestrator
+  - Sequential and parallel review step execution
+  - Review result aggregation and reporting
+  - Integration with GitHub PR status checks
+- [ ] Implement lint validation hook
+  - Configure linting tools (eslint, prettier, etc.)
+  - Create commit-level lint checking
+  - Generate actionable lint failure reports
+- [ ] Implement automated testing hook
+  - Unit test execution on commit
+  - Integration test suite runner
+  - Test coverage validation
+- [ ] Create merge blocking mechanism
+  - GitHub branch protection rule integration
+  - Status check requirements configuration
+  - Override mechanisms for emergency deployments
+- [ ] Build review dashboard/UI
+  - Review step status visualization
+  - Failed check details and remediation guidance
+  - Manual review trigger interface
+- [ ] Add configuration management
+  - YAML-based review workflow definitions
+  - Repository-specific and organization-level configs
+  - Environment-specific review requirements
 
 ## Acceptance Criteria
-- [x] Ralph repository is successfully updated with all new tooling integrated
-- [x] Interactive questioning flow allows users to create complete specs through guided prompts
-- [x] GitHub issues automatically trigger spec creation without manual intervention
-- [x] Both flows produce consistently formatted, valid specification documents
-- [x] System gracefully handles errors in both creation flows
-- [x] All new functionality is covered by automated tests
-- [x] Documentation exists for both spec creation flows
+- [ ] AI-generated PRs are automatically identified and routed through review system
+- [ ] Lint failures block PR merging with clear error messages and fix suggestions
+- [ ] Test failures prevent merging with detailed test result reports
+- [ ] Review system is configurable per repository with different rule sets
+- [ ] Manual override capability exists for authorized users in emergency situations
+- [ ] All review steps complete within 5 minutes for typical PRs
+- [ ] System integrates seamlessly with existing GitHub workflow without disrupting non-AI PRs
+- [ ] Review results are clearly displayed in GitHub PR interface
 
 ## Notes
-- Ensure backward compatibility with existing Ralph integrations during the update
-- Consider rate limiting and authentication for GitHub API interactions
-- The autonomous flow should handle various GitHub issue formats and extract relevant information intelligently
-- Both flows should produce specs that are compatible with existing tooling and workflows
-- Consider adding configuration options to customize the questioning flow based on project types
-- Implement proper logging and monitoring for the autonomous GitHub issue processing
-- Edge case: Handle malformed or insufficient GitHub issues gracefully
-- Edge case: Ensure the questioning flow can handle incomplete or invalid user responses
+- Consider rate limiting for review system to avoid overwhelming CI/CD resources
+- Need to handle cases where AI-generated code may not follow existing project conventions
+- Should support both blocking and non-blocking review steps for flexibility
+- Integration with existing GitHub Actions workflows should be backward compatible
+- May need webhook handling for real-time PR event processing
+- Consider storing review metrics for system optimization and AI model feedback
+- Security consideration: ensure review system cannot be bypassed maliciously
+- Edge case: Handle large PRs that may timeout during review process
