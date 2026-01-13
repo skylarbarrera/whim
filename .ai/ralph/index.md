@@ -104,3 +104,43 @@
 - Build verifies successfully with `bun run build`
 - Turborepo recognizes and caches both packages
 - All Phase 4.1 tasks completed in single iteration
+
+---
+
+## Session 5 - 2025-01-12
+
+### Task: Phase 4.2 - Database & Redis Clients
+
+**Commit:** d6adcc9
+
+**Files Created:**
+- `packages/orchestrator/src/db.ts` - PostgreSQL client wrapper
+- `packages/orchestrator/src/redis.ts` - Redis client wrapper
+
+**db.ts Features:**
+- Database class wrapping pg Pool
+- Typed query methods (query, queryOne, queryOneOrFail, execute)
+- Transaction support with automatic rollback on error
+- Snake_case to camelCase conversion for database rows
+- Entity-specific getters (getWorkItem, getWorker, getLearning, getWorkerMetrics)
+- Connection management (connect/disconnect/isConnected)
+- Row type interfaces matching PostgreSQL schema
+
+**redis.ts Features:**
+- RedisClient class wrapping ioredis
+- Key prefix support for namespacing (factory:)
+- String operations (get, set, del, exists)
+- Numeric operations (incr, incrBy, decr, decrBy)
+- Expiration operations (expire, expireAt, ttl, persist)
+- Hash operations (hset, hmset, hget, hgetall, hdel, hincrby)
+- Set operations (sadd, srem, sismember, smembers, scard)
+- List operations (lpush, rpush, lpop, rpop, lrange, llen)
+- JSON helpers (getJson, setJson)
+- Pub/Sub support (publish)
+- Connection management with retry strategy
+
+**Notes:**
+- Both clients create instances from environment variables (DATABASE_URL, REDIS_URL)
+- Types align with @factory/shared package
+- Build and type checks pass successfully
+- All Phase 4.2 tasks completed in single iteration

@@ -58,8 +58,8 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 - [x] Add dependencies: express, pg, ioredis, dockerode, uuid
 
 ### 4.2 Database & Redis Clients
-- [ ] Create `packages/orchestrator/src/db.ts` - PostgreSQL client wrapper
-- [ ] Create `packages/orchestrator/src/redis.ts` - Redis client wrapper
+- [x] Create `packages/orchestrator/src/db.ts` - PostgreSQL client wrapper
+- [x] Create `packages/orchestrator/src/redis.ts` - Redis client wrapper
 
 ### 4.3 Core Components
 - [ ] Create `packages/orchestrator/src/queue.ts` - QueueManager class:
