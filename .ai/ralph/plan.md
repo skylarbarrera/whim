@@ -1,139 +1,68 @@
-# Plan: Implement Automated Testing Hook
+# Ralph Iteration Plan
 
 ## Goal
-Create a test execution review step that runs unit tests, integration tests, and validates test coverage as part of the PR review system. This step should provide detailed test failure reports and coverage information.
+Implement merge blocking mechanism for AI-generated PRs with GitHub branch protection integration, status check requirements, and emergency override capabilities.
 
 ## Files to Create/Modify
+1. **packages/review-system/src/blocking/branch-protection.ts** - GitHub branch protection rule management
+2. **packages/review-system/src/blocking/status-checks.ts** - Status check requirements configuration
+3. **packages/review-system/src/blocking/override.ts** - Emergency deployment override mechanism
+4. **packages/review-system/src/blocking/index.ts** - Blocking module exports
+5. **packages/review-system/src/__tests__/branch-protection.test.ts** - Branch protection tests
+6. **packages/review-system/src/__tests__/status-checks.test.ts** - Status checks tests
+7. **packages/review-system/src/__tests__/override.test.ts** - Override mechanism tests
+8. **packages/review-system/src/index.ts** - Add blocking module exports
 
-### New Files
-1. `packages/review-system/src/steps/test-step.ts`
-   - TestStep class implementing ReviewStep interface
-   - Support for multiple test runners (Jest, Vitest, Bun, Mocha, custom)
-   - Parse test output and convert to ReviewMessages
-   - Test coverage validation
-   - Test suite execution with timeout handling
+## Implementation Plan
 
-2. `packages/review-system/src/__tests__/test-step.test.ts`
-   - Test execution scenarios
-   - Test output parsing for different runners
-   - Test coverage validation
-   - Error handling
-   - Timeout scenarios
+### 1. Branch Protection Management (branch-protection.ts)
+- BranchProtectionManager class
+- Configure GitHub branch protection rules via GitHub API
+- Set required status checks for protected branches
+- Set required pull request reviews
+- Set admin enforcement options
+- Get current protection rules
+- Update existing rules
+- Enable/disable protection
 
-### Existing Files to Modify
-1. `packages/review-system/src/steps/index.ts`
-   - Export TestStep class
+### 2. Status Check Requirements (status-checks.ts)
+- StatusCheckConfig class
+- Define required status checks per workflow
+- Map review step results to GitHub status contexts
+- Configure strict status checks (require branches to be up to date)
+- Set required contexts (lint, test, security, etc.)
+- Support for multiple workflows per repository
 
-2. `packages/review-system/package.json`
-   - Add dev dependencies for testing (if needed)
+### 3. Override Mechanism (override.ts)
+- OverrideManager class
+- Emergency override request creation
+- Authorization checks (admin users, teams, roles)
+- Time-limited override tokens
+- Override reason and audit logging
+- Automatic override expiration
+- Override revocation
+- Integration with GitHub bypass restrictions
 
-## Implementation Steps
-
-1. **Create TestStep class**
-   - Implement ReviewStep interface (initialize, execute, cleanup, validateConfig)
-   - Support multiple test runners: jest, vitest, bun, mocha, custom
-   - Run tests on commit-level (all affected tests)
-   - Parse stdout/stderr from test commands
-   - Convert test failures to ReviewMessages with file/line/test name
-   - Include stack traces and error details
-   - Track test counts: run, passed, failed, skipped
-
-2. **Test runner integration**
-   - Jest: `npm test -- --json` or `jest --json`
-   - Vitest: `vitest run --reporter=json`
-   - Bun: `bun test --reporter json`
-   - Mocha: `mocha --reporter json`
-   - Custom: configurable command with output parser
-
-3. **Output parsing**
-   - Parse JSON output from test runners
-   - Extract: test name, file path, line number, error message, stack trace
-   - Handle different JSON formats per runner
-   - Fallback to text parsing if JSON unavailable
-
-4. **Coverage validation**
-   - Run with coverage flags (--coverage)
-   - Parse coverage reports (lcov, json-summary)
-   - Check against thresholds: lines, functions, branches, statements
-   - Generate coverage messages if below threshold
-   - Support coverage config from project (jest.config, vitest.config)
-
-5. **Configuration**
-   - runner: "jest" | "vitest" | "bun" | "mocha" | "custom"
-   - command: string (custom command override)
-   - args: string[] (additional arguments)
-   - testScript: string (package.json script name, default: "test")
-   - coverage: boolean (enable coverage checking)
-   - coverageThresholds: { lines, functions, branches, statements }
-   - timeout: number (test suite timeout in ms)
-   - failOn: "error" | "failure" (fail on test errors only or any failure)
-
-6. **Result formatting**
-   - Group failures by test file
-   - Include test names and error messages
-   - Add stack traces for debugging
-   - Show test counts: X passed, Y failed, Z total
-   - Coverage summary: X% lines, Y% branches, etc.
-   - Actionable suggestions (e.g., "Fix failing test: should validate input")
-
-7. **Testing**
-   - Mock test command execution
-   - Test Jest output parsing
-   - Test Vitest output parsing
-   - Test Bun output parsing
-   - Test coverage threshold validation
-   - Test timeout handling
-   - Test error scenarios (test runner not found, invalid config)
-
-## Tests to Write
-
-1. **Basic test execution**
-   - Detect test failures
-   - Pass when all tests pass
-   - Count test results correctly
-
-2. **Output parsing**
-   - Parse Jest JSON format correctly
-   - Parse Vitest JSON format correctly
-   - Parse Bun output correctly
-   - Handle text output as fallback
-
-3. **Test failure reporting**
-   - Extract test name and file
-   - Include error messages
-   - Include stack traces
-   - Format as ReviewMessages
-
-4. **Coverage validation**
-   - Parse coverage reports
-   - Check against thresholds
-   - Generate coverage warnings
-   - Pass when coverage meets thresholds
-
-5. **Configuration validation**
-   - Reject invalid runner types
-   - Reject invalid failOn values
-   - Validate coverage thresholds
-
-6. **Error handling**
-   - Handle missing test runner
-   - Handle invalid JSON output
-   - Handle test suite crashes
-   - Handle timeouts
-
-7. **Test runner detection**
-   - Auto-detect runner from package.json
-   - Use configured test script
-   - Fallback to npm test
+### 4. Testing
+- Test branch protection API integration
+- Test status check configuration
+- Test override authorization logic
+- Test override token lifecycle
+- Test audit logging
+- Ensure graceful error handling
 
 ## Exit Criteria
+- [ ] BranchProtectionManager can configure GitHub branch protection
+- [ ] StatusCheckConfig maps review results to required checks
+- [ ] OverrideManager handles emergency deployments with audit trail
+- [ ] All classes integrate with existing review system types
+- [ ] Comprehensive test coverage for all components
+- [ ] Package builds successfully with TypeScript
+- [ ] All source code type-checks correctly
 
-- [ ] TestStep class implements all ReviewStep interface methods
-- [ ] Support for Jest, Vitest, Bun test runners
-- [ ] Test failures converted to ReviewMessages with file/line/test name
-- [ ] Test coverage validation with configurable thresholds
-- [ ] Detailed test failure reports with stack traces
-- [ ] Configuration validates test setup
-- [ ] At least 20 tests covering all scenarios
-- [ ] Package builds successfully with no type errors
-- [ ] Tests pass with `bun test`
+## Notes
+- Use @octokit/rest for GitHub API integration (already a dependency)
+- Follow security best practices for override tokens
+- Ensure override mechanism cannot be easily abused
+- Consider rate limiting for override requests
+- Branch protection requires admin/maintain permissions on repo

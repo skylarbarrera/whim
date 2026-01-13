@@ -12,3 +12,6 @@ export * from './orchestrator/index.js';
 
 // Review step implementations
 export * from './steps/index.js';
+
+// Merge blocking mechanism
+export * from './blocking/index.js';
