@@ -1,55 +1,42 @@
-# Plan: RateLimiter Class
+# Plan: ConflictDetector Implementation
 
 ## Goal
-Create `packages/orchestrator/src/rate-limits.ts` with RateLimiter class that manages worker spawn rate limiting and daily iteration budgets.
+Create `packages/orchestrator/src/conflicts.ts` - a ConflictDetector class that manages file locks to prevent multiple workers from editing the same files simultaneously.
 
-## Methods Required (from SPEC.md)
-- `canSpawnWorker()` - check if spawn allowed (based on cooldown and max workers)
-- `recordSpawn()` - record worker spawn timestamp
-- `recordWorkerDone()` - record worker completion (decrement active count)
-- `recordIteration()` - record iteration for daily budget tracking
-- `checkDailyReset()` - reset daily limits at midnight
-- `getStatus()` - get current rate limit status
+## Files to Create/Modify
+- `packages/orchestrator/src/conflicts.ts` (create) - ConflictDetector class
+- `packages/orchestrator/src/conflicts.test.ts` (create) - unit tests
 
-## Implementation Details
-
-### Redis Keys (with factory: prefix)
-- `rate:active_workers` - current count of active workers
-- `rate:last_spawn` - timestamp of last spawn
-- `rate:daily_iterations` - iteration count for today
-- `rate:daily_reset_date` - date string for tracking daily reset
-
-### Configuration
-- MAX_WORKERS (env, default: 2)
-- DAILY_BUDGET (env, default: 200)
-- COOLDOWN_SECONDS (env, default: 60)
-
-### Status Response (matches StatusResponse.rateLimits)
+## Interface (from SPEC.md)
 ```typescript
-{
-  iterationsToday: number;
-  dailyBudget: number;
-  lastSpawn: Date | null;
-  cooldownSeconds: number;
+class ConflictDetector {
+  acquireLocks(workerId: string, files: string[]): Promise<{ acquired: string[]; blocked: string[] }>
+  releaseLocks(workerId: string, files: string[]): Promise<void>
+  releaseAllLocks(workerId: string): Promise<void>
 }
 ```
 
-## Files to Create/Modify
-- CREATE: `packages/orchestrator/src/rate-limits.ts`
-- CREATE: `packages/orchestrator/src/rate-limits.test.ts`
+## Implementation Details
+1. Uses the `file_locks` table from migration 001:
+   - `id` UUID PRIMARY KEY
+   - `worker_id` UUID NOT NULL REFERENCES workers(id)
+   - `file_path` TEXT NOT NULL
+   - `acquired_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   - UNIQUE (file_path) -- Only one worker can hold a lock on a file
+
+2. `acquireLocks` - Try to insert locks for files, returning which were acquired vs blocked by other workers
+3. `releaseLocks` - Delete specific file locks owned by the worker
+4. `releaseAllLocks` - Delete all file locks owned by the worker (cleanup on completion/failure)
 
 ## Tests
-1. canSpawnWorker returns true when under limits
-2. canSpawnWorker returns false during cooldown
-3. canSpawnWorker returns false when at max workers
-4. canSpawnWorker returns false when daily budget exhausted
-5. recordSpawn increments active workers and sets timestamp
-6. recordWorkerDone decrements active workers
-7. recordIteration increments daily count
-8. checkDailyReset resets counters on new day
-9. getStatus returns correct values
+1. Test acquiring locks on free files
+2. Test acquiring locks when some are taken by another worker
+3. Test releasing specific locks
+4. Test releasing all locks for a worker
+5. Test that a worker can re-acquire its own locks (idempotent)
+6. Test acquiring empty file list
 
 ## Exit Criteria
-- TypeScript compiles without errors
-- All tests pass
-- Integrates with existing RedisClient pattern
+- [x] ConflictDetector class created with all 3 methods
+- [ ] Unit tests pass
+- [ ] TypeScript compiles without errors
