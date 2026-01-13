@@ -386,3 +386,56 @@ Management Routes:
 - All existing tests still pass (160 tests)
 - Phase 4 (Orchestrator Package) now complete
 - Next: Phase 5 Worker Package
+
+---
+
+## Session 13 - 2025-01-12
+
+### Task: Phase 5.1 - Worker Package Core
+
+**Files Created:**
+- `packages/worker/package.json` - Package config with name @factory/worker
+- `packages/worker/tsconfig.json` - Extends root config
+- `packages/worker/src/client.ts` - OrchestratorClient class
+- `packages/worker/src/setup.ts` - Workspace setup functions
+- `packages/worker/src/learnings.ts` - Learning management functions
+- `packages/worker/src/ralph.ts` - Ralph execution and event parsing
+- `packages/worker/src/index.ts` - Main entry point
+- `packages/worker/src/client.test.ts` - Client tests (11 tests)
+- `packages/worker/src/learnings.test.ts` - Learnings tests (9 tests)
+- `packages/worker/src/ralph.test.ts` - Ralph event parsing tests (9 tests)
+
+**OrchestratorClient Methods:**
+1. `heartbeat(iteration, status?, tokens?)` - POST /api/worker/:id/heartbeat
+2. `lockFile(files)` - POST /api/worker/:id/lock
+3. `unlockFile(files)` - POST /api/worker/:id/unlock
+4. `complete(prUrl?, metrics?, learnings?)` - POST /api/worker/:id/complete
+5. `fail(error, iteration)` - POST /api/worker/:id/fail
+6. `stuck(reason, attempts)` - POST /api/worker/:id/stuck
+7. `getLearnings(repo)` - GET /api/learnings?repo=
+
+**setupWorkspace Features:**
+- Clone repo with depth 1
+- Create branch from spec
+- Write SPEC.md to repo
+- Copy Claude config files
+- Configure git user
+
+**createPullRequest Features:**
+- Stage and commit changes
+- Push to remote
+- Create PR via gh CLI
+
+**runRalph Features:**
+- Spawn claude process with --dangerously-skip-permissions
+- Parse [RALPH:*] events from stdout
+- Event types: ITERATION, FILE_EDIT, STUCK, COMPLETE, FAILED
+- Automatic heartbeat on iteration events
+- File locking on edit events
+- Stuck/fail reporting
+
+**Notes:**
+- 29 tests pass
+- Build and type checks pass
+- First of 2 tasks in Phase 5 complete
+- Next: Phase 5.2 Worker Config and Dockerfile

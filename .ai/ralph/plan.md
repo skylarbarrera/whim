@@ -1,110 +1,68 @@
-# Plan: Phase 4.5 - Orchestrator Entry Point and Dockerfile
+# Phase 5.1: Worker Package Core
 
 ## Goal
-
-Complete the orchestrator package by implementing:
-1. `src/index.ts` - Entry point that initializes all components and runs the main loop
-2. `Dockerfile` - Container build for the orchestrator service
+Implement the worker package that runs inside Docker containers, communicates with the orchestrator, manages the workspace, and runs Ralph to execute tasks.
 
 ## Files to Create/Modify
 
-### src/index.ts - Entry Point
+### New Files
+1. `packages/worker/package.json` - Package config with dependencies
+2. `packages/worker/tsconfig.json` - TypeScript config extending root
+3. `packages/worker/src/client.ts` - OrchestratorClient class
+4. `packages/worker/src/setup.ts` - Workspace setup functions
+5. `packages/worker/src/learnings.ts` - Learning management functions
+6. `packages/worker/src/ralph.ts` - Ralph execution and event parsing
+7. `packages/worker/src/index.ts` - Main entry point
 
-**Responsibilities:**
-- Initialize Database and Redis clients
-- Create all component instances (QueueManager, RateLimiter, ConflictDetector, WorkerManager, MetricsCollector)
-- Create and start the Express server
-- Run main loop with:
-  - Check for worker capacity
-  - Get next queued work item
-  - Spawn workers for available items
-  - Run health checks on existing workers
-  - Sleep between iterations
+### Test Files
+- `packages/worker/src/client.test.ts` - Client tests
+- `packages/worker/src/setup.test.ts` - Setup tests
+- `packages/worker/src/learnings.test.ts` - Learnings tests
+- `packages/worker/src/ralph.test.ts` - Ralph event parsing tests
 
-**Structure:**
-```typescript
-// Configuration from environment
-const config = {
-  port: process.env.PORT ?? 3000,
-  loopIntervalMs: parseInt(process.env.LOOP_INTERVAL_MS ?? "5000", 10),
-};
+## Implementation Details
 
-// Initialize clients
-const db = createDatabase();
-const redis = createRedisClient();
+### OrchestratorClient (`src/client.ts`)
+- `baseUrl` property from env
+- `workerId` property
+- `heartbeat(iteration: number, status?: string, tokens?: {in: number, out: number})` - POST /api/worker/:id/heartbeat
+- `lockFile(files: string[])` - POST /api/worker/:id/lock
+- `complete(prUrl?: string, metrics?, learnings?)` - POST /api/worker/:id/complete
+- `fail(error: string, iteration: number)` - POST /api/worker/:id/fail
+- `stuck(reason: string, attempts: number)` - POST /api/worker/:id/stuck
+- `getLearnings(repo: string)` - GET /api/learnings?repo=
 
-// Initialize components
-const queue = new QueueManager(db);
-const rateLimiter = new RateLimiter(redis);
-const conflicts = new ConflictDetector(db);
-const docker = new Docker();
-const workers = new WorkerManager(db, rateLimiter, conflicts, docker);
-const metrics = new MetricsCollector(db);
+### setupWorkspace (`src/setup.ts`)
+- Clone repo: `git clone --depth 1 <repo-url>`
+- Create branch: `git checkout -b <branch>`
+- Write SPEC.md in repo root
+- Copy Claude config files if needed
 
-// Create server
-const app = createServer({ queue, workers, conflicts, rateLimiter, metrics });
+### loadLearnings, saveLearnings (`src/learnings.ts`)
+- `loadLearnings(client, repo, destPath)` - Fetch from orchestrator → write `.ai/learnings.md`
+- `saveLearnings(client, sourcePath)` - Parse `.ai/new-learnings.md` → send to orchestrator
 
-// Main loop
-async function runMainLoop() {
-  while (true) {
-    // 1. Check for stale workers
-    const stale = await workers.healthCheck();
-    for (const w of stale) await workers.kill(w.id, "heartbeat timeout");
+### runRalph (`src/ralph.ts`)
+- Spawn `claude --dangerously-skip-permissions` process
+- Parse `[RALPH:*]` events from stdout:
+  - `[RALPH:ITERATION]` → heartbeat
+  - `[RALPH:FILE_EDIT]` → lockFile
+  - `[RALPH:STUCK]` → stuck report
+  - `[RALPH:COMPLETE]` → metrics extraction
+  - `[RALPH:FAILED]` → fail report
 
-    // 2. Check capacity and spawn workers for queued items
-    while (await workers.hasCapacity()) {
-      const workItem = await queue.getNext();
-      if (!workItem) break;
-      await workers.spawn(workItem);
-    }
-
-    // 3. Sleep
-    await sleep(config.loopIntervalMs);
-  }
-}
-
-// Start
-async function main() {
-  await db.connect();
-  await redis.connect();
-  app.listen(config.port, () => console.log(`Orchestrator listening on :${config.port}`));
-  runMainLoop().catch(console.error);
-}
-
-main().catch(console.error);
-```
-
-### Dockerfile
-
-Based on Bun runtime for consistency with monorepo:
-```dockerfile
-FROM oven/bun:1 AS builder
-WORKDIR /app
-COPY package.json bun.lock ./
-COPY packages/shared ./packages/shared
-COPY packages/orchestrator ./packages/orchestrator
-RUN bun install --frozen-lockfile
-RUN bun run build --filter=@factory/orchestrator
-
-FROM oven/bun:1
-WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/packages/orchestrator/dist ./packages/orchestrator/dist
-COPY --from=builder /app/packages/orchestrator/package.json ./packages/orchestrator/
-WORKDIR /app/packages/orchestrator
-CMD ["bun", "run", "start"]
-```
-
-## Tests
-
-No new tests needed for index.ts (integration-level, tested via docker-compose in Phase 10).
+### Main Entry (`src/index.ts`)
+1. Parse env vars (ORCHESTRATOR_URL, WORK_ITEM, WORKER_ID, GITHUB_TOKEN)
+2. Create OrchestratorClient
+3. Setup workspace
+4. Load learnings
+5. Run Ralph
+6. Extract new learnings
+7. Create PR (using gh cli)
+8. Report completion
 
 ## Exit Criteria
-
-- [ ] `src/index.ts` initializes DB, Redis, all components, starts server, runs main loop
-- [ ] `Dockerfile` builds and runs the orchestrator
-- [ ] `bun run build` succeeds
-- [ ] `bun run typecheck` succeeds
-- [ ] Existing tests still pass
+- [x] All files created and compile without errors
+- [x] Unit tests pass for all modules
+- [x] `bun run build` succeeds
+- [x] `bun run typecheck` passes

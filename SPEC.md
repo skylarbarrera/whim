@@ -79,7 +79,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 5: Worker Package (`packages/worker`)
 
-- [ ] Implement worker package core
+- [x] Implement worker package core
   - `package.json` with name `@factory/worker`
   - `tsconfig.json`
   - `src/client.ts` - OrchestratorClient class (heartbeat, lockFile, complete, fail, stuck, getLearnings)

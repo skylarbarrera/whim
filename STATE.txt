@@ -11,5 +11,7 @@
   - 4.4: API Server (16 endpoints, 24 tests)
   - 4.5: Entry Point & Dockerfile
 
-## Current
-- Phase 5: Worker Package next
+## In Progress
+- Phase 5: Worker Package
+  - 5.1: Worker Package Core (DONE - 7 source files, 29 tests)
+  - 5.2: Worker Config and Dockerfile (next)
