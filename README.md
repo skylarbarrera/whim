@@ -98,9 +98,28 @@ Ralph's spec generator includes:
 
 ### 2. Interactive Spec Creation
 
-For manual spec creation with guided prompts, use Claude Code's `/create-spec` skill:
+For manual spec creation with guided prompts, use the wrapper script or run Claude Code's `/create-spec` skill directly.
+
+**Option A: Using the wrapper script (Recommended)**
 
 ```bash
+# Run from your project directory
+./scripts/create-spec.sh
+
+# Or specify output location
+./scripts/create-spec.sh --output /path/to/SPEC.md
+```
+
+The script will:
+- Check prerequisites (Claude CLI, git repo, API key)
+- Run the `/create-spec` skill interactively
+- Save the generated SPEC.md to your project
+- Show next steps for submission to the factory
+
+**Option B: Using Claude CLI directly**
+
+```bash
+cd your-project
 claude
 > /create-spec
 ```
@@ -110,6 +129,26 @@ The skill will:
 2. **Generate a structured SPEC.md** following Ralph conventions
 3. **Review with LLM** to catch anti-patterns and violations
 4. **Finalize** only after passing validation
+
+**Submitting your spec to the factory:**
+
+Once you have a SPEC.md, submit it via the API:
+
+```bash
+curl -X POST http://localhost:3002/api/work \
+  -H "Content-Type: application/json" \
+  -d @- << EOF
+{
+  "repo": "owner/repo",
+  "spec": "$(cat SPEC.md | jq -Rs .)",
+  "priority": "medium",
+  "metadata": {
+    "source": "interactive",
+    "createdBy": "$(git config user.name)"
+  }
+}
+EOF
+```
 
 **What makes a good SPEC:**
 - Each checkbox = one Ralph iteration

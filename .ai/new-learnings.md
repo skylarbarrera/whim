@@ -44,6 +44,37 @@ Created `RalphSpecGenerator` class in intake service:
 - Slightly longer generation time due to validation step
 - Creates temporary files in work directory
 
+### Interactive Spec Creation Wrapper
+
+Created `scripts/create-spec.sh` to provide a better UX for manual spec creation:
+
+**Features:**
+- Prerequisite checks (Claude CLI, git repo, API key)
+- Wraps `/create-spec` skill with helpful prompts
+- Handles output path configuration
+- Shows next steps after spec generation
+- Provides clear error messages
+
+**Design Decision:**
+Instead of integrating interactive spec creation into the factory API (complex streaming),
+we provide a local wrapper script. This approach:
+- Leverages Ralph's existing `/create-spec` skill
+- Maintains separation between spec creation and execution
+- Simpler to implement and maintain
+- Works with any repo before submission to factory
+- Provides better terminal UX than HTTP streaming
+
+**Usage:**
+```bash
+# From project directory
+./scripts/create-spec.sh
+
+# Then submit to factory
+curl -X POST http://localhost:3002/api/work \
+  -H "Content-Type: application/json" \
+  -d '{"repo":"owner/repo","spec":"...","priority":"medium"}'
+```
+
 ### Configuration
 
 ```env

@@ -1,53 +1,77 @@
-# Task 1: Update Ralph Repository Integration
+# Task 2: Implement Interactive Spec Creation Flow
 
 ## Goal
-Pull latest changes from Ralph repo (v0.3.0), integrate updated spec tooling, and test headless spec creation functionality.
+Implement a user interface for spec creation through guided questioning, allowing users to manually create specifications through an interactive process.
 
 ## Current State
-- Ralph is installed via `git clone` in worker Dockerfile (line 63-66)
-- Ralph v0.3.0 includes:
-  - Headless mode (`--headless` flag) with JSON events
-  - Autonomous spec generation (`ralph spec "description"`)
-  - Interactive spec creation skill (`/create-spec`)
-  - Spec validator and LLM review capabilities
-- Intake service uses Anthropic SDK directly for spec generation
-- Worker calls `ralph init` and `ralph run` successfully
+- Ralph v0.3.0 already includes `/create-spec` skill for interactive spec creation
+- This skill uses LLM-powered interview and review process
+- Skill is available in Claude Code CLI
+- Documentation exists in Ralph repository
+- No integration with factory system yet
+
+## Implementation Approach
+
+### Option 1: Expose Ralph's /create-spec skill via API
+- Add new API endpoint to orchestrator: POST /api/spec/interactive
+- Endpoint spawns a Claude Code session with /create-spec skill
+- Captures Q&A interaction and returns generated spec
+- Challenges: Complex to stream Q&A through HTTP API
+
+### Option 2: CLI-based interactive workflow (RECOMMENDED)
+- Document how users can run `/create-spec` skill locally
+- User runs `claude` CLI with `/create-spec` in their repo
+- Generated SPEC.md can be submitted to factory via existing API
+- Simpler, leverages existing Ralph tooling
+- No factory code changes needed
+
+### Option 3: Wrapper script for local usage
+- Create `scripts/create-spec.sh` wrapper
+- Script runs Claude CLI with appropriate settings
+- Guides user through the interview process
+- Outputs SPEC.md that can be submitted to factory
+- Provides better UX than raw CLI
+
+## Recommendation: Option 3 (Wrapper Script)
+
+This approach:
+- Leverages Ralph's existing `/create-spec` skill
+- Provides simple UX without complex API streaming
+- Works with local repos before submission to factory
+- Maintains separation between spec creation and execution
+- Easy to document and use
 
 ## Implementation Plan
 
-### 1. Document Ralph v0.3.0 Integration
-- Ralph is already at latest version (pulled from git on Docker build)
-- Document new capabilities in README/docs
-- No code changes needed for Ralph version itself
+### 1. Create wrapper script
+- `scripts/create-spec.sh` - Bash script for interactive spec creation
+- Checks prerequisites (Claude CLI installed)
+- Validates repo context
+- Runs Claude CLI with /create-spec skill
+- Saves SPEC.md to specified location
 
-### 2. Integrate Ralph Spec Tooling in Intake Service
-Create a new `RalphSpecGenerator` class that:
-- Wraps `ralph spec --headless` CLI command
-- Parses JSON event output
-- Falls back to Anthropic SDK on failure
-- Add as alternative to current SpecGenerator
+### 2. Add configuration
+- `.env.example` - Add any needed config vars
+- Document ANTHROPIC_API_KEY requirement
 
-### 3. Add Interactive Spec Creation Documentation
-- Document `/create-spec` skill for manual use
-- Add examples of both autonomous and interactive flows
-- Update factory README with workflow options
+### 3. Update documentation
+- README.md - Add section on interactive spec creation
+- Document the workflow: create spec → submit to factory
+- Add examples and screenshots if possible
 
-### 4. Test Integration
-- Test ralph spec generation with real GitHub issue
-- Verify JSON event parsing
-- Ensure fallback works
-- Integration test with orchestrator
+### 4. Test the workflow
+- Run the script manually
+- Verify SPEC.md generation
+- Ensure it works with factory submission
 
-## Files to Modify/Create
-- `packages/intake/src/ralph-spec-gen.ts` (NEW) - Ralph CLI wrapper
-- `packages/intake/src/ralph-spec-gen.test.ts` (NEW) - Tests
-- `packages/intake/src/index.ts` - Add RalphSpecGenerator option
-- `README.md` - Document new spec creation flows
-- `.ai/learnings.md` - Document Ralph v0.3.0 capabilities
+## Files to Create/Modify
+- `scripts/create-spec.sh` (NEW) - Interactive spec creation wrapper
+- `README.md` - Document interactive workflow
+- `.env.example` - Add ANTHROPIC_API_KEY if not present
 
 ## Exit Criteria
-- [x] Ralph repository is at latest version (v0.3.0)
-- [ ] Ralph spec tooling integrated in intake service
-- [ ] Tests pass for Ralph spec generation
-- [ ] Documentation updated
-- [ ] Both spec generation methods work (Ralph + Anthropic SDK)
+- [ ] Wrapper script created and executable
+- [ ] Script checks prerequisites and provides helpful errors
+- [ ] Documentation explains interactive workflow
+- [ ] Users can create specs interactively and submit to factory
+- [ ] Integration with existing factory submission API confirmed
