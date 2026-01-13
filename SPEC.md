@@ -42,7 +42,12 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Logs error message and stack trace on exception
   - Reports partial success (work done, PR failed) to orchestrator
   - Adds stdout/stderr logging for PRResult error cases
-- [ ] Log full stderr/stdout from failed git/gh commands
+- [x] Log full stderr/stdout from failed git/gh commands
+  - Added logSetupCommandResult() helper for setup step failures
+  - All git commands in setupWorkspace() now log full output on failure
+  - git config, git add, git commit, git clone, git checkout all covered
+  - ralph init logs full output on warning/failure
+  - Git clone URL sanitized in logs (token masked)
 - [ ] Add retry logic for transient network failures (push, gh api)
 
 ### Phase 4: Observability

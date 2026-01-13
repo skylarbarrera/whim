@@ -953,3 +953,44 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All 98 tests pass
 - Build and type checks pass
 - First task of Phase 3 (Improve Error Handling) complete
+
+---
+
+## Session 25 - 2026-01-13
+
+### Task: Bug Fix Phase 3.2 - Log Full stderr/stdout from Failed Git/GH Commands
+
+**Commit:** 2f6b9d5
+
+**Files Modified:**
+- `packages/worker/src/setup.ts` - Added comprehensive error logging
+
+**Changes Made:**
+
+1. **Added logSetupCommandResult() helper:**
+   - New helper function for logging setup step failures
+   - Logs context, full command, exit code, stdout, and stderr
+   - Uses [SETUP] prefix to distinguish from [PR] logs
+
+2. **Enhanced configureGit():**
+   - Now logs errors for git config user.email failures
+   - Now logs errors for git config user.name failures
+   - Throws descriptive errors instead of silent failures
+
+3. **Enhanced setupWorkspace():**
+   - git clone: Logs sanitized URL (token masked as ***)
+   - git checkout: Logs full output on branch creation failure
+   - git add (initial): Logs if staging initial files fails
+   - git commit (initial): Logs if initial commit fails
+   - ralph init: Logs full output (stdout, stderr, exit code) on warning/failure
+
+**Technical Details:**
+- Git clone URL sanitized to avoid exposing tokens in logs
+- All setup commands now capture and log full stdout/stderr
+- Consistent [SETUP] prefix for all setup-related error logs
+- Non-fatal failures (ralph init) log but continue
+
+**Notes:**
+- All 98 tests pass
+- Build and type checks pass
+- Second task of Phase 3 (Improve Error Handling) complete
