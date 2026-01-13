@@ -88,7 +88,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - `src/ralph.ts` - runRalph spawns Ralph, parses events (ITERATION→heartbeat, FILE_EDIT→lock, STUCK→report, COMPLETE→metrics, FAILED→report)
   - `src/index.ts` - Parse env vars, setup workspace, load learnings, run Ralph, extract learnings, create PR, report completion
 
-- [ ] Worker package config and Dockerfile
+- [x] Worker package config and Dockerfile
   - `.claude/CLAUDE.md` - Worker instructions
   - `.claude/mcp.json` - MCP server config (playwright, context7)
   - `.claude/settings.json` - If needed
