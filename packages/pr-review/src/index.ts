@@ -15,7 +15,26 @@ export { LintCheck } from './checks/lint-check.js';
 export { TestCheck } from './checks/test-check.js';
 
 // Configuration
-export { loadConfig, getLintConfig, getTestConfig, type PRReviewConfig, type LintConfig, type TestConfig, type LintToolConfig } from './config.js';
+export {
+  loadConfig,
+  getDetectionConfig,
+  getLintConfig,
+  getTestConfig,
+  getMergeBlockingConfig,
+  getBranchProtectionConfig,
+  getGitHubConfig,
+  type PRReviewConfig,
+  type DetectionConfig,
+  type LintConfig,
+  type TestConfig,
+  type LintToolConfig,
+  type MergeBlockingConfig,
+  type BranchProtectionConfig,
+  type GitHubConfig,
+} from './config.js';
+
+// Configuration validation
+export { validateConfig, type ValidationError, type ValidationResult } from './config-validator.js';
 
 // Lint runner
 export { runLintTool, runLintTools, type LintResult } from './lint-runner.js';

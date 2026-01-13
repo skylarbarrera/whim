@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { loadConfig, getLintConfig, getTestConfig } from "../src/config.js";
+import {
+  loadConfig,
+  getDetectionConfig,
+  getLintConfig,
+  getTestConfig,
+  getMergeBlockingConfig,
+  getBranchProtectionConfig,
+  getGitHubConfig,
+} from "../src/config.js";
 
 describe("Config Loader", () => {
   let tempDir: string;
@@ -164,5 +172,157 @@ test:
 
     expect(config.lint?.enabled).toBe(false);
     expect(config.test?.enabled).toBe(false);
+  });
+
+  it("should load detection config", () => {
+    const config = getDetectionConfig(tempDir);
+
+    expect(config.minConfidence).toBe(0.7);
+    expect(config.branchPatterns).toContain("ai/*");
+    expect(config.checkCoAuthor).toBe(true);
+  });
+
+  it("should load custom detection config", () => {
+    const configContent = `
+detection:
+  minConfidence: 0.9
+  branchPatterns:
+    - "bot/*"
+    - "automated/*"
+  labelPatterns:
+    - "automated-pr"
+  authorPatterns:
+    - "bot-user"
+  checkCoAuthor: false
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = getDetectionConfig(tempDir);
+
+    expect(config.minConfidence).toBe(0.9);
+    expect(config.branchPatterns).toHaveLength(2);
+    expect(config.branchPatterns).toContain("bot/*");
+    expect(config.labelPatterns).toContain("automated-pr");
+    expect(config.checkCoAuthor).toBe(false);
+  });
+
+  it("should load merge blocking config", () => {
+    const config = getMergeBlockingConfig(tempDir);
+
+    expect(config.enabled).toBe(true);
+    expect(config.requiredChecks).toEqual([]);
+    expect(config.requireOverrideReason).toBe(true);
+  });
+
+  it("should load custom merge blocking config", () => {
+    const configContent = `
+mergeBlocking:
+  enabled: false
+  requiredChecks:
+    - "lint"
+    - "test"
+  overrideUsers:
+    - "admin"
+    - "lead-dev"
+  requireOverrideReason: false
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = getMergeBlockingConfig(tempDir);
+
+    expect(config.enabled).toBe(false);
+    expect(config.requiredChecks).toHaveLength(2);
+    expect(config.requiredChecks).toContain("lint");
+    expect(config.overrideUsers).toContain("admin");
+    expect(config.requireOverrideReason).toBe(false);
+  });
+
+  it("should load branch protection config", () => {
+    const config = getBranchProtectionConfig(tempDir);
+
+    expect(config.enabled).toBe(false);
+    expect(config.branches).toContain("main");
+    expect(config.requirePullRequestReviews).toBe(true);
+    expect(config.requiredApprovingReviews).toBe(1);
+  });
+
+  it("should load custom branch protection config", () => {
+    const configContent = `
+branchProtection:
+  enabled: true
+  branches:
+    - "production"
+    - "staging"
+  requirePullRequestReviews: false
+  requiredApprovingReviews: 2
+  dismissStaleReviews: false
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = getBranchProtectionConfig(tempDir);
+
+    expect(config.enabled).toBe(true);
+    expect(config.branches).toHaveLength(2);
+    expect(config.branches).toContain("production");
+    expect(config.requirePullRequestReviews).toBe(false);
+    expect(config.requiredApprovingReviews).toBe(2);
+    expect(config.dismissStaleReviews).toBe(false);
+  });
+
+  it("should load github config", () => {
+    const config = getGitHubConfig(tempDir);
+
+    expect(config.statusContext).toBe("ai-factory/pr-review");
+    expect(config.syncBranchProtection).toBe(false);
+  });
+
+  it("should load custom github config", () => {
+    const configContent = `
+github:
+  token: "ghp_test123"
+  statusContext: "custom/pr-check"
+  targetUrl: "https://factory.example.com"
+  syncBranchProtection: true
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = getGitHubConfig(tempDir);
+
+    expect(config.token).toBe("ghp_test123");
+    expect(config.statusContext).toBe("custom/pr-check");
+    expect(config.targetUrl).toBe("https://factory.example.com");
+    expect(config.syncBranchProtection).toBe(true);
+  });
+
+  it("should load complete custom config with all sections", () => {
+    const configContent = `
+detection:
+  minConfidence: 0.85
+lint:
+  enabled: false
+test:
+  command: "bun test"
+mergeBlocking:
+  enabled: true
+branchProtection:
+  enabled: true
+github:
+  statusContext: "custom/check"
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = loadConfig(tempDir);
+
+    expect(config.detection?.minConfidence).toBe(0.85);
+    expect(config.lint?.enabled).toBe(false);
+    expect(config.test?.command).toBe("bun test");
+    expect(config.mergeBlocking?.enabled).toBe(true);
+    expect(config.branchProtection?.enabled).toBe(true);
+    expect(config.github?.statusContext).toBe("custom/check");
   });
 });

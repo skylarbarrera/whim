@@ -1,31 +1,88 @@
 # PR Review Configuration
 # Place this file at .ai/pr-review.yml in your repository root
+# For full documentation, see: docs/pr-review-configuration.md
 
-# Lint checks configuration
+# ============================================================================
+# Detection Configuration
+# ============================================================================
+# Controls how the system identifies AI-generated PRs
+
+detection:
+  # Minimum confidence score (0-1) to classify as AI-generated
+  # Higher values require stronger signals before triggering review
+  minConfidence: 0.7
+
+  # Branch name patterns that indicate AI-generated PRs
+  # Supports wildcards (*)
+  branchPatterns:
+    - "ai/*"
+    - "ai/issue-*"
+    - "ai/task-*"
+
+  # Label patterns that indicate AI-generated PRs
+  labelPatterns:
+    - "ai-generated"
+    - "automated"
+    - "bot"
+
+  # Commit author patterns to detect AI
+  # Case-insensitive substring matching
+  authorPatterns:
+    - "claude"
+    - "ai-factory"
+
+  # Whether to check for Claude co-author signature in commits
+  checkCoAuthor: true
+
+# ============================================================================
+# Lint Configuration
+# ============================================================================
+# Controls linting checks that run on every commit
+
 lint:
   # Whether lint checks are enabled
   enabled: true
 
   # Whether lint checks are required to pass for merge
+  # If false, failures will be reported but won't block merge
   required: true
 
   # Maximum execution time in milliseconds
   timeout: 60000  # 60 seconds
 
   # Lint tools to run
+  # Each tool runs independently and results are aggregated
   tools:
     - name: eslint
       command: "npx eslint . --format json"
       enabled: true
+      # Optional: File patterns to include
+      # include:
+      #   - "src/**/*.ts"
+      #   - "packages/**/*.tsx"
+      # Optional: File patterns to exclude
+      # exclude:
+      #   - "**/*.test.ts"
+      #   - "**/*.spec.ts"
 
     - name: prettier
       command: "npx prettier --check ."
       enabled: true
 
+    # Example: Add more lint tools
+    # - name: tslint
+    #   command: "npx tslint -p tsconfig.json"
+    #   enabled: false
+
   # Number of violations required to fail (0 = any violation fails)
+  # Set higher to allow some violations while still enforcing limits
   failureThreshold: 0
 
-# Test checks configuration
+# ============================================================================
+# Test Configuration
+# ============================================================================
+# Controls test execution and pass/fail criteria
+
 test:
   # Whether test checks are enabled
   enabled: true
@@ -37,14 +94,132 @@ test:
   timeout: 300000  # 5 minutes
 
   # Test command to run
+  # The system auto-detects Jest, Vitest, and Bun test output formats
   # Examples:
   # - "npm test"
   # - "bun test"
   # - "npx jest --json"
   # - "npx vitest run"
+  # - "yarn test:ci"
   command: "npm test"
 
   # Minimum pass percentage required (0-100)
   # 100 = all tests must pass
   # 90 = 90% of tests must pass
   minPassPercentage: 100
+
+  # Optional: Minimum code coverage percentage (0-100)
+  # Only enforced if your test framework reports coverage
+  # minCoverage: 80
+
+# ============================================================================
+# Merge Blocking Configuration
+# ============================================================================
+# Controls when PRs are blocked from merging
+
+mergeBlocking:
+  # Whether to enforce merge blocking
+  # If false, checks run but don't prevent merging
+  enabled: true
+
+  # Names of checks that must pass before merge
+  # Empty array = all required checks must pass
+  # Examples: ["lint", "test", "security-scan"]
+  requiredChecks: []
+
+  # GitHub usernames who can perform emergency overrides
+  # Empty array = no one can override (not recommended)
+  overrideUsers: []
+  # Example:
+  # overrideUsers:
+  #   - "johndoe"
+  #   - "engineering-lead"
+
+  # Whether to require a reason when overriding merge block
+  requireOverrideReason: true
+
+# ============================================================================
+# Branch Protection Configuration
+# ============================================================================
+# Controls automatic GitHub branch protection setup
+
+branchProtection:
+  # Whether to automatically configure branch protection
+  # Requires GitHub token with admin permissions
+  enabled: false
+
+  # Branch patterns to protect
+  # These branches will have required status checks enabled
+  branches:
+    - "main"
+    - "master"
+    - "develop"
+
+  # Whether to require pull request reviews
+  requirePullRequestReviews: true
+
+  # Number of required approving reviews (0-6)
+  requiredApprovingReviews: 1
+
+  # Whether to dismiss stale reviews when new commits are pushed
+  dismissStaleReviews: true
+
+# ============================================================================
+# GitHub Integration Configuration
+# ============================================================================
+# Controls how the system integrates with GitHub
+
+github:
+  # GitHub API token
+  # Can also be provided via GITHUB_TOKEN environment variable
+  # token: "ghp_xxxxxxxxxxxxxxxxxxxx"
+
+  # Status context name to use for GitHub status checks
+  # This appears in the PR checks list
+  statusContext: "ai-factory/pr-review"
+
+  # Target URL for status checks
+  # Users will be directed here for detailed review info
+  # Example: "https://factory.example.com/pr-reviews"
+  # targetUrl: ""
+
+  # Whether to automatically sync branch protection rules
+  # Requires branchProtection.enabled = true
+  syncBranchProtection: false
+
+# ============================================================================
+# Example Configurations
+# ============================================================================
+
+# Strict mode: All checks required, no tolerance for failures
+# detection:
+#   minConfidence: 0.9
+# lint:
+#   required: true
+#   failureThreshold: 0
+# test:
+#   required: true
+#   minPassPercentage: 100
+#   minCoverage: 90
+# mergeBlocking:
+#   enabled: true
+#   requiredChecks: []
+
+# Lenient mode: Checks run but don't block, allow some failures
+# lint:
+#   required: false
+#   failureThreshold: 10
+# test:
+#   required: false
+#   minPassPercentage: 95
+# mergeBlocking:
+#   enabled: false
+
+# Custom tools: Use your own linters and test runners
+# lint:
+#   tools:
+#     - name: custom-linter
+#       command: "./scripts/lint.sh"
+#       enabled: true
+# test:
+#   command: "make test"
