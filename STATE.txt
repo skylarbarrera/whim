@@ -13,6 +13,8 @@
 - Phase 5: Worker Package (all 2 tasks)
   - 5.1: Worker Package Core (7 source files, 29 tests)
   - 5.2: Worker Config and Dockerfile (CLAUDE.md, mcp.json, settings.json, Dockerfile)
+- Phase 6: Intake Package (1 task)
+  - 6.1: Complete intake package (GitHubAdapter, SpecGenerator, entry point, Dockerfile, 24 tests)
 
 ## In Progress
-- Phase 6: Intake Package (next)
+- Phase 7: Docker Infrastructure (next)

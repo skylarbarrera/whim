@@ -482,3 +482,63 @@ Management Routes:
 - Type checks pass
 - Phase 5 (Worker Package) now complete
 - Next: Phase 6 Intake Package
+
+---
+
+## Session 15 - 2025-01-13
+
+### Task: Phase 6 - Intake Package
+
+**Commit:** 0699908
+
+**Files Created:**
+- `packages/intake/package.json` - Package config with name @factory/intake
+- `packages/intake/tsconfig.json` - Extends root config
+- `packages/intake/src/github.ts` - GitHubAdapter class
+- `packages/intake/src/spec-gen.ts` - SpecGenerator class
+- `packages/intake/src/index.ts` - Main entry point
+- `packages/intake/Dockerfile` - Container build
+- `packages/intake/src/github.test.ts` - GitHubAdapter tests (14 tests)
+- `packages/intake/src/spec-gen.test.ts` - SpecGenerator tests (10 tests)
+
+**GitHubAdapter Methods:**
+1. `poll()` - Poll repos for issues with intake label
+2. `addLabel(owner, repo, issueNumber, label)` - Add label to issue
+3. `removeLabel(owner, repo, issueNumber, label)` - Remove label from issue
+4. `markProcessing(issue)` - Add processing label
+5. `markCompleted(issue)` - Remove intake/processing, add completed
+6. `markFailed(issue)` - Remove processing label for retry
+7. `getLabels()` - Get configured label names
+
+**GitHubAdapter Features:**
+- Filters out pull requests (appear as issues in API)
+- Filters out already-processing issues
+- Handles multiple repos
+- Graceful 404 handling on label removal
+- Configurable intake/processing/completed labels
+
+**SpecGenerator Methods:**
+1. `generate(issue)` - Generate spec from GitHub issue
+
+**SpecGenerator Features:**
+- Uses Claude claude-sonnet-4-20250514 model for spec generation
+- Branch name from issue title (sanitized, truncated to 50 chars)
+- Configurable model and max tokens
+- Returns title, spec, branch, metadata
+
+**Entry Point Features:**
+- Environment variable configuration (GITHUB_TOKEN, ANTHROPIC_API_KEY, REPOS, etc.)
+- Poll loop with configurable interval
+- Processing pipeline: mark processing → generate spec → submit to orchestrator
+- Graceful error handling with retry on failure
+
+**Dockerfile Features:**
+- Multi-stage build (builder + slim production)
+- Bun runtime for consistency
+- No secrets in image (env vars required at runtime)
+
+**Notes:**
+- 24 tests pass
+- Type checks pass
+- Phase 6 (Intake Package) now complete
+- Next: Phase 7 Docker Infrastructure

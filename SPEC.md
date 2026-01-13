@@ -98,7 +98,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 6: Intake Package (`packages/intake`)
 
-- [ ] Implement intake package
+- [x] Implement intake package
   - `package.json` with name `@factory/intake`
   - `tsconfig.json`
   - Dependencies: @octokit/rest, @anthropic-ai/sdk
