@@ -1,42 +1,53 @@
-# Plan: ConflictDetector Implementation
+# WorkerManager Implementation Plan
 
 ## Goal
-Create `packages/orchestrator/src/conflicts.ts` - a ConflictDetector class that manages file locks to prevent multiple workers from editing the same files simultaneously.
+Implement `packages/orchestrator/src/workers.ts` - WorkerManager class that handles worker lifecycle management including spawning Docker containers, registration, heartbeats, completion, failure, and health checks.
 
 ## Files to Create/Modify
-- `packages/orchestrator/src/conflicts.ts` (create) - ConflictDetector class
-- `packages/orchestrator/src/conflicts.test.ts` (create) - unit tests
+- `packages/orchestrator/src/workers.ts` - New file with WorkerManager class
+- `packages/orchestrator/src/workers.test.ts` - Tests for WorkerManager
 
-## Interface (from SPEC.md)
-```typescript
-class ConflictDetector {
-  acquireLocks(workerId: string, files: string[]): Promise<{ acquired: string[]; blocked: string[] }>
-  releaseLocks(workerId: string, files: string[]): Promise<void>
-  releaseAllLocks(workerId: string): Promise<void>
-}
-```
+## Methods to Implement
 
-## Implementation Details
-1. Uses the `file_locks` table from migration 001:
-   - `id` UUID PRIMARY KEY
-   - `worker_id` UUID NOT NULL REFERENCES workers(id)
-   - `file_path` TEXT NOT NULL
-   - `acquired_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
-   - UNIQUE (file_path) -- Only one worker can hold a lock on a file
+Per SPEC.md Phase 4.3:
+- `hasCapacity()` - Check if can spawn based on rate limiter
+- `spawn(workItem)` - Spawn Docker container for a work item
+- `register(workItemId)` - Worker self-registration, creates worker record
+- `heartbeat(workerId, data)` - Update heartbeat timestamp and iteration
+- `complete(workerId, data)` - Handle completion (update status, release locks, record metrics)
+- `fail(workerId, error, iteration)` - Handle failure (update status, release locks)
+- `stuck(workerId, reason, attempts)` - Handle stuck state
+- `healthCheck()` - Check for stale workers (no heartbeat in N seconds)
+- `kill(workerId, reason)` - Kill worker container
+- `list()` - List all workers
+- `getStats()` - Get worker statistics
 
-2. `acquireLocks` - Try to insert locks for files, returning which were acquired vs blocked by other workers
-3. `releaseLocks` - Delete specific file locks owned by the worker
-4. `releaseAllLocks` - Delete all file locks owned by the worker (cleanup on completion/failure)
+## Dependencies
+- Database (from `./db.ts`) - For worker table operations
+- RateLimiter (from `./rate-limits.ts`) - For spawn capacity checks
+- ConflictDetector (from `./conflicts.ts`) - For releasing file locks
+- Dockerode - For container management
+
+## Design Decisions
+1. Constructor accepts db, rateLimiter, conflictDetector, and Docker client
+2. Worker IDs are UUIDs generated on registration
+3. Container IDs are stored for kill operations
+4. Health check threshold is configurable (default 60s)
+5. Follow patterns from existing files (queue.ts, conflicts.ts)
 
 ## Tests
-1. Test acquiring locks on free files
-2. Test acquiring locks when some are taken by another worker
-3. Test releasing specific locks
-4. Test releasing all locks for a worker
-5. Test that a worker can re-acquire its own locks (idempotent)
-6. Test acquiring empty file list
+- `hasCapacity()` - Delegates to rateLimiter.canSpawnWorker()
+- `register()` - Creates worker record, returns worker ID
+- `heartbeat()` - Updates heartbeat timestamp and iteration
+- `complete()` - Updates status, releases locks, updates work item
+- `fail()` - Updates status, releases locks, updates work item
+- `stuck()` - Updates status to stuck
+- `healthCheck()` - Returns stale workers
+- `list()` - Returns all workers
+- `getStats()` - Returns statistics by status
 
 ## Exit Criteria
-- [x] ConflictDetector class created with all 3 methods
-- [ ] Unit tests pass
-- [ ] TypeScript compiles without errors
+- [ ] WorkerManager class implemented with all methods
+- [ ] Tests pass for all methods
+- [ ] Type checks pass (`bun run typecheck`)
+- [ ] Code follows existing patterns in the codebase
