@@ -1,6 +1,6 @@
 import type { WorkItem } from "@factory/shared";
 import { OrchestratorClient } from "./client.js";
-import { setupWorkspace, createPullRequest } from "./setup.js";
+import { setupWorkspace, createPullRequest, PRStep } from "./setup.js";
 import {
   loadLearnings,
   saveLearnings,
@@ -110,19 +110,25 @@ async function main(): Promise<void> {
     console.log(`Found ${learnings.length} new learnings`);
 
     console.log("Creating pull request...");
-    const prUrl = await createPullRequest(
+    const prResult = await createPullRequest(
       repoDir,
       config.workItem,
       config.githubToken
     );
 
-    if (prUrl) {
-      console.log(`Pull request created: ${prUrl}`);
+    if (prResult.status === "success") {
+      console.log(`Pull request created: ${prResult.prUrl}`);
+    } else if (prResult.status === "no_changes") {
+      console.log("No pull request created (no changes to push)");
     } else {
-      console.log("No pull request created (no changes or error)");
+      console.error(`PR creation failed at step: ${prResult.step}`);
+      if (prResult.error) {
+        console.error(`  Command: ${prResult.error.command}`);
+        console.error(`  Exit code: ${prResult.error.exitCode}`);
+      }
     }
 
-    await client.complete(prUrl ?? undefined, result.metrics, learnings);
+    await client.complete(prResult.prUrl, result.metrics, learnings);
     console.log("Completion reported to orchestrator");
   } else {
     console.error("Ralph failed:", result.error);

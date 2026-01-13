@@ -9,6 +9,38 @@ export interface WorkspaceConfig {
   claudeConfigDir?: string;
 }
 
+/**
+ * Steps in the PR creation flow for error tracking
+ */
+export enum PRStep {
+  STAGE = "stage",
+  COMMIT = "commit",
+  CHECK_UNPUSHED = "check_unpushed",
+  PUSH = "push",
+  CREATE_PR = "create_pr",
+}
+
+/**
+ * Detailed error information from a failed PR step
+ */
+export interface PRError {
+  step: PRStep;
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * Result of PR creation attempt with detailed status
+ */
+export interface PRResult {
+  status: "success" | "no_changes" | "error";
+  step: PRStep;
+  prUrl?: string;
+  error?: PRError;
+}
+
 function exec(
   command: string,
   args: string[],
@@ -136,42 +168,91 @@ async function copyClaudeConfig(
   }
 }
 
+/**
+ * Log detailed command failure information
+ */
+function logCommandFailure(
+  step: PRStep,
+  command: string,
+  args: string[],
+  result: { stdout: string; stderr: string; code: number }
+): void {
+  const fullCommand = `${command} ${args.join(" ")}`;
+  console.error(`[PR] Step ${step} FAILED`);
+  console.error(`[PR]   Command: ${fullCommand}`);
+  console.error(`[PR]   Exit code: ${result.code}`);
+  if (result.stdout.trim()) {
+    console.error(`[PR]   stdout: ${result.stdout.trim()}`);
+  }
+  if (result.stderr.trim()) {
+    console.error(`[PR]   stderr: ${result.stderr.trim()}`);
+  }
+}
+
+/**
+ * Create a PRError from a command result
+ */
+function createPRError(
+  step: PRStep,
+  command: string,
+  args: string[],
+  result: { stdout: string; stderr: string; code: number }
+): PRError {
+  return {
+    step,
+    command: `${command} ${args.join(" ")}`,
+    exitCode: result.code,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+}
+
 export async function createPullRequest(
   repoDir: string,
   workItem: WorkItem,
   githubToken: string
-): Promise<string | null> {
+): Promise<PRResult> {
   console.log("[PR] Starting PR creation for branch:", workItem.branch);
 
   // Step 1: Stage any uncommitted changes (Ralph may have left some)
-  const addResult = await exec("git", ["add", "-A"], { cwd: repoDir });
+  console.log("[PR] Step 1/5: Staging changes...");
+  const addArgs = ["add", "-A"];
+  const addResult = await exec("git", addArgs, { cwd: repoDir });
   if (addResult.code !== 0) {
-    console.error("[PR] Failed to stage changes:", addResult.stderr);
-    return null;
+    logCommandFailure(PRStep.STAGE, "git", addArgs, addResult);
+    return {
+      status: "error",
+      step: PRStep.STAGE,
+      error: createPRError(PRStep.STAGE, "git", addArgs, addResult),
+    };
   }
+  console.log("[PR] Step 1/5: Staging complete");
 
   // Step 2: Check for uncommitted changes and commit if present
+  console.log("[PR] Step 2/5: Checking for uncommitted changes...");
   const statusResult = await exec("git", ["status", "--porcelain"], {
     cwd: repoDir,
   });
   if (statusResult.stdout.trim() !== "") {
     console.log("[PR] Found uncommitted changes, committing...");
-    const commitResult = await exec(
-      "git",
-      ["commit", "-m", `feat: ${workItem.branch}\n\nImplemented by AI Factory`],
-      { cwd: repoDir }
-    );
+    const commitArgs = ["commit", "-m", `feat: ${workItem.branch}\n\nImplemented by AI Factory`];
+    const commitResult = await exec("git", commitArgs, { cwd: repoDir });
 
     if (commitResult.code !== 0) {
-      console.error("[PR] Failed to commit:", commitResult.stderr);
-      return null;
+      logCommandFailure(PRStep.COMMIT, "git", commitArgs, commitResult);
+      return {
+        status: "error",
+        step: PRStep.COMMIT,
+        error: createPRError(PRStep.COMMIT, "git", commitArgs, commitResult),
+      };
     }
-    console.log("[PR] Committed successfully");
+    console.log("[PR] Step 2/5: Committed successfully");
   } else {
-    console.log("[PR] No uncommitted changes (Ralph already committed)");
+    console.log("[PR] Step 2/5: No uncommitted changes (Ralph already committed)");
   }
 
   // Step 3: Check for unpushed commits
+  console.log("[PR] Step 3/5: Checking for unpushed commits...");
   // Use origin/HEAD if available, otherwise try origin/main or origin/master
   let unpushedCount = 0;
   const refs = ["origin/HEAD", "origin/main", "origin/master"];
@@ -213,52 +294,60 @@ export async function createPullRequest(
   }
 
   if (unpushedCount === 0) {
-    console.log("[PR] No commits to push");
-    return null;
+    console.log("[PR] Step 3/5: No commits to push");
+    return {
+      status: "no_changes",
+      step: PRStep.CHECK_UNPUSHED,
+    };
   }
+  console.log("[PR] Step 3/5: Found commits to push");
 
   // Step 4: Push to remote
-  console.log(`[PR] Pushing ${unpushedCount} commits to origin/${workItem.branch}...`);
-  const pushResult = await exec(
-    "git",
-    ["push", "-u", "origin", workItem.branch],
-    { cwd: repoDir }
-  );
+  console.log(`[PR] Step 4/5: Pushing ${unpushedCount} commits to origin/${workItem.branch}...`);
+  const pushArgs = ["push", "-u", "origin", workItem.branch];
+  const pushResult = await exec("git", pushArgs, { cwd: repoDir });
 
   if (pushResult.code !== 0) {
-    console.error("[PR] Failed to push:", pushResult.stderr);
-    console.error("[PR] Push stdout:", pushResult.stdout);
-    return null;
+    logCommandFailure(PRStep.PUSH, "git", pushArgs, pushResult);
+    return {
+      status: "error",
+      step: PRStep.PUSH,
+      error: createPRError(PRStep.PUSH, "git", pushArgs, pushResult),
+    };
   }
-  console.log("[PR] Push successful");
+  console.log("[PR] Step 4/5: Push successful");
 
   // Step 5: Create PR
-  console.log("[PR] Creating pull request...");
-  const prResult = await exec(
-    "gh",
-    [
-      "pr",
-      "create",
-      "--title",
-      `[AI Factory] ${workItem.branch}`,
-      "--body",
-      `Automated PR created by AI Factory.\n\nWork Item ID: ${workItem.id}`,
-      "--head",
-      workItem.branch,
-    ],
-    {
-      cwd: repoDir,
-      env: { GH_TOKEN: githubToken },
-    }
-  );
+  console.log("[PR] Step 5/5: Creating pull request...");
+  const prArgs = [
+    "pr",
+    "create",
+    "--title",
+    `[AI Factory] ${workItem.branch}`,
+    "--body",
+    `Automated PR created by AI Factory.\n\nWork Item ID: ${workItem.id}`,
+    "--head",
+    workItem.branch,
+  ];
+  const prResult = await exec("gh", prArgs, {
+    cwd: repoDir,
+    env: { GH_TOKEN: githubToken },
+  });
 
   if (prResult.code !== 0) {
-    console.error("[PR] Failed to create PR:", prResult.stderr);
-    console.error("[PR] gh stdout:", prResult.stdout);
-    return null;
+    logCommandFailure(PRStep.CREATE_PR, "gh", prArgs, prResult);
+    return {
+      status: "error",
+      step: PRStep.CREATE_PR,
+      error: createPRError(PRStep.CREATE_PR, "gh", prArgs, prResult),
+    };
   }
 
   const prUrl = prResult.stdout.trim();
-  console.log("[PR] Created PR:", prUrl);
-  return prUrl;
+  console.log("[PR] Step 5/5: Created PR:", prUrl);
+  return {
+    status: "success",
+    step: PRStep.CREATE_PR,
+    prUrl,
+  };
 }
