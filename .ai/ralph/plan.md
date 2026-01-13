@@ -1,25 +1,29 @@
-# Plan: Phase 9.1 - Dashboard Package Setup
+# Plan: Phase 9.2 - Dashboard Pages and Components
 
 ## Goal
-Setup the dashboard package with Next.js 14+ App Router, API proxy to orchestrator, and Dockerfile.
+Implement dashboard pages and shared components for monitoring the AI Factory.
 
 ## Files to Create/Modify
-1. `packages/dashboard/package.json` - Package config with name @factory/dashboard
-2. `packages/dashboard/tsconfig.json` - Next.js TypeScript config
-3. `packages/dashboard/next.config.js` - Next.js config with API proxy
-4. `packages/dashboard/app/layout.tsx` - Root layout
-5. `packages/dashboard/app/page.tsx` - Placeholder home page
-6. `packages/dashboard/Dockerfile` - Multi-stage Next.js build
+1. `packages/dashboard/app/page.tsx` - Overview/factory status summary
+2. `packages/dashboard/app/workers/page.tsx` - List workers, kill button
+3. `packages/dashboard/app/queue/page.tsx` - List queue, cancel button
+4. `packages/dashboard/app/learnings/page.tsx` - Browse learnings
+5. `packages/dashboard/app/metrics/page.tsx` - Basic metrics display
+6. `packages/dashboard/components/StatusCard.tsx` - Reusable status card
+7. `packages/dashboard/components/DataTable.tsx` - Reusable data table
+8. `packages/dashboard/components/Navigation.tsx` - Navigation component
+9. `packages/dashboard/app/layout.tsx` - Update with navigation
 
 ## Tests
 - Build verification with `bun run build`
 - Type checking with `bun run typecheck`
 
 ## Exit Criteria
-- [ ] package.json with Next.js 14+ dependencies
-- [ ] tsconfig.json for Next.js
-- [ ] next.config.js with API proxy to orchestrator
-- [ ] Basic app/layout.tsx and app/page.tsx
-- [ ] Dockerfile for production build
+- [ ] Overview page with status summary
+- [ ] Workers page with list and kill button
+- [ ] Queue page with list and cancel button
+- [ ] Learnings page for browsing
+- [ ] Metrics page with basic display
+- [ ] Shared components (StatusCard, DataTable, Navigation)
 - [ ] All type checks pass
 - [ ] Build succeeds

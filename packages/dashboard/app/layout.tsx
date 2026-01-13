@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Navigation } from '@/components';
 
 export const metadata: Metadata = {
   title: 'AI Factory Dashboard',
@@ -13,7 +14,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif' }}>
-        {children}
+        <Navigation />
+        <main style={{ padding: '2rem' }}>{children}</main>
       </body>
     </html>
   );
