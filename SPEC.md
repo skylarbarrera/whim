@@ -14,7 +14,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 1: Project Scaffolding
 
-- [ ] Initialize pnpm monorepo with `package.json` and `pnpm-workspace.yaml`
+- [ ] Initialize Bun monorepo with `package.json` (workspaces config)
 - [ ] Configure Turborepo with `turbo.json`
 - [ ] Create root `tsconfig.json` with base TypeScript config
 - [ ] Create `.gitignore` for Node.js/TypeScript project
@@ -236,7 +236,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 - [ ] Create `scripts/` directory
 - [ ] Create `scripts/setup.sh`:
-  - Check prerequisites (docker, pnpm)
+  - Check prerequisites (docker, bun)
   - Create .env if not exists
   - Install dependencies
   - Build worker image
@@ -274,7 +274,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 10: Integration & Testing
 
-- [ ] Verify all packages build with `pnpm build`
+- [ ] Verify all packages build with `bun build`
 - [ ] Test docker-compose up brings all services online
 - [ ] Test end-to-end flow:
   - Create work item via API

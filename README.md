@@ -95,8 +95,7 @@ Ralph and Factory are separate concerns. Factory spawns Ralph and parses its std
 ### Prerequisites
 
 - Docker & Docker Compose
-- Node.js 20+
-- pnpm
+- Bun
 - GitHub CLI (`gh`)
 
 ### Setup
@@ -112,7 +111,7 @@ cp .env.example .env
 # Edit .env with your GITHUB_TOKEN and REPOS
 
 # Start services
-pnpm dev
+bun dev
 ```
 
 ### Manual Work Item
@@ -220,16 +219,16 @@ When multiple workers run simultaneously, Redis-based file locking prevents conf
 
 ```bash
 # Build all packages
-pnpm build
+bun run build
 
 # Run specific package
-pnpm --filter @factory/orchestrator dev
+bun run --filter @factory/orchestrator dev
 
 # Run tests
-pnpm test
+bun test
 
 # Lint
-pnpm lint
+bun run lint
 ```
 
 ## Monitoring

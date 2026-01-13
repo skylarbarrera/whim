@@ -137,8 +137,7 @@ factory/
 ├── migrations/
 │   └── 001_initial.sql        # Database schema
 │
-├── package.json               # Monorepo root (pnpm workspaces)
-├── pnpm-workspace.yaml
+├── package.json               # Monorepo root (Bun workspaces)
 ├── turbo.json                 # Turborepo config
 └── README.md
 ```
@@ -1829,25 +1828,29 @@ RUN apt-get update && apt-get install -y \
     docker.io \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
 # Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/orchestrator/package.json ./packages/orchestrator/
 
 # Install dependencies
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # Copy source
 COPY packages/shared ./packages/shared
 COPY packages/orchestrator ./packages/orchestrator
 
 # Build
-RUN pnpm --filter @factory/shared build
-RUN pnpm --filter @factory/orchestrator build
+RUN bun run --filter @factory/shared build
+RUN bun run --filter @factory/orchestrator build
 
 EXPOSE 3000
 
-CMD ["node", "packages/orchestrator/dist/index.js"]
+CMD ["bun", "run", "packages/orchestrator/dist/index.js"]
 ```
 
 ```dockerfile
@@ -1875,21 +1878,25 @@ RUN npm install -g @anthropic-ai/claude-code
 
 WORKDIR /opt/worker
 
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
 # Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/worker/package.json ./packages/worker/
 
 # Install dependencies
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # Copy source
 COPY packages/shared ./packages/shared
 COPY packages/worker ./packages/worker
 
 # Build
-RUN pnpm --filter @factory/shared build
-RUN pnpm --filter @factory/worker build
+RUN bun run --filter @factory/shared build
+RUN bun run --filter @factory/worker build
 
 # Copy Claude config
 COPY packages/worker/.claude /opt/worker/.claude
@@ -1922,12 +1929,6 @@ CMD ["node", "/opt/worker/packages/worker/dist/index.js"]
 }
 ```
 
-```yaml
-# pnpm-workspace.yaml
-packages:
-  - 'packages/*'
-```
-
 ```json
 // turbo.json
 {
@@ -1956,7 +1957,7 @@ echo "Setting up AI Factory..."
 
 # Check prerequisites
 command -v docker >/dev/null 2>&1 || { echo "Docker is required but not installed."; exit 1; }
-command -v pnpm >/dev/null 2>&1 || { echo "pnpm is required but not installed."; exit 1; }
+command -v bun >/dev/null 2>&1 || { echo "Bun is required but not installed."; exit 1; }
 
 # Create .env if not exists
 if [ ! -f .env ]; then
@@ -1975,7 +1976,7 @@ fi
 
 # Install dependencies
 echo "Installing dependencies..."
-pnpm install
+bun install
 
 # Build worker image
 echo "Building worker Docker image..."
@@ -1993,7 +1994,7 @@ sleep 5
 echo "Running migrations..."
 ./scripts/migrate.sh
 
-echo "Setup complete! Run 'pnpm dev' to start the factory."
+echo "Setup complete! Run 'bun dev' to start the factory."
 ```
 
 ```bash
