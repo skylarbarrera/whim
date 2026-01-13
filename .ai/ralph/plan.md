@@ -1,99 +1,119 @@
-# Task 3: Build Core Review Orchestrator
+# Plan: Implement Lint Validation Hook
 
 ## Goal
-Implement the core review orchestrator that executes review steps sequentially or in parallel, aggregates results, and integrates with GitHub PR status checks.
+Create a lint validation review step that checks code quality using ESLint, Prettier, and other linting tools. This step should run as part of the review system, provide actionable error reports, and support multiple linters.
 
 ## Files to Create/Modify
 
 ### New Files
-1. `packages/review-system/src/orchestrator/executor.ts` - ReviewExecutor class
-   - Sequential and parallel step execution
-   - Step group coordination
-   - Error handling and recovery
+1. `packages/review-system/src/steps/lint-step.ts`
+   - LintStep class implementing ReviewStep interface
+   - Support for ESLint, Prettier, and generic linters
+   - Parse lint output and convert to ReviewMessages
+   - Configure severity mapping (error/warning)
 
-2. `packages/review-system/src/orchestrator/aggregator.ts` - ResultAggregator class
-   - Collect results from multiple steps
-   - Determine overall review status
-   - Group results by file/type
+2. `packages/review-system/src/steps/index.ts`
+   - Export LintStep and other step implementations
 
-3. `packages/review-system/src/orchestrator/github-status.ts` - GitHubStatusReporter class
-   - Post status checks to GitHub
-   - Update check runs with results
-   - Create check annotations for findings
+3. `packages/review-system/src/__tests__/lint-step.test.ts`
+   - Test lint detection and reporting
+   - Test ESLint output parsing
+   - Test Prettier output parsing
+   - Test file filtering and patterns
+   - Test error handling
 
-4. `packages/review-system/src/orchestrator/orchestrator.ts` - ReviewOrchestrator class
-   - Main orchestration logic
-   - Load configuration
-   - Execute workflow
-   - Report results
+### Existing Files to Modify
+1. `packages/review-system/package.json`
+   - Add dev dependencies: eslint, prettier (for testing)
 
-5. `packages/review-system/src/orchestrator/index.ts` - Module exports
+2. `packages/review-system/src/index.ts`
+   - Export steps module
 
-### Test Files
-6. `packages/review-system/src/__tests__/executor.test.ts` - Executor tests
-7. `packages/review-system/src/__tests__/aggregator.test.ts` - Aggregator tests
-8. `packages/review-system/src/__tests__/github-status.test.ts` - GitHub integration tests
-9. `packages/review-system/src/__tests__/orchestrator.test.ts` - Orchestrator tests
+## Implementation Steps
 
-### Modified Files
-10. `packages/review-system/src/index.ts` - Export orchestrator module
+1. **Create LintStep class**
+   - Implement ReviewStep interface (initialize, execute, cleanup, validateConfig)
+   - Support multiple linters: eslint, prettier, custom commands
+   - Run linters on changed files only (filter by context.changedFiles)
+   - Parse stdout/stderr from linter commands
+   - Convert lint errors/warnings to ReviewMessages with file/line/severity
+   - Include fix suggestions when available
 
-## Implementation Details
+2. **ESLint integration**
+   - Run: `eslint --format json [files]`
+   - Parse JSON output format
+   - Extract: filePath, line, column, message, severity, ruleId
+   - Map severity: 2=error, 1=warning, 0=info
 
-### ReviewExecutor
-- executeSequential(steps, context): Execute steps one by one
-- executeParallel(steps, context): Execute steps concurrently
-- executeGroup(group, context): Execute step group based on mode
-- evaluateCondition(condition, context): Check if step should run
-- Handle step timeouts
-- Stop on blocking step failure (configurable)
+3. **Prettier integration**
+   - Run: `prettier --check [files]`
+   - Parse output for unparsed files
+   - Generate "needs formatting" messages
+   - Support --write for auto-fix
 
-### ResultAggregator
-- addResult(stepType, result): Add step result
-- getOverallStatus(): Pass if all pass, fail if any fail
-- getBlockingFailures(): List blocking failures
-- groupByFile(): Group messages by file path
-- groupBySeverity(): Group by error/warning/info
-- getSummary(): Return aggregated summary
+4. **Configuration**
+   - linters: Array of linter configs (type, command, args, filePatterns)
+   - autoFix: boolean (run fix commands like eslint --fix)
+   - failOn: "error" | "warning" (minimum severity to fail step)
+   - timeout: number (per-linter timeout)
 
-### GitHubStatusReporter
-- createCheckRun(pr, workflow): Create GitHub check run
-- updateCheckRun(runId, status, results): Update with results
-- createAnnotations(results): Convert messages to annotations
-- postCommitStatus(sha, status): Post commit status (legacy)
-- Handle API rate limiting
-- Graceful error handling
+5. **Result formatting**
+   - Group errors by file
+   - Include line numbers and columns
+   - Add actionable suggestions (e.g., "Run: eslint --fix src/foo.ts")
+   - Count total errors/warnings
 
-### ReviewOrchestrator
-- loadConfig(path): Load workflow configuration
-- runReview(pr, config): Execute complete review workflow
-- buildContext(pr): Build ReviewContext from PR info
-- executeWorkflow(workflow, context): Run all step groups
-- reportResults(pr, results): Post to GitHub + return summary
-- Integration point with AI detection
+6. **Testing**
+   - Mock file system with test files
+   - Mock linter command execution
+   - Test ESLint JSON parsing with real examples
+   - Test Prettier output parsing
+   - Test file filtering (only run on changed files)
+   - Test severity mapping
+   - Test timeout handling
+   - Test error cases (linter not found, invalid config)
 
-## Tests
-- Sequential execution order
-- Parallel execution concurrency
-- Conditional step execution
-- Result aggregation logic
-- GitHub API integration (mocked)
-- Error handling and recovery
-- Timeout handling
-- Blocking vs non-blocking steps
+## Tests to Write
+
+1. **Basic lint detection**
+   - Detect ESLint errors in files
+   - Detect Prettier formatting issues
+   - Pass when no issues found
+
+2. **Output parsing**
+   - Parse ESLint JSON format correctly
+   - Parse Prettier output correctly
+   - Handle empty output
+
+3. **File filtering**
+   - Only lint changed files from context
+   - Apply file patterns (*.ts, *.js, etc.)
+   - Skip excluded patterns
+
+4. **Severity handling**
+   - Map ESLint severity correctly
+   - Fail on errors by default
+   - Continue on warnings
+
+5. **Configuration validation**
+   - Reject invalid linter types
+   - Reject invalid failOn values
+   - Require command for custom linters
+
+6. **Error handling**
+   - Handle missing linter binaries
+   - Handle invalid JSON output
+   - Handle linter crashes
+   - Handle timeouts
 
 ## Exit Criteria
-- All orchestrator classes implemented
-- Sequential and parallel execution working
-- Results properly aggregated
-- GitHub status checks posting correctly
-- At least 30 tests passing
-- Package builds successfully
-- All type checks pass
 
-## Notes
-- Use Promise.all() for parallel execution
-- Use Promise.allSettled() to handle partial failures
-- GitHub Check Runs API preferred over commit status
-- Support both organization and repository configs
-- Log all step executions for debugging
+- [ ] LintStep class implements all ReviewStep interface methods
+- [ ] ESLint integration works with JSON output parsing
+- [ ] Prettier integration detects formatting issues
+- [ ] Only changed files are linted (respects context.changedFiles)
+- [ ] Lint errors/warnings converted to ReviewMessages with correct severity
+- [ ] Configuration validates linter setup
+- [ ] At least 20 tests covering all scenarios
+- [ ] Package builds successfully with no type errors
+- [ ] Tests pass with `bun test`

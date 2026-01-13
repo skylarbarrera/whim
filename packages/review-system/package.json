@@ -23,6 +23,9 @@
   },
   "devDependencies": {
     "@types/bun": "^1.0.0",
+    "@types/eslint": "^9.6.1",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
     "typescript": "^5.7.0"
   }
 }

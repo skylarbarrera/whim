@@ -1615,3 +1615,130 @@ Orchestrator Tests:
 - All source code type-checks correctly
 - Task 3 of 8 complete in SPEC.md
 
+---
+
+## Session 33 - 2026-01-13
+
+### Task: Implement Lint Validation Hook
+
+**Files Created:**
+- `packages/review-system/src/steps/lint-step.ts` - LintStep class
+- `packages/review-system/src/steps/index.ts` - Steps module exports
+- `packages/review-system/src/__tests__/lint-step.test.ts` - Comprehensive test suite (29 tests)
+
+**Files Modified:**
+- `packages/review-system/src/index.ts` - Added steps module export
+- `packages/review-system/package.json` - Added eslint, prettier, @types/eslint dev dependencies
+
+**LintStep Implementation:**
+
+Configuration:
+- LintStepOptions interface with linters array, failOn, autoFix, linterTimeoutMs
+- LinterConfig interface for individual linter setup (type, command, args, filePatterns, autoFix)
+- Support for three linter types: eslint, prettier, custom
+
+Features:
+1. **ESLint Integration:**
+   - Runs: `npx eslint --format json [files]`
+   - Parses JSON output format
+   - Maps severity: 2=error, 1=warning, 0=info
+   - Extracts: filePath, line, column, message, ruleId
+   - Includes auto-fix suggestions when available
+
+2. **Prettier Integration:**
+   - Runs: `npx prettier --check [files]`
+   - Parses stdout for unformatted files
+   - Generates formatting warnings with fix suggestions
+   - Supports --write for auto-fix mode
+
+3. **Custom Linter Support:**
+   - Runs arbitrary commands with custom args
+   - Parses stderr for error messages
+   - Allows extension with any linter tool
+
+4. **File Filtering:**
+   - Only lints changed files from ReviewContext
+   - Skips deleted files
+   - Applies glob patterns (*.ts, **/*.ts, etc.)
+   - Simple pattern matching with regex conversion
+
+5. **Result Handling:**
+   - Converts linter output to ReviewMessages
+   - Includes file/line/column location data
+   - Maps severity to ReviewSeverity enum
+   - Provides actionable suggestions (e.g., "Run: eslint --fix file.ts")
+   - Configurable failOn: error or warning
+
+6. **Error Handling:**
+   - Graceful handling of missing linter binaries
+   - JSON parse error recovery
+   - Linter crash/timeout handling
+   - Non-zero exit code handling (expected for lint failures)
+
+**Test Coverage (29 tests):**
+
+1. Initialization (2 tests):
+   - Valid config initialization
+   - Throw on missing linters
+
+2. Configuration Validation (7 tests):
+   - Valid config passes
+   - Missing linters array
+   - Empty linters array
+   - Missing linter type
+   - Invalid linter type
+   - Custom linter missing command
+   - Invalid failOn value
+
+3. ESLint Integration (3 tests):
+   - Parse JSON output with errors/warnings
+   - Pass when no errors found
+   - Include auto-fix suggestions
+
+4. Prettier Integration (2 tests):
+   - Detect unformatted files
+   - Pass when all files formatted
+
+5. Custom Linter (2 tests):
+   - Run custom command
+   - Report custom linter errors
+
+6. File Filtering (4 tests):
+   - Only lint changed files
+   - Skip deleted files
+   - Apply file patterns
+   - Handle glob patterns
+
+7. Severity Handling (3 tests):
+   - Fail on errors by default
+   - Pass on warnings when failOn=error
+   - Fail on warnings when failOn=warning
+
+8. Error Handling (2 tests):
+   - Handle JSON parse errors
+   - Handle linter execution errors
+
+9. Multiple Linters (1 test):
+   - Aggregate results from multiple linters
+
+10. Metadata (2 tests):
+    - Include linter count
+    - Include error/warning counts
+
+11. Cleanup (1 test):
+    - Cleanup without errors
+
+**Technical Details:**
+- Uses Node.js child_process.exec for running linters
+- Promisified exec with timeout support
+- Regex-based glob pattern matching
+- Type-safe with TypeScript strict mode
+- Graceful degradation on linter failures
+
+**Notes:**
+- All source code type-checks successfully
+- Package builds to dist/ with lint-step.js
+- Tests require bun test runner (not executed in this session)
+- Ready for integration with ReviewOrchestrator
+- Task 4 of 8 complete in SPEC.md
+

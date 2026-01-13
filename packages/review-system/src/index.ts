@@ -9,3 +9,6 @@ export * from './detection/index.js';
 
 // Orchestrator module exports
 export * from './orchestrator/index.js';
+
+// Review step implementations
+export * from './steps/index.js';

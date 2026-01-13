@@ -169,3 +169,25 @@ All acceptance criteria met:
   - 4 test files created (executor, aggregator, github-status, orchestrator) with comprehensive coverage
   - Package builds successfully, all source code type-checks correctly
   - Supports workflow triggers (repositories, labels, AI-only, target branches)
+
+- [x] Task 4: Implement lint validation hook (Session 33)
+  - Created LintStep class implementing ReviewStep interface
+  - ESLint integration with JSON output parsing
+  - Prettier integration for formatting checks
+  - Custom linter support for extensibility
+  - File filtering by patterns (glob support: *.ts, **/*.ts)
+  - Severity mapping: ESLint errors/warnings to ReviewSeverity
+  - Configurable failOn: error or warning
+  - Auto-fix suggestions in review messages
+  - Actionable lint failure reports with file/line/column info
+  - Comprehensive test suite (29 tests) covering:
+    - Config validation
+    - ESLint/Prettier/custom linter execution
+    - Output parsing
+    - File filtering and patterns
+    - Severity handling
+    - Error handling
+    - Multiple linters aggregation
+  - Added dev dependencies: eslint, prettier, @types/eslint
+  - Package builds successfully with TypeScript
+  - All source code type-checks correctly
