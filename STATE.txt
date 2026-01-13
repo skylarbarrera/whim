@@ -243,95 +243,55 @@ All acceptance criteria met:
   - Package builds successfully with npm run build
   - blocking module exported from main index.ts
 
-## Session 36 - 2026-01-13
+- [x] Task 7: Build review dashboard/UI (Session 36)
+  - Created review-dashboard package with Next.js 14 App Router
+  - Review list page with filters, auto-refresh, status badges
+  - Review details page with timeline, messages, and file views
+  - Manual trigger page with form and real-time status updates
+  - 4 visualization components (ReviewStepStatus, ReviewTimeline, ReviewMessages, FileAnnotations)
+  - API client with fetch/trigger/poll methods
+  - 23 tests covering components and API client
+  - Dockerfile and docker-compose integration
+  - Responsive design with Tailwind CSS
+  - ~1000 lines of code created
+  - Task 7 of 8 complete in SPEC.md
 
-### Task: Build Review Dashboard/UI
+- [x] Task 8: Add configuration management (Session 37)
+  - Created ConfigLoader for loading YAML configs from files/strings/URLs
+  - Created ConfigValidator for schema validation and business rules
+  - Created ConfigMerger for hierarchical config merging (org > repo > env)
+  - Created default config templates (minimal, standard, full, AI, dev, prod)
+  - Added SimpleWorkflowConfig and SimpleStepConfig types for YAML format
+  - Created 5 example YAML files (.review.yml, .review-org.yml, .review-dev.yml, .review-prod.yml, .review-ai.yml)
+  - Updated ReviewOrchestrator with loadSimpleConfig and loadConfigWithHierarchy methods
+  - Added 73 comprehensive tests:
+    - 23 tests for ConfigLoader (file/string/URL loading, org/repo/env configs, hierarchy)
+    - 26 tests for ConfigValidator (workflow, step, trigger, stepGroup validation)
+    - 24 tests for ConfigMerger (two-config merge, multi-config merge, hierarchy, arrays, deep merge)
+  - Supports environment-specific, repository-specific, and organization-level configs
+  - Config priority: environment > repo > org > defaults
+  - YAML parsing via yaml package (already in dependencies)
+  - All config modules exported from main index.ts
+  - Task 8 of 8 complete in SPEC.md
 
-**Commit:** (pending)
+## Pre-Review Step Complete
 
-**Files Created:**
-- `packages/review-dashboard/package.json` - Package config with Next.js and dependencies
-- `packages/review-dashboard/tsconfig.json` - TypeScript config for Next.js App Router
-- `packages/review-dashboard/next.config.js` - API proxy and standalone build
-- `packages/review-dashboard/next-env.d.ts` - Next.js type definitions
-- `packages/review-dashboard/tailwind.config.js` - Tailwind CSS configuration
-- `packages/review-dashboard/postcss.config.js` - PostCSS configuration
-- `packages/review-dashboard/Dockerfile` - Multi-stage build for production
-- `packages/review-dashboard/app/layout.tsx` - Root layout with navigation
-- `packages/review-dashboard/app/globals.css` - Global styles with Tailwind
-- `packages/review-dashboard/app/page.tsx` - Review list page with filters
-- `packages/review-dashboard/app/reviews/[id]/page.tsx` - Review details page
-- `packages/review-dashboard/app/trigger/page.tsx` - Manual review trigger page
-- `packages/review-dashboard/components/ReviewStepStatus.tsx` - Status badge component
-- `packages/review-dashboard/components/ReviewTimeline.tsx` - Timeline visualization
-- `packages/review-dashboard/components/ReviewMessages.tsx` - Messages grouped by severity/file
-- `packages/review-dashboard/components/FileAnnotations.tsx` - File-level issue display
-- `packages/review-dashboard/components/TriggerForm.tsx` - Manual trigger form
-- `packages/review-dashboard/lib/api.ts` - API client with fetch/trigger/poll methods
-- `packages/review-dashboard/components/__tests__/ReviewStepStatus.test.tsx` - 7 tests
-- `packages/review-dashboard/components/__tests__/ReviewTimeline.test.tsx` - 6 tests
-- `packages/review-dashboard/lib/__tests__/api.test.ts` - 10 tests
+All 8 tasks in SPEC.md have been completed:
+- Design composable PR review system architecture
+- Implement AI PR detection mechanism
+- Build core review orchestrator
+- Implement lint validation hook
+- Implement automated testing hook
+- Create merge blocking mechanism
+- Build review dashboard/UI
+- Add configuration management
 
-**Files Modified:**
-- `docker/docker-compose.yml` - Added review-dashboard service on port 3004
-
-**Features Implemented:**
-
-1. **Review List Page (/):**
-   - Table view of recent reviews with PR info, status, timestamp
-   - Filter by status (PASS/FAIL/ERROR/PENDING)
-   - Filter by AI-generated only checkbox
-   - Auto-refresh every 10 seconds
-   - Click to view details
-
-2. **Review Details Page (/reviews/[id]):**
-   - Overall status and summary cards
-   - Three view tabs: Timeline, Messages, Files
-   - Timeline view: Sequential/parallel step execution with status badges
-   - Messages view: Grouped by severity (errors, warnings, info)
-   - Files view: Grouped by file with line numbers and suggestions
-   - AI-generated PR indicator with context
-
-3. **Manual Trigger Page (/trigger):**
-   - Form to specify owner/repo/PR number
-   - Workflow dropdown selection
-   - Optional commit SHA input
-   - Real-time status updates during review
-   - Result display with error/warning counts
-   - View details button on completion
-
-4. **Visualization Components:**
-   - ReviewStepStatus: Color-coded badges (green=pass, red=fail, orange=error, blue=pending, gray=skipped)
-   - ReviewTimeline: Timeline with step numbers, durations, error messages
-   - ReviewMessages: Severity-grouped messages with file locations and suggestions
-   - FileAnnotations: File-grouped issues with line/column numbers and fix suggestions
-   - TriggerForm: Validated form with error handling
-
-5. **API Client (lib/api.ts):**
-   - fetchReviews(): Get list with optional filters
-   - fetchReviewById(): Get single review
-   - triggerReview(): Start manual review
-   - pollReviewStatus(): Real-time updates with cancel support
-
-6. **Infrastructure:**
-   - Next.js 14+ with App Router
-   - TypeScript strict mode
-   - Tailwind CSS for styling
-   - API proxy to orchestrator at /api/reviews
-   - Dockerfile with standalone build
-   - docker-compose integration on port 3004
-
-**Test Coverage:**
-- 7 tests for ReviewStepStatus (status types, duration formatting)
-- 6 tests for ReviewTimeline (modes, results, errors, messages)
-- 10 tests for API client (params, requests, responses, types)
-- All tests validate type structures and business logic
-
-**Notes:**
-- ~1000 lines of code created
-- All components use @factory/review-system types
-- Responsive design with Tailwind
-- Real-time updates via polling (2s interval)
-- Package ready for integration with orchestrator API
-- Task 7 of 8 complete in SPEC.md
-
+Summary:
+- ~2700 lines of source code created
+- 260+ comprehensive tests covering all modules
+- 5 example YAML configuration files
+- Full TypeScript support with strict type checking
+- Modular, extensible architecture with plugin system
+- Hierarchical configuration management
+- GitHub API integration for status checks and branch protection
+- Next.js dashboard for visualization and manual triggers

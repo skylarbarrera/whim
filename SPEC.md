@@ -32,7 +32,7 @@ Implement a composable PR review system specifically for AI-generated PRs with a
   - Review step status visualization
   - Failed check details and remediation guidance
   - Manual review trigger interface
-- [ ] Add configuration management
+- [x] Add configuration management
   - YAML-based review workflow definitions
   - Repository-specific and organization-level configs
   - Environment-specific review requirements
