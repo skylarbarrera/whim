@@ -1659,3 +1659,142 @@ This integration provides:
 - Default timeout is 5 minutes (vs 60s for lint)
 - Ready for Phase 5: Create merge blocking system
 
+---
+
+## Session 34 - 2026-01-13
+
+### Task: Phase 5 - Create Merge Blocking System
+
+**Commit:** 42056e1
+
+**Files Created:**
+- `packages/pr-review/src/github-status.ts` - GitHub Status API client (203 lines)
+- `packages/pr-review/src/branch-protection.ts` - Branch protection manager (197 lines)
+- `packages/pr-review/src/merge-guardian.ts` - Merge prevention logic (240 lines)
+- `packages/pr-review/tests/github-status.test.ts` - Status client tests (10 tests)
+- `packages/pr-review/tests/branch-protection.test.ts` - Protection tests (14 tests)
+- `packages/pr-review/tests/merge-guardian.test.ts` - Guardian tests (18 tests)
+
+**Files Modified:**
+- `packages/pr-review/package.json` - Added @octokit/rest dependency
+- `packages/pr-review/src/service.ts` - Integrated merge blocking components
+- `packages/pr-review/src/index.ts` - Exported new modules
+- `packages/pr-review/src/tracker.ts` - Added headSha parameter to createReview
+- `packages/shared/src/types.ts` - Added headSha to PRReview interface
+- `migrations/002_pr_reviews.sql` - Added head_sha column to pr_reviews table
+
+**GitHub Status API Client (github-status.ts):**
+- `GitHubStatusClient` class for GitHub Commit Status API
+- `createStatus()` - POST to /repos/:owner/:repo/statuses/:sha
+- `createStatusFromReview()` - Create status from review result
+- `getStatuses()` - GET all statuses for a commit
+- `getReviewStatus()` - Get AI factory review status
+- Status context: "ai-factory/pr-review"
+- States: pending, success, failure, error
+- Target URL to dashboard review page
+- Description truncated to 140 chars (GitHub limit)
+- Determines state from review status and merge blocked flag
+- Special handling for overrides (always success)
+
+**Branch Protection Manager (branch-protection.ts):**
+- `BranchProtectionManager` class wrapping Octokit
+- `getProtection()` - GET branch protection rules
+- `addRequiredStatusCheck()` - Add AI factory review as required
+- `removeRequiredStatusCheck()` - Remove from required checks
+- `isReviewRequired()` - Check if review is required on branch
+- `updateProtection()` - Update protection with custom settings
+- `syncProtectionAcrossBranches()` - Sync across multiple branches
+- Creates minimal protection if none exists
+- Preserves existing required checks when adding/removing
+- Returns 404 as null (no protection), throws on other errors
+
+**Merge Guardian (merge-guardian.ts):**
+- `MergeGuardian` class enforcing merge rules
+- `canMerge()` - Determine if PR can be merged
+- `blockMerge()` - Update status to blocked
+- `allowMerge()` - Update status to allowed
+- `isOverridden()` - Check override status
+- `override()` - Emergency override with audit trail
+- `evaluateAndUpdate()` - Evaluate and update GitHub status
+- `areChecksComplete()` - Check if all required checks done
+- `getCheckSummary()` - Get statistics (total, required, passed, failed, pending)
+- Returns `MergeDecision` with allowed, reason, failedChecks, pendingChecks, overridden
+- Blocks if any required check failed or pending
+- Allows if all required checks passed
+- Override always allows merge regardless of check status
+- Logs override events for audit trail
+
+**ReviewService Integration (service.ts):**
+- Added optional githubToken and dashboardUrl constructor params
+- Creates GitHubStatusClient if token provided
+- Creates BranchProtectionManager if token provided
+- Creates MergeGuardian with optional status client
+- Updated `runCheck()` to call `evaluateAndReportStatus()` after completion
+- Added `evaluateAndReportStatus()` - Update merge status and GitHub
+- Added `reportStatus()` - Report current status to GitHub
+- Added `syncProtection()` - Sync branch protection rules
+- Added `emergencyOverride()` - Emergency override with audit trail
+- Added `canMerge()` - Query merge eligibility
+- Added `getCheckSummary()` - Get check statistics
+- Updated `detectAndCreateReview()` to extract headSha from commits
+
+**Database Schema Updates:**
+- Added `head_sha VARCHAR(40) NOT NULL` to pr_reviews table
+- Required for GitHub status API commit reference
+- Migration 002_pr_reviews.sql updated
+
+**Type System Updates:**
+- Added `headSha: string` to PRReview interface
+- Consistent use of `overrideUser` instead of `overriddenBy`
+- All code updated to use correct property names
+
+**Testing (42 tests):**
+
+*github-status.test.ts (10 tests):*
+- createStatus with various states
+- createStatusFromReview for different scenarios
+- Long description truncation
+- Override status handling
+- getStatuses and getReviewStatus
+
+*branch-protection.test.ts (14 tests):*
+- getProtection for existing/missing protection
+- addRequiredStatusCheck (new and existing)
+- No duplicate status checks
+- Create minimal protection if none exists
+- removeRequiredStatusCheck
+- Remove status check requirement if last check
+- isReviewRequired
+- syncProtectionAcrossBranches
+- Error handling
+
+*merge-guardian.test.ts (18 tests):*
+- canMerge with various check combinations
+- Review not found handling
+- Override allowing merge despite failures
+- All required checks passed
+- Required check failures blocking
+- Required check pending blocking
+- Multiple failed checks
+- No required checks allowing merge
+- blockMerge and allowMerge
+- isOverridden
+- override with audit trail
+- Override throwing if review not found
+- evaluateAndUpdate
+- areChecksComplete
+- getCheckSummary statistics
+
+**Dependencies:**
+- Added @octokit/rest ^21.0.2 for GitHub API integration
+
+**Notes:**
+- All 42 tests pass (mocked Octokit)
+- Package builds successfully with TypeScript
+- All 4 sub-bullets completed in single iteration
+- GitHub integration is optional (service works without token)
+- Emergency override mechanism includes audit trail logging
+- Branch protection manager supports multiple branches
+- Status context "ai-factory/pr-review" matches integration docs
+- Ready for Phase 6: Build review dashboard/UI
+
