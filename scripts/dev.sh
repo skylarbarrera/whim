@@ -108,9 +108,9 @@ fi
 echo "Services:"
 echo "  • PostgreSQL:   localhost:5432"
 echo "  • Redis:        localhost:6379"
-echo "  • Orchestrator: http://localhost:3000"
+echo "  • Orchestrator: http://localhost:3002"
 if [ "$DASHBOARD" = true ]; then
-    echo "  • Dashboard:    http://localhost:3001"
+    echo "  • Dashboard:    http://localhost:3003"
 fi
 echo ""
 

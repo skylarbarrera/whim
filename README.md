@@ -2,6 +2,16 @@
 
 An autonomous AI development system that takes GitHub issues, converts them to specs, and produces PRs through iterative Claude Code execution.
 
+## Features (v1)
+
+- **GitHub Issue → PR Pipeline** - Label an issue `ai-factory`, get a PR back
+- **Issue Linking** - PRs reference source issues with `Closes #N` for auto-close on merge
+- **Parallel Workers** - Run multiple Claude Code instances simultaneously
+- **Learnings System** - Workers share discoveries across tasks via vector embeddings
+- **Rate Limiting** - Respects Claude Max limits with daily budgets and cooldowns
+- **File Locking** - Prevents conflicts when workers touch the same files
+- **Real-time Dashboard** - Monitor queue, workers, and metrics
+
 ## Core Philosophy
 
 - **Fresh context per iteration** - State lives in files, not memory
@@ -95,58 +105,75 @@ Ralph and Factory are separate concerns. Factory spawns Ralph and parses its std
 ### Prerequisites
 
 - Docker & Docker Compose
-- Bun
-- GitHub CLI (`gh`)
+- GitHub CLI (`gh`) authenticated
+- GitHub Personal Access Token (repo permissions)
+- Anthropic API Key (for Claude)
 
 ### Setup
 
 ```bash
 # Clone and setup
 git clone <repo>
-cd factory
+cd <repo>
 ./scripts/setup.sh
 
 # Edit configuration
 cp .env.example .env
-# Edit .env with your GITHUB_TOKEN and REPOS
+# Add your GITHUB_TOKEN, ANTHROPIC_API_KEY, and REPOS
 
-# Start services
-bun dev
+# Start services (without dashboard)
+./scripts/dev.sh
+
+# Or with dashboard
+./scripts/dev.sh --dashboard
 ```
+
+After startup:
+- Orchestrator API: http://localhost:3002
+- Dashboard (if enabled): http://localhost:3003
 
 ### Manual Work Item
 
 ```bash
-# Submit work via API
-curl -X POST http://localhost:3000/api/work \
+# Submit work via API (orchestrator runs on port 3002)
+curl -X POST http://localhost:3002/api/work \
   -H "Content-Type: application/json" \
   -d '{
-    "source": "api",
-    "sourceId": "manual-1",
-    "sourceUrl": "https://example.com",
-    "repo": "https://github.com/owner/repo.git",
-    "spec": "# Task\n\n- [ ] Add hello world endpoint",
-    "priority": "medium"
+    "repo": "owner/repo",
+    "branch": "ai/add-hello-endpoint",
+    "spec": "# Task\n\n- [ ] Add hello world endpoint to src/index.ts",
+    "priority": "medium",
+    "metadata": {
+      "issueNumber": 42,
+      "issueTitle": "Add hello endpoint"
+    }
   }'
 ```
 
 ### GitHub Integration
 
 1. Add label `ai-factory` to a GitHub issue
-2. Intake service picks it up
-3. Generates SPEC.md from issue
-4. Queues for processing
-5. PR created when complete
+2. Intake service picks it up, adds `ai-processing` label
+3. Generates SPEC.md from issue description
+4. Queues work item for processing
+5. Worker executes tasks, creates PR with `Closes #N`
+6. Comment posted to issue with PR link
+7. Issue label updated to `ai-pr-ready`
+8. When PR merges, GitHub auto-closes the issue
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GITHUB_TOKEN` | required | GitHub PAT with repo permissions |
+| `ANTHROPIC_API_KEY` | required | Anthropic API key for Claude |
 | `REPOS` | required | Comma-separated: `owner/repo1,owner/repo2` |
+| `DATABASE_URL` | `postgres://factory:factory@localhost:5432/factory` | PostgreSQL connection |
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection |
 | `MAX_WORKERS` | `2` | Maximum concurrent workers |
 | `DAILY_BUDGET` | `200` | Max iterations per day (Claude Max) |
 | `COOLDOWN_SECONDS` | `60` | Seconds between worker spawns |
+| `STALE_THRESHOLD` | `300` | Seconds before worker marked stale |
 | `INTAKE_LABEL` | `ai-factory` | GitHub label to watch |
 | `POLL_INTERVAL` | `60000` | GitHub poll interval (ms) |
 
@@ -157,15 +184,25 @@ curl -X POST http://localhost:3000/api/work \
 - `GET /api/work/:id` - Get work item status
 - `POST /api/work/:id/cancel` - Cancel work item
 
-### Workers
+### Workers (Management)
 - `GET /api/workers` - List all workers
 - `POST /api/workers/:id/kill` - Kill worker
 
-### Dashboard
+### Workers (Internal - used by workers)
+- `POST /api/worker/register` - Worker self-registration
+- `POST /api/worker/:id/heartbeat` - Send heartbeat
+- `POST /api/worker/:id/lock` - Request file locks
+- `POST /api/worker/:id/unlock` - Release file locks
+- `POST /api/worker/:id/complete` - Mark work complete
+- `POST /api/worker/:id/fail` - Report failure
+- `POST /api/worker/:id/stuck` - Report stuck state
+
+### Status & Metrics
 - `GET /api/status` - Factory status overview
-- `GET /api/queue` - Queue contents
+- `GET /api/queue` - Queue contents and stats
 - `GET /api/metrics` - Performance metrics
 - `GET /api/learnings` - Browse learnings
+- `GET /health` - Health check
 
 ## Worker Protocol
 
@@ -174,15 +211,21 @@ Workers communicate with orchestrator via HTTP:
 ```
 Worker                              Orchestrator
    │                                     │
-   ├──── POST /worker/register ─────────►│
+   ├──── POST /api/worker/register ─────►│  (get workerId + workItem)
    │                                     │
-   ├──── POST /worker/:id/heartbeat ────►│  (every iteration)
+   │  ┌─── iteration loop ───────────────┤
+   │  │                                  │
+   ├──┼── POST /api/worker/:id/heartbeat►│  (every tool call)
+   │  │                                  │
+   ├──┼── POST /api/worker/:id/lock ────►│  (before editing files)
+   │  │                                  │
+   ├──┼── POST /api/worker/:id/unlock ──►│  (after editing files)
+   │  │                                  │
+   │  └──────────────────────────────────┤
    │                                     │
-   ├──── POST /worker/:id/lock ─────────►│  (before editing files)
-   │                                     │
-   ├──── POST /worker/:id/complete ─────►│  (on success)
-   │  or POST /worker/:id/fail ─────────►│  (on failure)
-   │  or POST /worker/:id/stuck ────────►│  (when stuck)
+   ├──── POST /api/worker/:id/complete ─►│  (on success + PR URL)
+   │  or POST /api/worker/:id/fail ─────►│  (on failure)
+   │  or POST /api/worker/:id/stuck ────►│  (when stuck)
    │                                     │
 ```
 
@@ -233,13 +276,27 @@ bun run lint
 
 ## Monitoring
 
-Dashboard at `http://localhost:3001`:
+Start with dashboard enabled:
 
-- **Overview**: Queue depth, active workers, daily usage
-- **Workers**: Live status, iterations, kill button
-- **Queue**: Pending items, priorities, cancel button
-- **Learnings**: Browse and search past discoveries
-- **Metrics**: Charts for throughput, success rate, duration
+```bash
+./scripts/dev.sh --dashboard
+```
+
+Dashboard at `http://localhost:3003`:
+
+- **Overview** (`/`): Queue depth, active workers, daily usage
+- **Workers** (`/workers`): Live status, iterations, kill button
+- **Queue** (`/queue`): Pending items, priorities, cancel button
+- **Learnings** (`/learnings`): Browse and search past discoveries
+- **Metrics** (`/metrics`): Charts for throughput, success rate, duration
+
+Service ports:
+| Service | Port |
+|---------|------|
+| Orchestrator API | 3002 |
+| Dashboard | 3003 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
 
 ## Troubleshooting
 
