@@ -1,0 +1,2066 @@
+# AI Software Factory - Implementation Spec
+
+## Overview
+
+An autonomous AI development system that takes GitHub issues, converts them to specs, and produces PRs through iterative Claude Code execution.
+
+**Core Philosophy:**
+- Fresh context per iteration (state lives in files, not memory)
+- Learnings persist across tasks and workers
+- Single system handles any task size (1 commit or 50)
+- Local-first, Docker-based, scales horizontally
+
+**User Context:**
+- Using Claude Max (no per-token API costs, but rate limits apply)
+- Has existing `ralph` CLI that runs Claude Code in autonomous loops
+- Specs created via Claude + askUserTool with specific formatting
+- GitHub + Git only (no Linear/Sentry for now)
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              FACTORY                                     │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                         ORCHESTRATOR                                │ │
+│  │  • Queue management (priority-based)                                │ │
+│  │  • Worker lifecycle (spawn/kill/health)                             │ │
+│  │  • Rate limiting (Claude Max aware)                                 │ │
+│  │  • Conflict detection (file locking)                                │ │
+│  │  • Metrics collection                                               │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                     │
+│                    ┌───────────────┼───────────────┐                    │
+│                    ▼               ▼               ▼                    │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐        │
+│  │     WORKER 1     │ │     WORKER 2     │ │     WORKER N     │        │
+│  │  ┌────────────┐  │ │  ┌────────────┐  │ │  ┌────────────┐  │        │
+│  │  │   RALPH    │  │ │  │   RALPH    │  │ │  │   RALPH    │  │        │
+│  │  │ (core loop)│  │ │  │ (core loop)│  │ │  │ (core loop)│  │        │
+│  │  └────────────┘  │ │  └────────────┘  │ │  └────────────┘  │        │
+│  │  ┌────────────┐  │ │  ┌────────────┐  │ │  ┌────────────┐  │        │
+│  │  │CLAUDE CODE │  │ │  │CLAUDE CODE │  │ │  │CLAUDE CODE │  │        │
+│  │  │  + MCPs    │  │ │  │  + MCPs    │  │ │  │  + MCPs    │  │        │
+│  │  └────────────┘  │ │  └────────────┘  │ │  └────────────┘  │        │
+│  └──────────────────┘ └──────────────────┘ └──────────────────┘        │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                         SHARED STATE                                │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │ │
+│  │  │  PostgreSQL  │  │    Redis     │  │     Git      │              │ │
+│  │  │  (learnings, │  │   (locks,    │  │   (repos,    │              │ │
+│  │  │   metrics)   │  │   pubsub)    │  │  branches)   │              │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘              │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Repository Structure
+
+```
+factory/
+├── packages/
+│   ├── orchestrator/          # Central brain service
+│   │   ├── src/
+│   │   │   ├── index.ts       # Entry point
+│   │   │   ├── server.ts      # Express/Fastify API
+│   │   │   ├── queue.ts       # Priority queue management
+│   │   │   ├── workers.ts     # Worker lifecycle management
+│   │   │   ├── rate-limits.ts # Claude Max rate limiting
+│   │   │   ├── conflicts.ts   # File locking via Redis
+│   │   │   ├── metrics.ts     # Metrics collection
+│   │   │   └── db.ts          # Database client
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── Dockerfile
+│   │
+│   ├── worker/                # Worker container setup
+│   │   ├── src/
+│   │   │   ├── index.ts       # Worker entry point
+│   │   │   ├── setup.ts       # Workspace setup (clone, branch)
+│   │   │   ├── learnings.ts   # Load/save learnings
+│   │   │   ├── ralph.ts       # Ralph execution wrapper
+│   │   │   └── client.ts      # Orchestrator API client
+│   │   ├── .claude/           # Claude Code config (copied into container)
+│   │   │   ├── CLAUDE.md
+│   │   │   ├── settings.json
+│   │   │   └── mcp.json
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── Dockerfile
+│   │
+│   ├── intake/                # GitHub intake adapter
+│   │   ├── src/
+│   │   │   ├── index.ts       # Entry point
+│   │   │   ├── github.ts      # GitHub Issues polling
+│   │   │   ├── spec-gen.ts    # Issue → SPEC.md conversion
+│   │   │   └── webhook.ts     # GitHub webhook handler
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── shared/                # Shared types and utilities
+│   │   ├── src/
+│   │   │   ├── types.ts       # Shared TypeScript types
+│   │   │   ├── db.ts          # Database utilities
+│   │   │   ├── redis.ts       # Redis utilities
+│   │   │   └── learnings.ts   # Learnings retrieval/storage
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── dashboard/             # Web UI for monitoring
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── page.tsx           # Overview
+│       │   │   ├── workers/page.tsx   # Worker status
+│       │   │   ├── queue/page.tsx     # Queue management
+│       │   │   ├── learnings/page.tsx # Browse learnings
+│       │   │   └── metrics/page.tsx   # Charts/stats
+│       │   └── components/
+│       ├── package.json
+│       └── next.config.js
+│
+├── docker/
+│   ├── docker-compose.yml     # Local development
+│   └── docker-compose.prod.yml
+│
+├── scripts/
+│   ├── setup.sh               # First-time setup
+│   ├── dev.sh                 # Start dev environment
+│   ├── migrate.sh             # Run DB migrations
+│   └── seed.sh                # Seed test data
+│
+├── migrations/
+│   └── 001_initial.sql        # Database schema
+│
+├── package.json               # Monorepo root (pnpm workspaces)
+├── pnpm-workspace.yaml
+├── turbo.json                 # Turborepo config
+└── README.md
+```
+
+---
+
+## Component Specifications
+
+### 1. Shared Types (`packages/shared`)
+
+```typescript
+// packages/shared/src/types.ts
+
+// === WORK ITEMS ===
+
+export type WorkItemStatus = 
+  | 'queued'      // In queue, waiting
+  | 'assigned'    // Assigned to worker
+  | 'running'     // Worker actively processing
+  | 'stuck'       // Worker reported stuck
+  | 'completed'   // Successfully completed
+  | 'failed'      // Failed after retries
+  | 'cancelled';  // Manually cancelled
+
+export type Priority = 'critical' | 'high' | 'medium' | 'low';
+
+export interface WorkItem {
+  id: string;                    // UUID
+  source: 'github' | 'api';      // Where it came from
+  sourceId: string;              // GitHub issue number, etc.
+  sourceUrl: string;             // Link back to source
+  repo: string;                  // git@github.com:user/repo.git or https URL
+  baseBranch: string;            // Usually 'main'
+  spec: string;                  // SPEC.md content
+  priority: Priority;
+  status: WorkItemStatus;
+  workerId?: string;             // Assigned worker
+  prUrl?: string;                // Created PR URL
+  error?: string;                // Error message if failed
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+export interface CreateWorkItemInput {
+  source: 'github' | 'api';
+  sourceId: string;
+  sourceUrl: string;
+  repo: string;
+  baseBranch?: string;           // Defaults to 'main'
+  spec: string;
+  priority?: Priority;           // Defaults to 'medium'
+}
+
+// === WORKERS ===
+
+export type WorkerStatus = 
+  | 'idle'        // Ready for work
+  | 'busy'        // Processing a work item
+  | 'stuck'       // Reported stuck
+  | 'dead';       // Failed health check
+
+export interface Worker {
+  id: string;                    // UUID
+  containerId: string;           // Docker container ID
+  workItemId?: string;           // Current work item
+  status: WorkerStatus;
+  currentIteration: number;
+  totalTokens: number;
+  lastHeartbeat: Date;
+  createdAt: Date;
+}
+
+// === LEARNINGS ===
+
+export interface Learning {
+  id: string;
+  repo: string;                  // Which repo this applies to
+  content: string;               // The learning itself
+  embedding?: number[];          // Vector for semantic search
+  sourceWorkerId: string;
+  sourceWorkItemId: string;
+  useCount: number;              // How many times retrieved
+  createdAt: Date;
+}
+
+// === METRICS ===
+
+export interface WorkerMetrics {
+  workerId: string;
+  workItemId: string;
+  iterations: number;
+  tokensUsed: number;
+  durationSeconds: number;
+  filesChanged: number;
+  status: 'completed' | 'failed' | 'stuck';
+  createdAt: Date;
+}
+
+export interface FactoryMetrics {
+  totalWorkItems: number;
+  completedWorkItems: number;
+  failedWorkItems: number;
+  averageIterations: number;
+  averageDuration: number;
+  totalTokensToday: number;
+  activeWorkers: number;
+  queueDepth: number;
+}
+
+// === API CONTRACTS ===
+
+// Worker → Orchestrator
+export interface WorkerRegisterRequest {
+  workItemId: string;
+}
+
+export interface WorkerHeartbeatRequest {
+  iteration: number;
+  tokens: number;
+  phase: 'setup' | 'running' | 'committing' | 'stuck';
+}
+
+export interface WorkerLockRequest {
+  files: string[];
+}
+
+export interface WorkerCompleteRequest {
+  prUrl: string;
+  iterations: number;
+  tokens: number;
+  filesChanged: string[];
+  newLearnings: string[];
+}
+
+export interface WorkerFailRequest {
+  error: string;
+  iteration: number;
+}
+
+export interface WorkerStuckRequest {
+  reason: string;
+  attempts: number;
+}
+```
+
+---
+
+### 2. Database Schema (`migrations/001_initial.sql`)
+
+```sql
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Work items table
+CREATE TABLE work_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source VARCHAR(50) NOT NULL,
+  source_id VARCHAR(255) NOT NULL,
+  source_url TEXT NOT NULL,
+  repo VARCHAR(255) NOT NULL,
+  base_branch VARCHAR(100) NOT NULL DEFAULT 'main',
+  spec TEXT NOT NULL,
+  priority VARCHAR(20) NOT NULL DEFAULT 'medium',
+  status VARCHAR(50) NOT NULL DEFAULT 'queued',
+  worker_id UUID,
+  pr_url TEXT,
+  error TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  started_at TIMESTAMP WITH TIME ZONE,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  
+  CONSTRAINT valid_priority CHECK (priority IN ('critical', 'high', 'medium', 'low')),
+  CONSTRAINT valid_status CHECK (status IN ('queued', 'assigned', 'running', 'stuck', 'completed', 'failed', 'cancelled'))
+);
+
+CREATE INDEX idx_work_items_status ON work_items(status);
+CREATE INDEX idx_work_items_priority ON work_items(priority);
+CREATE INDEX idx_work_items_created ON work_items(created_at);
+
+-- Workers table
+CREATE TABLE workers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  container_id VARCHAR(100) NOT NULL,
+  work_item_id UUID REFERENCES work_items(id),
+  status VARCHAR(50) NOT NULL DEFAULT 'idle',
+  current_iteration INT DEFAULT 0,
+  total_tokens INT DEFAULT 0,
+  last_heartbeat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  CONSTRAINT valid_worker_status CHECK (status IN ('idle', 'busy', 'stuck', 'dead'))
+);
+
+CREATE INDEX idx_workers_status ON workers(status);
+
+-- Learnings table with vector search
+CREATE TABLE learnings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  repo VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  embedding VECTOR(1536),
+  source_worker_id UUID NOT NULL,
+  source_work_item_id UUID REFERENCES work_items(id),
+  use_count INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_learnings_repo ON learnings(repo);
+CREATE INDEX idx_learnings_embedding ON learnings USING ivfflat (embedding vector_cosine_ops);
+
+-- Metrics table
+CREATE TABLE worker_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  worker_id UUID NOT NULL,
+  work_item_id UUID REFERENCES work_items(id),
+  iterations INT NOT NULL,
+  tokens_used INT NOT NULL,
+  duration_seconds INT NOT NULL,
+  files_changed INT NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_metrics_created ON worker_metrics(created_at);
+
+-- File locks table (for conflict detection, backed by Redis in practice)
+CREATE TABLE file_locks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  repo VARCHAR(255) NOT NULL,
+  file_path TEXT NOT NULL,
+  worker_id UUID NOT NULL REFERENCES workers(id),
+  acquired_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  UNIQUE(repo, file_path)
+);
+```
+
+---
+
+### 3. Orchestrator (`packages/orchestrator`)
+
+#### Entry Point
+
+```typescript
+// packages/orchestrator/src/index.ts
+
+import { createServer } from './server';
+import { QueueManager } from './queue';
+import { WorkerManager } from './workers';
+import { RateLimiter } from './rate-limits';
+import { ConflictDetector } from './conflicts';
+import { MetricsCollector } from './metrics';
+import { Database } from './db';
+import { Redis } from './redis';
+
+async function main() {
+  // Initialize connections
+  const db = new Database(process.env.DATABASE_URL!);
+  const redis = new Redis(process.env.REDIS_URL!);
+  
+  await db.connect();
+  await redis.connect();
+  
+  // Initialize components
+  const queue = new QueueManager(db);
+  const rateLimiter = new RateLimiter({
+    maxConcurrentWorkers: parseInt(process.env.MAX_WORKERS || '2'),
+    dailyIterationBudget: parseInt(process.env.DAILY_BUDGET || '200'),
+    cooldownSeconds: parseInt(process.env.COOLDOWN_SECONDS || '60'),
+  });
+  const workers = new WorkerManager(db, redis, rateLimiter);
+  const conflicts = new ConflictDetector(redis);
+  const metrics = new MetricsCollector(db);
+  
+  // Start server
+  const server = createServer({
+    queue,
+    workers,
+    conflicts,
+    metrics,
+    rateLimiter,
+  });
+  
+  const port = parseInt(process.env.PORT || '3000');
+  server.listen(port, () => {
+    console.log(`Orchestrator running on port ${port}`);
+  });
+  
+  // Start main loop
+  runMainLoop(queue, workers, rateLimiter);
+}
+
+async function runMainLoop(
+  queue: QueueManager,
+  workers: WorkerManager,
+  rateLimiter: RateLimiter
+) {
+  while (true) {
+    try {
+      // Check if we can spawn a worker
+      if (rateLimiter.canSpawnWorker() && workers.hasCapacity()) {
+        const workItem = await queue.getNext();
+        if (workItem) {
+          await workers.spawn(workItem);
+        }
+      }
+      
+      // Health check existing workers
+      await workers.healthCheck();
+      
+      // Reset daily limits at midnight
+      rateLimiter.checkDailyReset();
+      
+    } catch (error) {
+      console.error('Main loop error:', error);
+    }
+    
+    // Poll every 5 seconds
+    await sleep(5000);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+main().catch(console.error);
+```
+
+#### API Server
+
+```typescript
+// packages/orchestrator/src/server.ts
+
+import express from 'express';
+import { 
+  QueueManager, 
+  WorkerManager, 
+  ConflictDetector, 
+  MetricsCollector,
+  RateLimiter 
+} from './';
+import { CreateWorkItemInput } from '@factory/shared';
+
+interface ServerDeps {
+  queue: QueueManager;
+  workers: WorkerManager;
+  conflicts: ConflictDetector;
+  metrics: MetricsCollector;
+  rateLimiter: RateLimiter;
+}
+
+export function createServer(deps: ServerDeps) {
+  const app = express();
+  app.use(express.json());
+  
+  // === WORK ITEM ENDPOINTS ===
+  
+  // Add work item to queue
+  app.post('/api/work', async (req, res) => {
+    try {
+      const input: CreateWorkItemInput = req.body;
+      const workItem = await deps.queue.add(input);
+      res.json(workItem);
+    } catch (error) {
+      res.status(400).json({ error: String(error) });
+    }
+  });
+  
+  // Get work item status
+  app.get('/api/work/:id', async (req, res) => {
+    const workItem = await deps.queue.get(req.params.id);
+    if (!workItem) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    res.json(workItem);
+  });
+  
+  // Cancel work item
+  app.post('/api/work/:id/cancel', async (req, res) => {
+    await deps.queue.cancel(req.params.id);
+    res.json({ success: true });
+  });
+  
+  // === WORKER ENDPOINTS ===
+  
+  // Worker registration
+  app.post('/api/worker/register', async (req, res) => {
+    const { workItemId } = req.body;
+    const workerId = await deps.workers.register(workItemId);
+    res.json({ workerId });
+  });
+  
+  // Worker heartbeat
+  app.post('/api/worker/:id/heartbeat', async (req, res) => {
+    const { iteration, tokens, phase } = req.body;
+    await deps.workers.heartbeat(req.params.id, { iteration, tokens, phase });
+    deps.rateLimiter.recordIteration();
+    res.json({ success: true });
+  });
+  
+  // Request file locks
+  app.post('/api/worker/:id/lock', async (req, res) => {
+    const { files } = req.body;
+    const result = await deps.conflicts.acquireLocks(req.params.id, files);
+    res.json(result);
+  });
+  
+  // Release file locks
+  app.post('/api/worker/:id/unlock', async (req, res) => {
+    const { files } = req.body;
+    await deps.conflicts.releaseLocks(req.params.id, files);
+    res.json({ success: true });
+  });
+  
+  // Worker completed
+  app.post('/api/worker/:id/complete', async (req, res) => {
+    const { prUrl, iterations, tokens, filesChanged, newLearnings } = req.body;
+    await deps.workers.complete(req.params.id, {
+      prUrl,
+      iterations,
+      tokens,
+      filesChanged,
+      newLearnings,
+    });
+    res.json({ success: true });
+  });
+  
+  // Worker failed
+  app.post('/api/worker/:id/fail', async (req, res) => {
+    const { error, iteration } = req.body;
+    await deps.workers.fail(req.params.id, error, iteration);
+    res.json({ success: true });
+  });
+  
+  // Worker stuck
+  app.post('/api/worker/:id/stuck', async (req, res) => {
+    const { reason, attempts } = req.body;
+    await deps.workers.stuck(req.params.id, reason, attempts);
+    res.json({ success: true });
+  });
+  
+  // === DASHBOARD ENDPOINTS ===
+  
+  // Overall status
+  app.get('/api/status', async (req, res) => {
+    const status = {
+      queue: await deps.queue.getStats(),
+      workers: await deps.workers.getStats(),
+      rateLimits: deps.rateLimiter.getStatus(),
+      metrics: await deps.metrics.getSummary(),
+    };
+    res.json(status);
+  });
+  
+  // List workers
+  app.get('/api/workers', async (req, res) => {
+    const workers = await deps.workers.list();
+    res.json(workers);
+  });
+  
+  // Kill worker
+  app.post('/api/workers/:id/kill', async (req, res) => {
+    await deps.workers.kill(req.params.id, req.body.reason || 'Manual kill');
+    res.json({ success: true });
+  });
+  
+  // Queue contents
+  app.get('/api/queue', async (req, res) => {
+    const items = await deps.queue.list();
+    res.json(items);
+  });
+  
+  // Metrics
+  app.get('/api/metrics', async (req, res) => {
+    const metrics = await deps.metrics.getAll();
+    res.json(metrics);
+  });
+  
+  // Learnings
+  app.get('/api/learnings', async (req, res) => {
+    const { repo, search, limit } = req.query;
+    const learnings = await deps.metrics.getLearnings({
+      repo: repo as string,
+      search: search as string,
+      limit: parseInt(limit as string) || 50,
+    });
+    res.json(learnings);
+  });
+  
+  return app;
+}
+```
+
+#### Queue Manager
+
+```typescript
+// packages/orchestrator/src/queue.ts
+
+import { Database } from './db';
+import { WorkItem, CreateWorkItemInput, WorkItemStatus, Priority } from '@factory/shared';
+import { v4 as uuid } from 'uuid';
+
+const PRIORITY_ORDER: Record<Priority, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+export class QueueManager {
+  constructor(private db: Database) {}
+  
+  async add(input: CreateWorkItemInput): Promise<WorkItem> {
+    const workItem: WorkItem = {
+      id: uuid(),
+      source: input.source,
+      sourceId: input.sourceId,
+      sourceUrl: input.sourceUrl,
+      repo: input.repo,
+      baseBranch: input.baseBranch || 'main',
+      spec: input.spec,
+      priority: input.priority || 'medium',
+      status: 'queued',
+      createdAt: new Date(),
+    };
+    
+    await this.db.query(
+      `INSERT INTO work_items (id, source, source_id, source_url, repo, base_branch, spec, priority, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        workItem.id,
+        workItem.source,
+        workItem.sourceId,
+        workItem.sourceUrl,
+        workItem.repo,
+        workItem.baseBranch,
+        workItem.spec,
+        workItem.priority,
+        workItem.status,
+        workItem.createdAt,
+      ]
+    );
+    
+    return workItem;
+  }
+  
+  async get(id: string): Promise<WorkItem | null> {
+    const result = await this.db.query(
+      `SELECT * FROM work_items WHERE id = $1`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+  
+  async getNext(): Promise<WorkItem | null> {
+    // Get highest priority queued item
+    const result = await this.db.query(
+      `UPDATE work_items
+       SET status = 'assigned'
+       WHERE id = (
+         SELECT id FROM work_items
+         WHERE status = 'queued'
+         ORDER BY 
+           CASE priority
+             WHEN 'critical' THEN 0
+             WHEN 'high' THEN 1
+             WHEN 'medium' THEN 2
+             WHEN 'low' THEN 3
+           END,
+           created_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING *`
+    );
+    
+    return result.rows[0] || null;
+  }
+  
+  async cancel(id: string): Promise<void> {
+    await this.db.query(
+      `UPDATE work_items SET status = 'cancelled' WHERE id = $1`,
+      [id]
+    );
+  }
+  
+  async list(): Promise<WorkItem[]> {
+    const result = await this.db.query(
+      `SELECT * FROM work_items 
+       WHERE status IN ('queued', 'assigned', 'running')
+       ORDER BY created_at DESC`
+    );
+    return result.rows;
+  }
+  
+  async getStats(): Promise<{ queued: number; running: number; completed: number; failed: number }> {
+    const result = await this.db.query(
+      `SELECT status, COUNT(*) as count FROM work_items GROUP BY status`
+    );
+    
+    const stats = { queued: 0, running: 0, completed: 0, failed: 0 };
+    for (const row of result.rows) {
+      if (row.status === 'queued' || row.status === 'assigned') {
+        stats.queued += parseInt(row.count);
+      } else if (row.status === 'running') {
+        stats.running += parseInt(row.count);
+      } else if (row.status === 'completed') {
+        stats.completed += parseInt(row.count);
+      } else if (row.status === 'failed' || row.status === 'stuck') {
+        stats.failed += parseInt(row.count);
+      }
+    }
+    
+    return stats;
+  }
+}
+```
+
+#### Worker Manager
+
+```typescript
+// packages/orchestrator/src/workers.ts
+
+import { Database } from './db';
+import { Redis } from './redis';
+import { RateLimiter } from './rate-limits';
+import { Worker, WorkItem, WorkerCompleteRequest } from '@factory/shared';
+import { v4 as uuid } from 'uuid';
+import Docker from 'dockerode';
+
+export class WorkerManager {
+  private docker: Docker;
+  
+  constructor(
+    private db: Database,
+    private redis: Redis,
+    private rateLimiter: RateLimiter
+  ) {
+    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+  }
+  
+  hasCapacity(): boolean {
+    return this.rateLimiter.canSpawnWorker();
+  }
+  
+  async spawn(workItem: WorkItem): Promise<string> {
+    const workerId = uuid();
+    
+    // Create container
+    const container = await this.docker.createContainer({
+      Image: 'factory-worker:latest',
+      Env: [
+        `WORKER_ID=${workerId}`,
+        `WORK_ITEM=${JSON.stringify(workItem)}`,
+        `ORCHESTRATOR_URL=http://host.docker.internal:3000`,
+        `GITHUB_TOKEN=${process.env.GITHUB_TOKEN}`,
+      ],
+      HostConfig: {
+        AutoRemove: true,
+        NetworkMode: 'host',
+      },
+    });
+    
+    await container.start();
+    
+    // Record worker
+    await this.db.query(
+      `INSERT INTO workers (id, container_id, work_item_id, status, created_at)
+       VALUES ($1, $2, $3, 'busy', NOW())`,
+      [workerId, container.id, workItem.id]
+    );
+    
+    // Update work item
+    await this.db.query(
+      `UPDATE work_items SET status = 'running', worker_id = $1, started_at = NOW() WHERE id = $2`,
+      [workerId, workItem.id]
+    );
+    
+    this.rateLimiter.recordSpawn();
+    
+    return workerId;
+  }
+  
+  async register(workItemId: string): Promise<string> {
+    // Worker self-registers when it starts
+    const workerId = uuid();
+    return workerId;
+  }
+  
+  async heartbeat(
+    workerId: string, 
+    data: { iteration: number; tokens: number; phase: string }
+  ): Promise<void> {
+    await this.db.query(
+      `UPDATE workers 
+       SET last_heartbeat = NOW(), current_iteration = $2, total_tokens = total_tokens + $3
+       WHERE id = $1`,
+      [workerId, data.iteration, data.tokens]
+    );
+    
+    // Update Redis for fast health checks
+    await this.redis.set(`worker:${workerId}:heartbeat`, Date.now().toString(), 'EX', 120);
+  }
+  
+  async complete(workerId: string, data: WorkerCompleteRequest): Promise<void> {
+    // Update work item
+    await this.db.query(
+      `UPDATE work_items 
+       SET status = 'completed', pr_url = $2, completed_at = NOW()
+       WHERE worker_id = $1`,
+      [workerId, data.prUrl]
+    );
+    
+    // Record metrics
+    const worker = await this.getWorker(workerId);
+    await this.db.query(
+      `INSERT INTO worker_metrics (worker_id, work_item_id, iterations, tokens_used, duration_seconds, files_changed, status)
+       VALUES ($1, $2, $3, $4, EXTRACT(EPOCH FROM (NOW() - $5)), $6, 'completed')`,
+      [workerId, worker?.workItemId, data.iterations, data.tokens, worker?.createdAt, data.filesChanged.length]
+    );
+    
+    // Save learnings
+    for (const learning of data.newLearnings) {
+      await this.db.query(
+        `INSERT INTO learnings (repo, content, source_worker_id, source_work_item_id)
+         SELECT repo, $2, $3, id FROM work_items WHERE worker_id = $3`,
+        [learning, workerId]
+      );
+    }
+    
+    // Clean up worker record
+    await this.db.query(`DELETE FROM workers WHERE id = $1`, [workerId]);
+  }
+  
+  async fail(workerId: string, error: string, iteration: number): Promise<void> {
+    await this.db.query(
+      `UPDATE work_items 
+       SET status = 'failed', error = $2, completed_at = NOW()
+       WHERE worker_id = $1`,
+      [workerId, error]
+    );
+    
+    await this.db.query(`DELETE FROM workers WHERE id = $1`, [workerId]);
+  }
+  
+  async stuck(workerId: string, reason: string, attempts: number): Promise<void> {
+    await this.db.query(
+      `UPDATE work_items SET status = 'stuck', error = $2 WHERE worker_id = $1`,
+      [workerId, reason]
+    );
+    
+    await this.db.query(
+      `UPDATE workers SET status = 'stuck' WHERE id = $1`,
+      [workerId]
+    );
+    
+    // Could implement auto-retry logic here
+  }
+  
+  async healthCheck(): Promise<void> {
+    // Find workers with stale heartbeats
+    const staleThreshold = 2 * 60 * 1000; // 2 minutes
+    
+    const result = await this.db.query(
+      `SELECT * FROM workers WHERE last_heartbeat < NOW() - INTERVAL '2 minutes' AND status = 'busy'`
+    );
+    
+    for (const worker of result.rows) {
+      console.log(`Worker ${worker.id} is dead (no heartbeat)`);
+      await this.kill(worker.id, 'No heartbeat');
+    }
+  }
+  
+  async kill(workerId: string, reason: string): Promise<void> {
+    const worker = await this.getWorker(workerId);
+    if (!worker) return;
+    
+    // Kill container
+    try {
+      const container = this.docker.getContainer(worker.containerId);
+      await container.kill();
+    } catch (e) {
+      // Container may already be dead
+    }
+    
+    // Update records
+    await this.db.query(
+      `UPDATE work_items SET status = 'failed', error = $2 WHERE worker_id = $1`,
+      [workerId, `Killed: ${reason}`]
+    );
+    
+    await this.db.query(`DELETE FROM workers WHERE id = $1`, [workerId]);
+  }
+  
+  async list(): Promise<Worker[]> {
+    const result = await this.db.query(`SELECT * FROM workers ORDER BY created_at DESC`);
+    return result.rows;
+  }
+  
+  async getWorker(id: string): Promise<Worker | null> {
+    const result = await this.db.query(`SELECT * FROM workers WHERE id = $1`, [id]);
+    return result.rows[0] || null;
+  }
+  
+  async getStats(): Promise<{ active: number; stuck: number }> {
+    const result = await this.db.query(
+      `SELECT status, COUNT(*) as count FROM workers GROUP BY status`
+    );
+    
+    const stats = { active: 0, stuck: 0 };
+    for (const row of result.rows) {
+      if (row.status === 'busy') stats.active += parseInt(row.count);
+      if (row.status === 'stuck') stats.stuck += parseInt(row.count);
+    }
+    
+    return stats;
+  }
+}
+```
+
+#### Rate Limiter
+
+```typescript
+// packages/orchestrator/src/rate-limits.ts
+
+export interface RateLimitConfig {
+  maxConcurrentWorkers: number;
+  dailyIterationBudget: number;
+  cooldownSeconds: number;
+}
+
+export class RateLimiter {
+  private activeWorkers = 0;
+  private iterationsToday = 0;
+  private lastSpawn = 0;
+  private lastDailyReset: Date;
+  
+  constructor(private config: RateLimitConfig) {
+    this.lastDailyReset = new Date();
+  }
+  
+  canSpawnWorker(): boolean {
+    const now = Date.now();
+    const cooldownMs = this.config.cooldownSeconds * 1000;
+    
+    if (now - this.lastSpawn < cooldownMs) {
+      return false;
+    }
+    
+    if (this.activeWorkers >= this.config.maxConcurrentWorkers) {
+      return false;
+    }
+    
+    if (this.iterationsToday >= this.config.dailyIterationBudget) {
+      return false;
+    }
+    
+    return true;
+  }
+  
+  recordSpawn(): void {
+    this.activeWorkers++;
+    this.lastSpawn = Date.now();
+  }
+  
+  recordWorkerDone(): void {
+    this.activeWorkers = Math.max(0, this.activeWorkers - 1);
+  }
+  
+  recordIteration(): void {
+    this.iterationsToday++;
+  }
+  
+  checkDailyReset(): void {
+    const now = new Date();
+    if (now.getDate() !== this.lastDailyReset.getDate()) {
+      this.iterationsToday = 0;
+      this.lastDailyReset = now;
+      console.log('Daily iteration budget reset');
+    }
+  }
+  
+  getStatus(): { 
+    activeWorkers: number; 
+    maxWorkers: number;
+    iterationsToday: number;
+    dailyBudget: number;
+    canSpawn: boolean;
+  } {
+    return {
+      activeWorkers: this.activeWorkers,
+      maxWorkers: this.config.maxConcurrentWorkers,
+      iterationsToday: this.iterationsToday,
+      dailyBudget: this.config.dailyIterationBudget,
+      canSpawn: this.canSpawnWorker(),
+    };
+  }
+}
+```
+
+#### Conflict Detector
+
+```typescript
+// packages/orchestrator/src/conflicts.ts
+
+import { Redis } from './redis';
+
+export class ConflictDetector {
+  private lockTTL = 60 * 60; // 1 hour
+  
+  constructor(private redis: Redis) {}
+  
+  async acquireLocks(
+    workerId: string, 
+    files: string[]
+  ): Promise<{ acquired: string[]; conflicts: string[] }> {
+    const acquired: string[] = [];
+    const conflicts: string[] = [];
+    
+    for (const file of files) {
+      const lockKey = `lock:${file}`;
+      const existing = await this.redis.get(lockKey);
+      
+      if (existing && existing !== workerId) {
+        conflicts.push(file);
+      } else {
+        await this.redis.set(lockKey, workerId, 'EX', this.lockTTL);
+        acquired.push(file);
+      }
+    }
+    
+    return { acquired, conflicts };
+  }
+  
+  async releaseLocks(workerId: string, files: string[]): Promise<void> {
+    for (const file of files) {
+      const lockKey = `lock:${file}`;
+      const existing = await this.redis.get(lockKey);
+      
+      if (existing === workerId) {
+        await this.redis.del(lockKey);
+      }
+    }
+  }
+  
+  async releaseAllLocks(workerId: string): Promise<void> {
+    const pattern = `lock:*`;
+    const keys = await this.redis.keys(pattern);
+    
+    for (const key of keys) {
+      const existing = await this.redis.get(key);
+      if (existing === workerId) {
+        await this.redis.del(key);
+      }
+    }
+  }
+}
+```
+
+---
+
+### 4. Worker (`packages/worker`)
+
+#### Entry Point
+
+```typescript
+// packages/worker/src/index.ts
+
+import { WorkItem } from '@factory/shared';
+import { OrchestratorClient } from './client';
+import { setupWorkspace } from './setup';
+import { loadLearnings, saveLearnings } from './learnings';
+import { runRalph } from './ralph';
+
+async function main() {
+  const workerId = process.env.WORKER_ID!;
+  const workItem: WorkItem = JSON.parse(process.env.WORK_ITEM!);
+  const orchestratorUrl = process.env.ORCHESTRATOR_URL!;
+  
+  const client = new OrchestratorClient(orchestratorUrl, workerId);
+  
+  console.log(`Worker ${workerId} starting for work item ${workItem.id}`);
+  console.log(`Repo: ${workItem.repo}`);
+  console.log(`SPEC:\n${workItem.spec}`);
+  
+  try {
+    // Setup workspace (clone, branch, write spec)
+    const workspace = await setupWorkspace(workItem);
+    console.log(`Workspace ready at ${workspace}`);
+    
+    // Load relevant learnings
+    const learnings = await loadLearnings(client, workItem);
+    console.log(`Loaded ${learnings.length} relevant learnings`);
+    
+    // Run Ralph
+    const result = await runRalph(workspace, workItem, client);
+    console.log(`Ralph completed: ${result.iterations} iterations, ${result.tokens} tokens`);
+    
+    // Extract and save new learnings
+    const newLearnings = await saveLearnings(workspace);
+    
+    // Create PR
+    const prUrl = await createPR(workspace, workItem);
+    console.log(`PR created: ${prUrl}`);
+    
+    // Report completion
+    await client.complete({
+      prUrl,
+      iterations: result.iterations,
+      tokens: result.tokens,
+      filesChanged: result.filesChanged,
+      newLearnings,
+    });
+    
+    console.log('Work completed successfully');
+    process.exit(0);
+    
+  } catch (error) {
+    console.error('Worker failed:', error);
+    await client.fail({
+      error: String(error),
+      iteration: 0, // TODO: track actual iteration
+    });
+    process.exit(1);
+  }
+}
+
+async function createPR(workspace: string, workItem: WorkItem): Promise<string> {
+  const { execSync } = require('child_process');
+  
+  process.chdir(workspace);
+  
+  // Push branch
+  execSync(`git push -u origin HEAD`, { stdio: 'inherit' });
+  
+  // Create PR
+  const prUrl = execSync(
+    `gh pr create --fill --body "Auto-generated by AI Factory from ${workItem.sourceUrl}"`,
+    { encoding: 'utf-8' }
+  ).trim();
+  
+  return prUrl;
+}
+
+main().catch(console.error);
+```
+
+#### Workspace Setup
+
+```typescript
+// packages/worker/src/setup.ts
+
+import { WorkItem } from '@factory/shared';
+import { execSync } from 'child_process';
+import { writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
+
+export async function setupWorkspace(workItem: WorkItem): Promise<string> {
+  const workspace = '/workspace';
+  
+  // Clone repo
+  execSync(`git clone ${workItem.repo} ${workspace}`, { stdio: 'inherit' });
+  process.chdir(workspace);
+  
+  // Checkout base branch
+  execSync(`git checkout ${workItem.baseBranch}`, { stdio: 'inherit' });
+  
+  // Create feature branch
+  const branchName = `factory/${workItem.id.slice(0, 8)}`;
+  execSync(`git checkout -b ${branchName}`, { stdio: 'inherit' });
+  
+  // Write SPEC.md
+  writeFileSync(join(workspace, 'SPEC.md'), workItem.spec);
+  
+  // Create .ai directory
+  mkdirSync(join(workspace, '.ai'), { recursive: true });
+  
+  // Copy Claude config
+  execSync(`cp -r /opt/worker/.claude ${workspace}/.claude`, { stdio: 'inherit' });
+  
+  return workspace;
+}
+```
+
+#### Learnings
+
+```typescript
+// packages/worker/src/learnings.ts
+
+import { OrchestratorClient } from './client';
+import { WorkItem } from '@factory/shared';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
+
+export async function loadLearnings(
+  client: OrchestratorClient, 
+  workItem: WorkItem
+): Promise<string[]> {
+  // Get learnings from orchestrator (semantic search based on spec)
+  const learnings = await client.getLearnings(workItem.repo, workItem.spec);
+  
+  // Write to .ai/learnings.md
+  const learningsPath = join('/workspace', '.ai', 'learnings.md');
+  const content = learnings.length > 0 
+    ? `# Relevant Learnings from Previous Work\n\n${learnings.map(l => `- ${l}`).join('\n')}`
+    : '# No previous learnings found for this task';
+  
+  writeFileSync(learningsPath, content);
+  
+  return learnings;
+}
+
+export async function saveLearnings(workspace: string): Promise<string[]> {
+  // Read new learnings file if it exists
+  const newLearningsPath = join(workspace, '.ai', 'new-learnings.md');
+  
+  if (!existsSync(newLearningsPath)) {
+    return [];
+  }
+  
+  const content = readFileSync(newLearningsPath, 'utf-8');
+  
+  // Parse learnings (simple format: one per line starting with -)
+  const learnings = content
+    .split('\n')
+    .filter(line => line.trim().startsWith('-'))
+    .map(line => line.trim().slice(1).trim())
+    .filter(Boolean);
+  
+  return learnings;
+}
+```
+
+#### Ralph Wrapper
+
+```typescript
+// packages/worker/src/ralph.ts
+
+import { WorkItem } from '@factory/shared';
+import { OrchestratorClient } from './client';
+import { spawn } from 'child_process';
+
+export interface RalphResult {
+  iterations: number;
+  tokens: number;
+  filesChanged: string[];
+}
+
+export async function runRalph(
+  workspace: string,
+  workItem: WorkItem,
+  client: OrchestratorClient
+): Promise<RalphResult> {
+  return new Promise((resolve, reject) => {
+    let iterations = 0;
+    let tokens = 0;
+    const filesChanged = new Set<string>();
+    
+    // Spawn Ralph process
+    const ralph = spawn('ralph', ['run', '--headless', '--spec', 'SPEC.md'], {
+      cwd: workspace,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        RALPH_HEADLESS: 'true',
+      },
+    });
+    
+    // Parse Ralph output for metrics
+    ralph.stdout.on('data', async (data) => {
+      const output = data.toString();
+      console.log(output);
+      
+      // Parse iteration events
+      if (output.includes('iteration:')) {
+        const match = output.match(/iteration:\s*(\d+)/);
+        if (match) {
+          iterations = parseInt(match[1]);
+          await client.heartbeat({
+            iteration: iterations,
+            tokens: 0,
+            phase: 'running',
+          });
+        }
+      }
+      
+      // Parse file edits
+      if (output.includes('edit:')) {
+        const match = output.match(/edit:\s*(.+)/);
+        if (match) {
+          const file = match[1].trim();
+          filesChanged.add(file);
+          await client.lockFile(file);
+        }
+      }
+      
+      // Parse tokens (if Ralph reports them)
+      if (output.includes('tokens:')) {
+        const match = output.match(/tokens:\s*(\d+)/);
+        if (match) {
+          tokens += parseInt(match[1]);
+        }
+      }
+    });
+    
+    ralph.stderr.on('data', (data) => {
+      console.error(data.toString());
+    });
+    
+    ralph.on('close', (code) => {
+      if (code === 0) {
+        resolve({
+          iterations,
+          tokens,
+          filesChanged: Array.from(filesChanged),
+        });
+      } else {
+        reject(new Error(`Ralph exited with code ${code}`));
+      }
+    });
+    
+    ralph.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+```
+
+#### Orchestrator Client
+
+```typescript
+// packages/worker/src/client.ts
+
+import { 
+  WorkerHeartbeatRequest, 
+  WorkerCompleteRequest, 
+  WorkerFailRequest 
+} from '@factory/shared';
+
+export class OrchestratorClient {
+  constructor(
+    private baseUrl: string,
+    private workerId: string
+  ) {}
+  
+  private async request(path: string, body: any): Promise<any> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Orchestrator request failed: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+  
+  async heartbeat(data: WorkerHeartbeatRequest): Promise<void> {
+    await this.request(`/api/worker/${this.workerId}/heartbeat`, data);
+  }
+  
+  async lockFile(file: string): Promise<boolean> {
+    const result = await this.request(`/api/worker/${this.workerId}/lock`, {
+      files: [file],
+    });
+    return result.acquired.includes(file);
+  }
+  
+  async complete(data: WorkerCompleteRequest): Promise<void> {
+    await this.request(`/api/worker/${this.workerId}/complete`, data);
+  }
+  
+  async fail(data: WorkerFailRequest): Promise<void> {
+    await this.request(`/api/worker/${this.workerId}/fail`, data);
+  }
+  
+  async stuck(reason: string, attempts: number): Promise<void> {
+    await this.request(`/api/worker/${this.workerId}/stuck`, { reason, attempts });
+  }
+  
+  async getLearnings(repo: string, spec: string): Promise<string[]> {
+    const response = await fetch(
+      `${this.baseUrl}/api/learnings?repo=${encodeURIComponent(repo)}&search=${encodeURIComponent(spec)}&limit=10`
+    );
+    const data = await response.json();
+    return data.map((l: any) => l.content);
+  }
+}
+```
+
+#### Claude Config
+
+```markdown
+// packages/worker/.claude/CLAUDE.md
+
+# AI Factory Worker
+
+You are operating as an autonomous worker in the AI Software Factory. Your job is to implement the tasks in SPEC.md.
+
+## Working Protocol
+
+1. **Read SPEC.md** - Understand all tasks
+2. **Check .ai/learnings.md** - See what's worked before
+3. **For each unchecked task:**
+   - Implement the task
+   - Run tests
+   - If tests pass, commit
+   - Check off the task in SPEC.md
+4. **If stuck:**
+   - Try a different approach
+   - If still stuck after 2 attempts, write to .ai/stuck.md and stop
+
+## Quality Gates
+
+Before each commit:
+- All tests must pass
+- TypeScript must compile (if applicable)
+- Linting must pass
+
+## Learnings
+
+If you discover something useful (a pattern, a gotcha, a better approach), write it to .ai/new-learnings.md in this format:
+
+```
+- [Learning in one line]
+```
+
+## Commits
+
+Make small, atomic commits. One task = one commit. Use conventional commit format:
+- feat: for new features
+- fix: for bug fixes
+- refactor: for refactoring
+- test: for tests
+
+## Files
+
+- SPEC.md - Your task list (check off items as you complete them)
+- .ai/learnings.md - Past learnings (read-only)
+- .ai/new-learnings.md - Your new learnings (write here)
+- .ai/stuck.md - If you get stuck, explain why here
+```
+
+```json
+// packages/worker/.claude/mcp.json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@context7/mcp"]
+    }
+  }
+}
+```
+
+---
+
+### 5. Intake (`packages/intake`)
+
+```typescript
+// packages/intake/src/index.ts
+
+import { GitHubAdapter } from './github';
+import { SpecGenerator } from './spec-gen';
+
+async function main() {
+  const github = new GitHubAdapter({
+    token: process.env.GITHUB_TOKEN!,
+    repos: process.env.REPOS!.split(','), // comma-separated list
+    label: process.env.INTAKE_LABEL || 'ai-factory',
+    pollInterval: parseInt(process.env.POLL_INTERVAL || '60000'),
+  });
+  
+  const specGen = new SpecGenerator();
+  const orchestratorUrl = process.env.ORCHESTRATOR_URL!;
+  
+  console.log('Intake service starting...');
+  
+  while (true) {
+    try {
+      const issues = await github.poll();
+      console.log(`Found ${issues.length} issues to process`);
+      
+      for (const issue of issues) {
+        // Generate spec from issue
+        const spec = await specGen.generate(issue);
+        
+        // Submit to orchestrator
+        const response = await fetch(`${orchestratorUrl}/api/work`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'github',
+            sourceId: issue.number.toString(),
+            sourceUrl: issue.html_url,
+            repo: issue.repo,
+            spec,
+            priority: getPriority(issue.labels),
+          }),
+        });
+        
+        if (response.ok) {
+          // Mark issue as picked up
+          await github.addLabel(issue, 'ai-factory-processing');
+          await github.removeLabel(issue, 'ai-factory');
+          console.log(`Submitted issue #${issue.number} to factory`);
+        }
+      }
+    } catch (error) {
+      console.error('Intake error:', error);
+    }
+    
+    await sleep(github.pollInterval);
+  }
+}
+
+function getPriority(labels: string[]): string {
+  if (labels.includes('critical') || labels.includes('P0')) return 'critical';
+  if (labels.includes('high') || labels.includes('P1')) return 'high';
+  if (labels.includes('low') || labels.includes('P3')) return 'low';
+  return 'medium';
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+main().catch(console.error);
+```
+
+```typescript
+// packages/intake/src/github.ts
+
+import { Octokit } from '@octokit/rest';
+
+export interface GitHubIssue {
+  number: number;
+  title: string;
+  body: string;
+  html_url: string;
+  repo: string;
+  labels: string[];
+}
+
+export interface GitHubAdapterConfig {
+  token: string;
+  repos: string[];
+  label: string;
+  pollInterval: number;
+}
+
+export class GitHubAdapter {
+  private octokit: Octokit;
+  public pollInterval: number;
+  
+  constructor(private config: GitHubAdapterConfig) {
+    this.octokit = new Octokit({ auth: config.token });
+    this.pollInterval = config.pollInterval;
+  }
+  
+  async poll(): Promise<GitHubIssue[]> {
+    const issues: GitHubIssue[] = [];
+    
+    for (const repoFullName of this.config.repos) {
+      const [owner, repo] = repoFullName.split('/');
+      
+      const response = await this.octokit.issues.listForRepo({
+        owner,
+        repo,
+        labels: this.config.label,
+        state: 'open',
+      });
+      
+      for (const issue of response.data) {
+        if (issue.pull_request) continue; // Skip PRs
+        
+        issues.push({
+          number: issue.number,
+          title: issue.title,
+          body: issue.body || '',
+          html_url: issue.html_url,
+          repo: `https://github.com/${repoFullName}.git`,
+          labels: issue.labels.map(l => typeof l === 'string' ? l : l.name || ''),
+        });
+      }
+    }
+    
+    return issues;
+  }
+  
+  async addLabel(issue: GitHubIssue, label: string): Promise<void> {
+    const [owner, repo] = this.extractOwnerRepo(issue.repo);
+    await this.octokit.issues.addLabels({
+      owner,
+      repo,
+      issue_number: issue.number,
+      labels: [label],
+    });
+  }
+  
+  async removeLabel(issue: GitHubIssue, label: string): Promise<void> {
+    const [owner, repo] = this.extractOwnerRepo(issue.repo);
+    try {
+      await this.octokit.issues.removeLabel({
+        owner,
+        repo,
+        issue_number: issue.number,
+        name: label,
+      });
+    } catch (e) {
+      // Label might not exist
+    }
+  }
+  
+  private extractOwnerRepo(repoUrl: string): [string, string] {
+    const match = repoUrl.match(/github\.com[/:](.+?)\/(.+?)(\.git)?$/);
+    if (!match) throw new Error(`Invalid repo URL: ${repoUrl}`);
+    return [match[1], match[2]];
+  }
+}
+```
+
+```typescript
+// packages/intake/src/spec-gen.ts
+
+import { GitHubIssue } from './github';
+import Anthropic from '@anthropic-ai/sdk';
+
+export class SpecGenerator {
+  private anthropic: Anthropic;
+  
+  constructor() {
+    this.anthropic = new Anthropic();
+  }
+  
+  async generate(issue: GitHubIssue): Promise<string> {
+    // NOTE: User mentioned they have existing spec generation via Claude + askUserTool
+    // This is a simplified version - should be replaced with their existing system
+    
+    const response = await this.anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: `You convert GitHub issues into SPEC.md files for autonomous AI development.
+
+Output format:
+- A markdown file with checkboxes for each task
+- Tasks should be atomic (one commit each)
+- Tasks should be in logical order
+- Each task should be independently testable
+
+Example:
+\`\`\`markdown
+# Feature: User Authentication
+
+## Tasks
+- [ ] Install next-auth package
+- [ ] Configure NextAuth with GitHub provider
+- [ ] Create login button component
+- [ ] Add protected route middleware
+- [ ] Write tests for auth flow
+\`\`\``,
+      messages: [{
+        role: 'user',
+        content: `Convert this issue to a SPEC.md:
+
+Title: ${issue.title}
+
+Body:
+${issue.body}`,
+      }],
+    });
+    
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+    
+    // Extract markdown from response (might be wrapped in code blocks)
+    const match = text.match(/```(?:markdown)?\n?([\s\S]*?)```/);
+    return match ? match[1].trim() : text.trim();
+  }
+}
+```
+
+---
+
+### 6. Docker Setup
+
+```yaml
+# docker/docker-compose.yml
+
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: factory
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: factory
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: packages/orchestrator/Dockerfile
+    environment:
+      DATABASE_URL: postgres://factory:factory@postgres:5432/factory
+      REDIS_URL: redis://redis:6379
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      MAX_WORKERS: ${MAX_WORKERS:-2}
+      DAILY_BUDGET: ${DAILY_BUDGET:-200}
+      COOLDOWN_SECONDS: ${COOLDOWN_SECONDS:-60}
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  intake:
+    build:
+      context: ..
+      dockerfile: packages/intake/Dockerfile
+    environment:
+      ORCHESTRATOR_URL: http://orchestrator:3000
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      REPOS: ${REPOS}
+      INTAKE_LABEL: ${INTAKE_LABEL:-ai-factory}
+      POLL_INTERVAL: ${POLL_INTERVAL:-60000}
+    depends_on:
+      - orchestrator
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: packages/dashboard/Dockerfile
+    environment:
+      ORCHESTRATOR_URL: http://orchestrator:3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - orchestrator
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+```dockerfile
+# packages/orchestrator/Dockerfile
+
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install Docker CLI (for spawning workers)
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/orchestrator/package.json ./packages/orchestrator/
+
+# Install dependencies
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/shared ./packages/shared
+COPY packages/orchestrator ./packages/orchestrator
+
+# Build
+RUN pnpm --filter @factory/shared build
+RUN pnpm --filter @factory/orchestrator build
+
+EXPOSE 3000
+
+CMD ["node", "packages/orchestrator/dist/index.js"]
+```
+
+```dockerfile
+# packages/worker/Dockerfile
+
+FROM node:20-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code
+RUN npm install -g @anthropic-ai/claude-code
+
+# Install Ralph (assuming it's published or built locally)
+# TODO: Replace with actual Ralph installation
+# RUN npm install -g ralph-cli
+
+WORKDIR /opt/worker
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/worker/package.json ./packages/worker/
+
+# Install dependencies
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/shared ./packages/shared
+COPY packages/worker ./packages/worker
+
+# Build
+RUN pnpm --filter @factory/shared build
+RUN pnpm --filter @factory/worker build
+
+# Copy Claude config
+COPY packages/worker/.claude /opt/worker/.claude
+
+WORKDIR /workspace
+
+CMD ["node", "/opt/worker/packages/worker/dist/index.js"]
+```
+
+---
+
+### 7. Configuration Files
+
+```json
+// package.json (root)
+{
+  "name": "ai-factory",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose -f docker/docker-compose.yml up",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "setup": "./scripts/setup.sh",
+    "migrate": "./scripts/migrate.sh"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+```
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - 'packages/*'
+```
+
+```json
+// turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "lint": {},
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+```bash
+#!/bin/bash
+# scripts/setup.sh
+
+set -e
+
+echo "Setting up AI Factory..."
+
+# Check prerequisites
+command -v docker >/dev/null 2>&1 || { echo "Docker is required but not installed."; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "pnpm is required but not installed."; exit 1; }
+
+# Create .env if not exists
+if [ ! -f .env ]; then
+  echo "Creating .env file..."
+  cat > .env << EOF
+GITHUB_TOKEN=your_github_token_here
+REPOS=owner/repo1,owner/repo2
+INTAKE_LABEL=ai-factory
+MAX_WORKERS=2
+DAILY_BUDGET=200
+COOLDOWN_SECONDS=60
+POLL_INTERVAL=60000
+EOF
+  echo "Please edit .env with your configuration"
+fi
+
+# Install dependencies
+echo "Installing dependencies..."
+pnpm install
+
+# Build worker image
+echo "Building worker Docker image..."
+docker build -t factory-worker:latest -f packages/worker/Dockerfile .
+
+# Start services
+echo "Starting services..."
+docker compose -f docker/docker-compose.yml up -d postgres redis
+
+# Wait for postgres
+echo "Waiting for PostgreSQL..."
+sleep 5
+
+# Run migrations
+echo "Running migrations..."
+./scripts/migrate.sh
+
+echo "Setup complete! Run 'pnpm dev' to start the factory."
+```
+
+```bash
+#!/bin/bash
+# scripts/migrate.sh
+
+set -e
+
+docker compose -f docker/docker-compose.yml exec -T postgres psql -U factory -d factory < migrations/001_initial.sql
+
+echo "Migrations complete"
+```
+
+---
+
+## Build Order
+
+| Phase | Component | Priority | Dependencies | Est. Time |
+|-------|-----------|----------|--------------|-----------|
+| 1 | `packages/shared` | P0 | None | 0.5 day |
+| 2 | Database schema + migrations | P0 | None | 0.5 day |
+| 3 | `packages/orchestrator` (core) | P0 | shared | 2 days |
+| 4 | `packages/worker` (core) | P0 | shared | 2 days |
+| 5 | Docker setup | P0 | orchestrator, worker | 1 day |
+| 6 | `packages/intake` (GitHub) | P1 | orchestrator | 1 day |
+| 7 | Rate limiting + budgets | P1 | orchestrator | 0.5 day |
+| 8 | Conflict detection | P1 | orchestrator, redis | 0.5 day |
+| 9 | Learnings (basic) | P1 | shared, postgres | 1 day |
+| 10 | `packages/dashboard` (MVP) | P2 | orchestrator | 2 days |
+| 11 | Learnings (vector search) | P2 | learnings basic | 1 day |
+| 12 | Integration testing | P1 | All above | 1 day |
+
+**Total: ~13 days**
+
+---
+
+## Environment Variables
+
+```bash
+# Required
+GITHUB_TOKEN=           # GitHub PAT with repo permissions
+REPOS=                  # Comma-separated list: owner/repo1,owner/repo2
+
+# Optional (with defaults)
+DATABASE_URL=postgres://factory:factory@localhost:5432/factory
+REDIS_URL=redis://localhost:6379
+MAX_WORKERS=2           # Max concurrent workers
+DAILY_BUDGET=200        # Max iterations per day (Claude Max limits)
+COOLDOWN_SECONDS=60     # Seconds between worker spawns
+INTAKE_LABEL=ai-factory # GitHub label to watch
+POLL_INTERVAL=60000     # How often to poll GitHub (ms)
+```
+
+---
+
+## Notes for Implementation
+
+1. **Ralph Integration**: This spec assumes Ralph exists and works. The `packages/worker/src/ralph.ts` is a wrapper that needs to match Ralph's actual interface. Adjust based on actual Ralph CLI.
+
+2. **Spec Generation**: User has existing spec generation via Claude + askUserTool. The `packages/intake/src/spec-gen.ts` is a placeholder - should be replaced with their system or integrated.
+
+3. **TLDR Integration**: Not explicitly included in this spec. If adding TLDR, it would go in the worker image and Claude config. Can be added as enhancement.
+
+4. **Claude Max Rate Limits**: The rate limiter is conservative (2 workers, 200 iterations/day). Adjust based on actual Claude Max limits.
+
+5. **Worker Image**: Needs actual Ralph CLI installed. Placeholder comment in Dockerfile.
+
+6. **Dashboard**: Basic CRUD views. Can be enhanced with charts, logs, etc. later.
+
+7. **Testing**: Add Jest/Vitest configs as needed. Integration tests should spin up Docker compose and run end-to-end.
