@@ -25,19 +25,19 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies
+# Copy dependencies (bun hoists to root node_modules)
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/packages/dashboard/node_modules ./packages/dashboard/node_modules
 
 # Copy source files
-COPY package.json ./
+COPY package.json tsconfig.json ./
 COPY packages/shared ./packages/shared
 COPY packages/dashboard ./packages/dashboard
 
-# Build shared package first
+# Install bun and build shared package first
+RUN npm install -g bun
+
 WORKDIR /app/packages/shared
-RUN npm install -g bun && bun run build
+RUN bun run build
 
 # Build dashboard
 WORKDIR /app/packages/dashboard
@@ -58,6 +58,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy node_modules from deps (standalone doesn't work well in monorepos)
+COPY --from=deps /app/node_modules ./node_modules
+
 # Copy standalone output
 COPY --from=builder /app/packages/dashboard/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/dashboard/.next/standalone ./
@@ -71,4 +74,4 @@ ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 ENV ORCHESTRATOR_URL=http://orchestrator:3000
 
-CMD ["node", "packages/dashboard/server.js"]
+CMD ["node", "server.js"]
