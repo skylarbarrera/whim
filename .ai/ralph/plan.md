@@ -1,156 +1,63 @@
-# Ralph Iteration Plan
+# Iteration Plan: Verify Acceptance Criteria
 
 ## Goal
-Implement configuration management for the review system with YAML-based workflow definitions, repository-specific and organization-level configs, and environment-specific review requirements.
+Verify that all acceptance criteria in SPEC.md are met by the implemented PR review system.
 
-## Files to Create/Modify
+## Files to Review
+- `packages/review-system/src/` - All implementation modules
+- `packages/review-dashboard/` - UI implementation
+- `SPEC.md` - Acceptance criteria
+- Configuration examples in review-system
 
-**New Files:**
-1. `packages/review-system/src/config/loader.ts` - Configuration loader for YAML files
-2. `packages/review-system/src/config/validator.ts` - Configuration validator
-3. `packages/review-system/src/config/defaults.ts` - Default configuration templates
-4. `packages/review-system/src/config/merger.ts` - Configuration merger (org → repo → env)
-5. `packages/review-system/src/config/index.ts` - Config module exports
-6. `packages/review-system/src/__tests__/config-loader.test.ts` - Loader tests
-7. `packages/review-system/src/__tests__/config-validator.test.ts` - Validator tests
-8. `packages/review-system/src/__tests__/config-merger.test.ts` - Merger tests
+## Acceptance Criteria to Verify
 
-**Example Config Files (for documentation):**
-9. `packages/review-system/examples/.review.yml` - Default workflow example
-10. `packages/review-system/examples/.review-org.yml` - Organization-level config
-11. `packages/review-system/examples/.review-dev.yml` - Development environment config
-12. `packages/review-system/examples/.review-prod.yml` - Production environment config
+1. **AI-generated PRs are automatically identified and routed through review system**
+   - Check: AIDetector implementation
+   - Check: ReviewOrchestrator workflow trigger filtering
+   - Check: Configuration support for aiGeneratedOnly
 
-**Modified Files:**
-13. `packages/review-system/src/orchestrator/orchestrator.ts` - Use config loader
-14. `packages/review-system/src/index.ts` - Export config module
-15. `packages/review-system/package.json` - Add js-yaml dependency
+2. **Lint failures block PR merging with clear error messages and fix suggestions**
+   - Check: LintStep implementation
+   - Check: GitHub status check creation
+   - Check: Error messages include file/line/suggestions
 
-## Implementation Plan
+3. **Test failures prevent merging with detailed test result reports**
+   - Check: TestStep implementation
+   - Check: Test failure reporting with stack traces
+   - Check: GitHub check run annotations
 
-### 1. Configuration Loader (loader.ts)
-- ConfigLoader class
-- loadFromFile(): Load YAML from file path
-- loadFromString(): Parse YAML string
-- loadFromUrl(): Fetch and parse remote config
-- loadOrgConfig(): Load organization-level config
-- loadRepoConfig(): Load repository-specific config
-- loadEnvConfig(): Load environment-specific config
-- Support for multiple config sources:
-  - Local file: ./.review.yml
-  - Repository: .github/.review.yml
-  - Organization: https://org.com/.github/.review.yml
-  - Environment: .review-{env}.yml
+4. **Review system is configurable per repository with different rule sets**
+   - Check: ConfigLoader with hierarchical loading
+   - Check: Repository-specific config support
+   - Check: Example YAML files
 
-### 2. Configuration Validator (validator.ts)
-- ConfigValidator class
-- validateWorkflow(): Validate ReviewWorkflowConfig structure
-- validateSteps(): Validate step configurations
-- validateTriggers(): Validate workflow triggers
-- validateStepGroups(): Validate step groups
-- Schema validation using JSON Schema or Zod
-- Required field checks
-- Type validation (enums, ranges)
-- Dependency validation (required steps, contexts)
-- Custom validation rules
+5. **Manual override capability exists for authorized users in emergency situations**
+   - Check: OverrideManager implementation
+   - Check: Authorization checks
+   - Check: Time-limited tokens
 
-### 3. Default Configuration (defaults.ts)
-- createDefaultConfig(): Factory for default workflow
-- defaultLintStep(): Default lint configuration
-- defaultTestStep(): Default test configuration
-- defaultSecurityStep(): Default security scan configuration
-- Templates for common use cases:
-  - Minimal (lint only)
-  - Standard (lint + test)
-  - Full (lint + test + security + coverage)
+6. **All review steps complete within 5 minutes for typical PRs**
+   - Check: Timeout configuration in TestStep and LintStep
+   - Check: Default timeout values (5 minutes)
 
-### 4. Configuration Merger (merger.ts)
-- ConfigMerger class
-- merge(): Merge multiple configs with priority
-- Priority order: environment > repo > org > defaults
-- Deep merge for nested objects
-- Array concatenation or replacement (configurable)
-- Override resolution rules:
-  - Workflow-level overrides
-  - Step-level overrides
-  - Environment-specific overrides
+7. **System integrates seamlessly with existing GitHub workflow without disrupting non-AI PRs**
+   - Check: Workflow trigger conditions
+   - Check: Repository filtering
+   - Check: aiGeneratedOnly flag support
 
-### 5. Integration with Orchestrator
-- Update ReviewOrchestrator.loadConfig()
-- Support config file path or URL
-- Auto-detect environment from env vars
-- Cache loaded configs for performance
-- Hot reload on config file changes (optional)
+8. **Review results are clearly displayed in GitHub PR interface**
+   - Check: GitHubStatusReporter implementation
+   - Check: Check run creation with annotations
+   - Check: Formatted output with emojis and markdown
 
-### 6. Example Configurations
-Create example YAML files demonstrating:
-- Basic workflow (lint + test)
-- AI-specific workflow with detection
-- Multi-environment setup
-- Organization-wide defaults
-- Repository overrides
-- Custom step configurations
-
-### 7. Testing
-- Test YAML parsing and loading
-- Test config validation (valid and invalid configs)
-- Test config merging with different priorities
-- Test environment-specific overrides
-- Test error handling (missing files, invalid YAML)
-- Integration tests with ReviewOrchestrator
-
-## Configuration Schema Example
-
-```yaml
-# .review.yml
-version: '1.0'
-name: 'default-review'
-enabled: true
-
-triggers:
-  aiGeneratedOnly: false
-  targetBranches: ['main', 'develop']
-  requiredLabels: []
-  excludedLabels: ['skip-review']
-
-steps:
-  - name: 'lint'
-    type: 'lint'
-    blocking: true
-    timeout: 300000
-    config:
-      linters:
-        - type: 'eslint'
-          filePatterns: ['**/*.ts', '**/*.tsx']
-      failOn: 'error'
-
-  - name: 'test'
-    type: 'test'
-    blocking: true
-    timeout: 600000
-    config:
-      runner: 'jest'
-      coverage: true
-      coverageThresholds:
-        lines: 80
-        functions: 80
+## Tests
+Run type checking to ensure all code compiles:
+```bash
+cd packages/review-system && npx tsc --noEmit
 ```
 
 ## Exit Criteria
-- ✅ Config loader can load YAML from file/string/URL
-- ✅ Config validator ensures schema compliance
-- ✅ Config merger handles org/repo/env precedence
-- ✅ Default configs available for common use cases
-- ✅ Example YAML files demonstrate all features
-- ✅ ReviewOrchestrator integrates config loader
-- ✅ Comprehensive tests for all config modules
-- ✅ Package builds successfully
-- ✅ TypeScript type checks pass
-
-## Notes
-- Use js-yaml for YAML parsing
-- Support both .yml and .yaml extensions
-- Environment detection via NODE_ENV or custom var
-- Config caching for performance
-- Clear error messages for config issues
-- Backward compatible with existing code
+- All 8 acceptance criteria verified as met
+- Create verification document showing evidence for each criterion
+- Update SPEC.md to mark all acceptance criteria as complete
+- Commit changes with message documenting completion

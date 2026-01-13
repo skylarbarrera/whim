@@ -40,12 +40,12 @@ export class ConfigMerger {
     }
 
     if (configs.length === 1) {
-      return configs[0];
+      return configs[0]!;
     }
 
-    let result: SimpleWorkflowConfig = configs[0];
+    let result: SimpleWorkflowConfig = configs[0]!;
     for (let i = 1; i < configs.length; i++) {
-      result = this.mergeTwoConfigs(result, configs[i]);
+      result = this.mergeTwoConfigs(result, configs[i]!);
     }
 
     return result;
