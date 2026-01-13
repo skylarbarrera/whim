@@ -1,0 +1,70 @@
+# Default Review Workflow Configuration
+# Place this file at .github/.review.yml or .review.yml in your repository root
+
+# Workflow metadata
+name: 'default-review'
+enabled: true
+
+# Workflow triggers - when should this workflow run?
+triggers:
+  # Only run on AI-generated PRs (set to false for all PRs)
+  aiGeneratedOnly: false
+
+  # Target branches that trigger review
+  targetBranches:
+    - main
+    - develop
+
+  # Required labels (PR must have ALL of these)
+  requiredLabels: []
+
+  # Excluded labels (PR must have NONE of these)
+  excludedLabels:
+    - skip-review
+    - draft
+
+# Review steps - executed in order
+steps:
+  # Lint validation step
+  - name: 'lint'
+    type: 'lint'
+    blocking: true  # Blocks merge if fails
+    timeout: 300000  # 5 minutes in milliseconds
+    config:
+      linters:
+        - type: 'eslint'
+          filePatterns:
+            - '**/*.ts'
+            - '**/*.tsx'
+            - '**/*.js'
+            - '**/*.jsx'
+        - type: 'prettier'
+          filePatterns:
+            - '**/*.ts'
+            - '**/*.tsx'
+            - '**/*.js'
+            - '**/*.jsx'
+            - '**/*.json'
+            - '**/*.md'
+      failOn: 'error'  # 'error' or 'warning'
+
+  # Test execution step
+  - name: 'test'
+    type: 'test'
+    blocking: true
+    timeout: 600000  # 10 minutes
+    config:
+      runner: 'detect'  # Auto-detect: jest, vitest, bun, mocha
+      coverage: true
+      coverageThresholds:
+        lines: 80
+        functions: 80
+        branches: 75
+        statements: 80
+      failOn: 'failure'  # 'error' or 'failure'
+
+# Step groups for parallel execution
+stepGroups:
+  validation:
+    - lint
+    - test

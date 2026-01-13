@@ -15,3 +15,6 @@ export * from './steps/index.js';
 
 // Merge blocking mechanism
 export * from './blocking/index.js';
+
+// Configuration module exports
+export * from './config/index.js';

@@ -1,0 +1,94 @@
+# AI-Generated PR Review Configuration
+# Specialized workflow for PRs created by AI agents
+
+name: 'ai-review'
+enabled: true
+
+# Only run on AI-generated PRs
+triggers:
+  aiGeneratedOnly: true
+  targetBranches:
+    - main
+    - develop
+  requiredLabels:
+    - ai-generated
+  excludedLabels:
+    - skip-review
+
+# Steps specifically for AI-generated code
+steps:
+  # Standard linting
+  - name: 'lint'
+    type: 'lint'
+    blocking: true
+    timeout: 300000
+    config:
+      linters:
+        - type: 'eslint'
+          filePatterns: ['**/*.ts', '**/*.tsx']
+        - type: 'prettier'
+          filePatterns: ['**/*']
+      failOn: 'error'
+
+  # Comprehensive testing
+  - name: 'test'
+    type: 'test'
+    blocking: true
+    timeout: 600000
+    config:
+      runner: 'detect'
+      coverage: true
+      coverageThresholds:
+        lines: 85
+        functions: 85
+        branches: 80
+        statements: 85
+
+  # AI-specific quality checks
+  - name: 'ai-quality'
+    type: 'custom'
+    blocking: true
+    timeout: 300000
+    condition: 'context.aiGenerated === true'
+    config:
+      checks:
+        # Ensure code isn't overly complex
+        - name: 'complexity'
+          threshold: 10
+          metric: 'cyclomatic'
+
+        # Check for proper documentation
+        - name: 'documentation'
+          requireComments: true
+          requireJsDoc: true
+
+        # Verify test quality
+        - name: 'test-quality'
+          minAssertions: 1
+          noSkippedTests: true
+
+        # Security patterns for AI code
+        - name: 'security-patterns'
+          checkSqlInjection: true
+          checkXss: true
+          checkHardcodedSecrets: true
+
+  # Human review trigger if quality gates fail
+  - name: 'request-human-review'
+    type: 'custom'
+    blocking: false
+    condition: 'context.failedSteps.length > 0'
+    config:
+      action: 'request-review'
+      reviewers:
+        - 'code-review-team'
+      message: 'AI-generated code requires human review due to failed quality checks'
+
+stepGroups:
+  validation:
+    - lint
+    - test
+  quality:
+    - ai-quality
+  escalation:
+    - request-human-review

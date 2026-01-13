@@ -1,0 +1,77 @@
+# Production Environment Configuration
+# Place this file at .review-prod.yml in your repository
+# Set NODE_ENV=production or REVIEW_ENV=prod to use this config
+
+name: 'prod-review'
+enabled: true
+
+# Strict triggers for production
+triggers:
+  aiGeneratedOnly: false
+  targetBranches:
+    - main
+    - master
+    - 'release/*'
+  excludedLabels: []
+
+# Blocking steps with high quality gates
+steps:
+  # Strict linting
+  - name: 'lint'
+    type: 'lint'
+    blocking: true
+    timeout: 300000
+    config:
+      linters:
+        - type: 'eslint'
+          filePatterns: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx']
+        - type: 'prettier'
+          filePatterns: ['**/*']
+      failOn: 'warning'  # Block on warnings in prod
+
+  # Tests with high coverage requirements
+  - name: 'test'
+    type: 'test'
+    blocking: true
+    timeout: 900000  # 15 minutes
+    config:
+      runner: 'detect'
+      coverage: true
+      coverageThresholds:
+        lines: 90
+        functions: 90
+        branches: 85
+        statements: 90
+      failOn: 'failure'
+
+  # Mandatory security scan
+  - name: 'security'
+    type: 'security'
+    blocking: true
+    timeout: 600000  # 10 minutes
+    config:
+      scanners:
+        - npm-audit
+        - snyk
+        - trivy
+      severityThreshold: 'medium'  # Block on medium+ severity
+      ignoreDevDependencies: true
+
+  # Performance budgets
+  - name: 'performance'
+    type: 'custom'
+    blocking: true
+    timeout: 300000
+    config:
+      budgets:
+        bundle-size: '500kb'
+        first-contentful-paint: '2s'
+
+stepGroups:
+  validation:
+    - lint
+    - test
+  security:
+    - security
+  quality:
+    - performance

@@ -1,0 +1,63 @@
+# Organization-Level Review Configuration
+# Place this file at https://github.com/your-org/.github/.review.yml
+# This config applies to all repositories in the organization
+
+name: 'org-defaults'
+enabled: true
+
+# Organization-wide triggers
+triggers:
+  aiGeneratedOnly: false
+  targetBranches:
+    - main
+    - master
+  excludedLabels:
+    - skip-review
+    - wip
+
+# Standard steps required for all repositories
+steps:
+  # Mandatory lint step
+  - name: 'lint'
+    type: 'lint'
+    blocking: true
+    timeout: 300000
+    config:
+      linters:
+        - type: 'eslint'
+          filePatterns: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx']
+        - type: 'prettier'
+          filePatterns: ['**/*']
+      failOn: 'error'
+
+  # Mandatory test step
+  - name: 'test'
+    type: 'test'
+    blocking: true
+    timeout: 600000
+    config:
+      runner: 'detect'
+      coverage: true
+      coverageThresholds:
+        lines: 75
+        functions: 75
+        branches: 70
+        statements: 75
+
+  # Organization security standards
+  - name: 'security'
+    type: 'security'
+    blocking: true
+    timeout: 300000
+    config:
+      scanners:
+        - npm-audit
+        - snyk
+      severityThreshold: 'high'
+      ignoreDevDependencies: false
+
+stepGroups:
+  required:
+    - lint
+    - test
+    - security

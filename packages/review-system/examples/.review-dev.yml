@@ -1,0 +1,43 @@
+# Development Environment Configuration
+# Place this file at .review-dev.yml in your repository
+# Set NODE_ENV=development or REVIEW_ENV=dev to use this config
+
+name: 'dev-review'
+enabled: true
+
+# Relaxed triggers for development
+triggers:
+  aiGeneratedOnly: false
+  targetBranches:
+    - develop
+    - dev
+    - 'feature/*'
+  excludedLabels:
+    - skip-review
+
+# Non-blocking steps for faster iteration
+steps:
+  # Lint with warnings allowed
+  - name: 'lint'
+    type: 'lint'
+    blocking: false  # Non-blocking in dev
+    timeout: 180000  # 3 minutes
+    config:
+      linters:
+        - type: 'eslint'
+          filePatterns: ['**/*.ts', '**/*.tsx']
+      failOn: 'error'
+
+  # Tests without coverage
+  - name: 'test'
+    type: 'test'
+    blocking: false  # Non-blocking in dev
+    timeout: 300000  # 5 minutes
+    config:
+      runner: 'detect'
+      coverage: false  # Skip coverage in dev for speed
+
+stepGroups:
+  validation:
+    - lint
+    - test

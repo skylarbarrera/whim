@@ -2,6 +2,7 @@ import { ReviewStepRegistry } from '../plugin/registry.js';
 import { ReviewExecutor } from './executor.js';
 import { ResultAggregator } from './aggregator.js';
 import { GitHubStatusReporter } from './github-status.js';
+import { ConfigLoader, ConfigMerger, createDefaultConfig } from '../config/index.js';
 import {
   ReviewWorkflowConfig,
   ReviewStepGroup,
@@ -52,25 +53,101 @@ export class ReviewOrchestrator {
 
   /**
    * Load and parse a review workflow configuration from a file
+   * Returns SimpleWorkflowConfig from YAML/JSON files
    *
    * @param configPath Path to configuration file (JSON or YAML)
+   * @param options Additional options
    * @returns Parsed configuration
    */
+  async loadSimpleConfig(
+    configPath: string,
+    options?: {
+      org?: string;
+      environment?: string;
+      mergeWithDefaults?: boolean;
+    }
+  ) {
+    const loader = new ConfigLoader();
+    const merger = new ConfigMerger();
+
+    // Determine if URL or file path
+    const isUrl = configPath.startsWith('http://') || configPath.startsWith('https://');
+
+    // Load the main config
+    let config;
+    if (isUrl) {
+      config = await loader.loadFromUrl(configPath);
+    } else {
+      const path = await import('path');
+      const ext = path.extname(configPath);
+
+      if (ext === '.json') {
+        const fs = await import('fs/promises');
+        const content = await fs.readFile(configPath, 'utf-8');
+        config = JSON.parse(content);
+      } else if (ext === '.yaml' || ext === '.yml') {
+        config = await loader.loadFromFile(configPath);
+      } else {
+        throw new Error(`Unsupported configuration format: ${ext}`);
+      }
+    }
+
+    // Merge with defaults if requested
+    if (options?.mergeWithDefaults) {
+      const defaults = createDefaultConfig(options.environment);
+      config = merger.mergeWithDefaults(config, defaults);
+    }
+
+    return config;
+  }
+
+  /**
+   * Load configuration with hierarchy (org > repo > env)
+   * Returns SimpleWorkflowConfig from YAML files
+   *
+   * @param repoPath Repository path
+   * @param org Organization name
+   * @param environment Environment name
+   * @returns Merged configuration
+   */
+  async loadConfigWithHierarchy(
+    repoPath: string,
+    org?: string,
+    environment?: string
+  ) {
+    const loader = new ConfigLoader();
+    const merger = new ConfigMerger();
+
+    // Load default config
+    const defaults = createDefaultConfig(environment);
+
+    // Load org config
+    const orgConfig = org ? await loader.loadOrgConfig(org) : null;
+
+    // Load repo config
+    const repoConfig = await loader.loadRepoConfig(repoPath);
+
+    // Load env config
+    const envConfig = environment ? await loader.loadEnvConfig(repoPath, environment) : null;
+
+    // Merge with priority
+    return merger.mergeHierarchy(defaults, orgConfig || undefined, repoConfig || undefined, envConfig || undefined);
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * Load configuration (JSON format with groups structure)
+   */
   async loadConfig(configPath: string): Promise<ReviewSystemConfig> {
-    // Read config file
     const fs = await import('fs/promises');
     const path = await import('path');
     const content = await fs.readFile(configPath, 'utf-8');
 
-    // Parse based on file extension
     const ext = path.extname(configPath);
     if (ext === '.json') {
       return JSON.parse(content);
-    } else if (ext === '.yaml' || ext === '.yml') {
-      // For YAML support, would need to add yaml parser
-      throw new Error('YAML configuration not yet supported');
     } else {
-      throw new Error(`Unsupported configuration format: ${ext}`);
+      throw new Error('Legacy loadConfig only supports JSON format');
     }
   }
 

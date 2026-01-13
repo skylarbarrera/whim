@@ -1,103 +1,156 @@
 # Ralph Iteration Plan
 
 ## Goal
-Build a review dashboard/UI for visualizing review step status, showing failed check details with remediation guidance, and providing a manual review trigger interface.
+Implement configuration management for the review system with YAML-based workflow definitions, repository-specific and organization-level configs, and environment-specific review requirements.
 
 ## Files to Create/Modify
 
-**New Package:**
-1. `packages/review-dashboard/package.json` - Package config
-2. `packages/review-dashboard/tsconfig.json` - TypeScript config
-3. `packages/review-dashboard/next.config.js` - Next.js config
-4. `packages/review-dashboard/Dockerfile` - Container build
+**New Files:**
+1. `packages/review-system/src/config/loader.ts` - Configuration loader for YAML files
+2. `packages/review-system/src/config/validator.ts` - Configuration validator
+3. `packages/review-system/src/config/defaults.ts` - Default configuration templates
+4. `packages/review-system/src/config/merger.ts` - Configuration merger (org → repo → env)
+5. `packages/review-system/src/config/index.ts` - Config module exports
+6. `packages/review-system/src/__tests__/config-loader.test.ts` - Loader tests
+7. `packages/review-system/src/__tests__/config-validator.test.ts` - Validator tests
+8. `packages/review-system/src/__tests__/config-merger.test.ts` - Merger tests
 
-**Pages:**
-5. `packages/review-dashboard/app/layout.tsx` - Root layout
-6. `packages/review-dashboard/app/page.tsx` - Review list/overview
-7. `packages/review-dashboard/app/reviews/[id]/page.tsx` - Review details
-8. `packages/review-dashboard/app/trigger/page.tsx` - Manual trigger
+**Example Config Files (for documentation):**
+9. `packages/review-system/examples/.review.yml` - Default workflow example
+10. `packages/review-system/examples/.review-org.yml` - Organization-level config
+11. `packages/review-system/examples/.review-dev.yml` - Development environment config
+12. `packages/review-system/examples/.review-prod.yml` - Production environment config
 
-**Components:**
-9. `packages/review-dashboard/components/ReviewStepStatus.tsx` - Status badges
-10. `packages/review-dashboard/components/ReviewTimeline.tsx` - Step timeline
-11. `packages/review-dashboard/components/ReviewMessages.tsx` - Error/warning display
-12. `packages/review-dashboard/components/FileAnnotations.tsx` - File-level issues
-13. `packages/review-dashboard/components/TriggerForm.tsx` - Manual trigger form
-
-**Library:**
-14. `packages/review-dashboard/lib/api.ts` - API client
-
-**Tests:**
-15. `packages/review-dashboard/components/__tests__/ReviewStepStatus.test.tsx`
-16. `packages/review-dashboard/components/__tests__/ReviewTimeline.test.tsx`
-17. `packages/review-dashboard/lib/__tests__/api.test.ts`
-
-**Updates:**
-18. `docker/docker-compose.yml` - Add review-dashboard service
+**Modified Files:**
+13. `packages/review-system/src/orchestrator/orchestrator.ts` - Use config loader
+14. `packages/review-system/src/index.ts` - Export config module
+15. `packages/review-system/package.json` - Add js-yaml dependency
 
 ## Implementation Plan
 
-### 1. Create Dashboard Package
-- Set up Next.js 14+ with App Router
-- Configure TypeScript with strict mode
-- Add dependencies: react, next, @factory/review-system, @factory/shared
-- Create basic layout and navigation
+### 1. Configuration Loader (loader.ts)
+- ConfigLoader class
+- loadFromFile(): Load YAML from file path
+- loadFromString(): Parse YAML string
+- loadFromUrl(): Fetch and parse remote config
+- loadOrgConfig(): Load organization-level config
+- loadRepoConfig(): Load repository-specific config
+- loadEnvConfig(): Load environment-specific config
+- Support for multiple config sources:
+  - Local file: ./.review.yml
+  - Repository: .github/.review.yml
+  - Organization: https://org.com/.github/.review.yml
+  - Environment: .review-{env}.yml
 
-### 2. Build Review Visualization Components
-- ReviewStepStatus: Color-coded status badges (pass=green, fail=red, error=orange, pending=blue, skipped=gray)
-- ReviewTimeline: Visual timeline showing step execution order (sequential/parallel)
-- ReviewMessages: Grouped by severity (errors, warnings, info) with file/line links
-- FileAnnotations: Group issues by file with syntax highlighting
+### 2. Configuration Validator (validator.ts)
+- ConfigValidator class
+- validateWorkflow(): Validate ReviewWorkflowConfig structure
+- validateSteps(): Validate step configurations
+- validateTriggers(): Validate workflow triggers
+- validateStepGroups(): Validate step groups
+- Schema validation using JSON Schema or Zod
+- Required field checks
+- Type validation (enums, ranges)
+- Dependency validation (required steps, contexts)
+- Custom validation rules
 
-### 3. Review List Page (/)
-- Table of recent reviews with PR info, status, timestamp
-- Filter by status, repository, AI-generated flag
-- Click to view details
+### 3. Default Configuration (defaults.ts)
+- createDefaultConfig(): Factory for default workflow
+- defaultLintStep(): Default lint configuration
+- defaultTestStep(): Default test configuration
+- defaultSecurityStep(): Default security scan configuration
+- Templates for common use cases:
+  - Minimal (lint only)
+  - Standard (lint + test)
+  - Full (lint + test + security + coverage)
 
-### 4. Review Details Page (/reviews/[id])
-- Overall status and summary
-- ReviewTimeline showing all steps
-- ReviewMessages grouped by severity and file
-- Detailed metadata (duration, PR info, AI context)
-- Remediation guidance for failures
+### 4. Configuration Merger (merger.ts)
+- ConfigMerger class
+- merge(): Merge multiple configs with priority
+- Priority order: environment > repo > org > defaults
+- Deep merge for nested objects
+- Array concatenation or replacement (configurable)
+- Override resolution rules:
+  - Workflow-level overrides
+  - Step-level overrides
+  - Environment-specific overrides
 
-### 5. Manual Trigger Page (/trigger)
-- Form to select PR (owner/repo/number)
-- Workflow dropdown (from config)
-- Configuration overrides (optional)
-- Trigger button
-- Real-time status updates
-- Result display
+### 5. Integration with Orchestrator
+- Update ReviewOrchestrator.loadConfig()
+- Support config file path or URL
+- Auto-detect environment from env vars
+- Cache loaded configs for performance
+- Hot reload on config file changes (optional)
 
-### 6. API Client (lib/api.ts)
-- fetchReviews() - Get list of reviews
-- fetchReviewById() - Get single review
-- triggerReview() - Start manual review
-- getReviewStatus() - Poll for status updates
+### 6. Example Configurations
+Create example YAML files demonstrating:
+- Basic workflow (lint + test)
+- AI-specific workflow with detection
+- Multi-environment setup
+- Organization-wide defaults
+- Repository overrides
+- Custom step configurations
 
-### 7. Docker Integration
-- Dockerfile with Next.js standalone build
-- Add service to docker-compose.yml
-- Configure API proxy to review-system
+### 7. Testing
+- Test YAML parsing and loading
+- Test config validation (valid and invalid configs)
+- Test config merging with different priorities
+- Test environment-specific overrides
+- Test error handling (missing files, invalid YAML)
+- Integration tests with ReviewOrchestrator
 
-### 8. Testing
-- Component tests with React Testing Library
-- API client tests with mocked fetch
-- Integration tests for pages
+## Configuration Schema Example
+
+```yaml
+# .review.yml
+version: '1.0'
+name: 'default-review'
+enabled: true
+
+triggers:
+  aiGeneratedOnly: false
+  targetBranches: ['main', 'develop']
+  requiredLabels: []
+  excludedLabels: ['skip-review']
+
+steps:
+  - name: 'lint'
+    type: 'lint'
+    blocking: true
+    timeout: 300000
+    config:
+      linters:
+        - type: 'eslint'
+          filePatterns: ['**/*.ts', '**/*.tsx']
+      failOn: 'error'
+
+  - name: 'test'
+    type: 'test'
+    blocking: true
+    timeout: 600000
+    config:
+      runner: 'jest'
+      coverage: true
+      coverageThresholds:
+        lines: 80
+        functions: 80
+```
 
 ## Exit Criteria
-- ✅ Dashboard displays review results with status visualization
-- ✅ Failed checks show detailed error information with fix suggestions
-- ✅ Manual trigger interface can initiate reviews
-- ✅ Real-time status updates during review execution
-- ✅ All components have tests
+- ✅ Config loader can load YAML from file/string/URL
+- ✅ Config validator ensures schema compliance
+- ✅ Config merger handles org/repo/env precedence
+- ✅ Default configs available for common use cases
+- ✅ Example YAML files demonstrate all features
+- ✅ ReviewOrchestrator integrates config loader
+- ✅ Comprehensive tests for all config modules
 - ✅ Package builds successfully
 - ✅ TypeScript type checks pass
-- ✅ Docker image builds and runs
 
 ## Notes
-- Reuse patterns from existing @factory/dashboard package
-- Use @factory/review-system types directly
-- Consider Server-Sent Events (SSE) for real-time updates
-- Store review results in memory or database for historical tracking
-- Keep UI simple and functional (no fancy animations)
+- Use js-yaml for YAML parsing
+- Support both .yml and .yaml extensions
+- Environment detection via NODE_ENV or custom var
+- Config caching for performance
+- Clear error messages for config issues
+- Backward compatible with existing code

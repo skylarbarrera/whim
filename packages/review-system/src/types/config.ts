@@ -138,3 +138,65 @@ export interface EnvironmentConfig {
     metricsCollection?: boolean;
   };
 }
+
+/**
+ * Workflow triggers - conditions for when a workflow should run
+ */
+export interface WorkflowTriggers {
+  /** Only run for these repositories (owner/repo format) */
+  repositories?: string[];
+  /** Only run for PRs with these labels */
+  requiredLabels?: string[];
+  /** Skip PRs with these labels */
+  excludedLabels?: string[];
+  /** Only run for AI-generated PRs */
+  aiGeneratedOnly?: boolean;
+  /** Only run for PRs targeting these branches */
+  targetBranches?: string[];
+}
+
+/**
+ * Simple step configuration (for YAML files)
+ * User-friendly format for defining review steps
+ */
+export interface SimpleStepConfig {
+  /** Step name/identifier */
+  name: string;
+  /** Step type (lint, test, security, custom) */
+  type: string;
+  /** Whether this step blocks PR merge on failure */
+  blocking?: boolean;
+  /** Timeout for this step in milliseconds */
+  timeout?: number;
+  /** Condition expression for conditional execution */
+  condition?: string;
+  /** Step-specific configuration */
+  config?: Record<string, any>;
+}
+
+/**
+ * Simplified workflow config format (for YAML files)
+ * This is the user-facing format that gets converted to ReviewWorkflowConfig
+ */
+export interface SimpleWorkflowConfig {
+  /** Workflow name/identifier */
+  name: string;
+  /** Human-readable description */
+  description?: string;
+  /** Whether this workflow is enabled */
+  enabled?: boolean;
+  /** Conditions for when this workflow should run */
+  triggers?: WorkflowTriggers;
+  /** Flat array of review steps */
+  steps: SimpleStepConfig[];
+  /** Optional grouping of steps for parallel/sequential execution */
+  stepGroups?: Record<string, string[]>;
+  /** Global timeout for entire workflow in milliseconds */
+  timeoutMs?: number;
+  /** Whether to post results as PR comment */
+  postComment?: boolean;
+  /** Whether to update GitHub commit status */
+  updateStatus?: boolean;
+  /** Status check context name */
+  statusContext?: string;
+}
