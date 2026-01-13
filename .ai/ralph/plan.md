@@ -1,24 +1,25 @@
-# Phase 6: Intake Package
+# Phase 7: Docker Infrastructure
 
 ## Goal
-Implement the intake package that polls GitHub for issues with a specific label, generates specs from them using Claude, and submits work items to the orchestrator.
+Create Docker infrastructure with docker-compose.yml that orchestrates all services (postgres, redis, orchestrator, intake, dashboard placeholder).
 
 ## Files to Create
-- `packages/intake/package.json` - Package config with @octokit/rest, @anthropic-ai/sdk
-- `packages/intake/tsconfig.json` - TypeScript config extending root
-- `packages/intake/src/github.ts` - GitHubAdapter class (poll, addLabel, removeLabel)
-- `packages/intake/src/spec-gen.ts` - SpecGenerator class (generate: issue → SPEC.md)
-- `packages/intake/src/index.ts` - Main entry: poll → generate → submit → update labels
-- `packages/intake/Dockerfile` - Docker build config
-
-## Tests
-- `packages/intake/src/github.test.ts` - GitHubAdapter tests (mocked Octokit)
-- `packages/intake/src/spec-gen.test.ts` - SpecGenerator tests (mocked Anthropic)
-- `packages/intake/src/index.test.ts` - Integration tests
+- `docker/docker-compose.yml` - Complete service definitions
 
 ## Exit Criteria
-- [ ] All source files created with proper types
-- [ ] Tests pass with `bun test`
-- [ ] Type check passes with `bun run typecheck`
-- [ ] Dockerfile builds successfully
-- [ ] SPEC.md checkbox marked
+- [x] `docker/docker-compose.yml` exists with all required services
+- [x] Services configured: postgres (pgvector), redis, orchestrator, intake, dashboard
+- [x] Volumes defined for postgres_data and redis_data
+- [x] All services have proper environment variables and dependencies
+- [x] Network configuration allows inter-service communication
+
+## Implementation Steps
+1. Create `docker/` directory
+2. Create `docker/docker-compose.yml` with:
+   - postgres service (pgvector/pgvector:pg16)
+   - redis service (redis:7-alpine)
+   - orchestrator service (depends on postgres, redis)
+   - intake service (depends on orchestrator)
+   - dashboard service placeholder (depends on orchestrator)
+   - Named volumes for persistence
+   - Health checks for dependencies

@@ -15,6 +15,8 @@
   - 5.2: Worker Config and Dockerfile (CLAUDE.md, mcp.json, settings.json, Dockerfile)
 - Phase 6: Intake Package (1 task)
   - 6.1: Complete intake package (GitHubAdapter, SpecGenerator, entry point, Dockerfile, 24 tests)
+- Phase 7: Docker Infrastructure (1 task)
+  - 7.1: docker-compose.yml with postgres, redis, orchestrator, intake, dashboard services
 
 ## In Progress
-- Phase 7: Docker Infrastructure (next)
+- Phase 8: Scripts (next)

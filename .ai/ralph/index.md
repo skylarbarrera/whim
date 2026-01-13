@@ -542,3 +542,53 @@ Management Routes:
 - Type checks pass
 - Phase 6 (Intake Package) now complete
 - Next: Phase 7 Docker Infrastructure
+
+---
+
+## Session 16 - 2025-01-13
+
+### Task: Phase 7 - Docker Infrastructure
+
+**Files Created:**
+- `docker/docker-compose.yml` - Complete Docker Compose configuration
+
+**Services Configured:**
+
+1. **postgres** (pgvector/pgvector:pg16)
+   - Persistent volume (postgres_data)
+   - Health check with pg_isready
+   - Mounts migrations for auto-initialization
+
+2. **redis** (redis:7-alpine)
+   - Persistent volume (redis_data)
+   - Append-only mode enabled
+   - Health check with redis-cli ping
+
+3. **orchestrator**
+   - Builds from packages/orchestrator/Dockerfile
+   - Depends on healthy postgres + redis
+   - Docker socket mounted for container management
+   - Health check on /health endpoint
+
+4. **intake**
+   - Builds from packages/intake/Dockerfile
+   - Depends on healthy orchestrator
+   - Environment: GITHUB_TOKEN, ANTHROPIC_API_KEY, REPOS
+
+5. **dashboard** (placeholder)
+   - Builds from packages/dashboard/Dockerfile (not yet implemented)
+   - Profile: with-dashboard (disabled by default)
+   - Depends on healthy orchestrator
+
+**Features:**
+- Named volumes for data persistence
+- Health checks on all services for dependency ordering
+- Environment variable substitution with defaults
+- Custom network (factory-network) for inter-service communication
+- Dashboard in profile (won't start by default until implemented)
+
+**Notes:**
+- No tests for docker-compose (infrastructure only)
+- All build and type checks pass
+- Phase 7 (Docker Infrastructure) now complete
+- Next: Phase 8 Scripts
