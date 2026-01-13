@@ -4,6 +4,11 @@ export { ReviewTracker, type DatabaseClient } from './tracker.js';
 export { ResultAggregator, type AggregatedResult } from './aggregator.js';
 export { ReviewService, type CheckConfig, type ServiceConfig } from './service.js';
 
+// Merge blocking
+export { GitHubStatusClient, REVIEW_STATUS_CONTEXT, type StatusState, type CreateStatusParams, type CommitStatus } from './github-status.js';
+export { BranchProtectionManager, type BranchProtection, type UpdateProtectionParams } from './branch-protection.js';
+export { MergeGuardian, type MergeDecision, type OverrideParams } from './merge-guardian.js';
+
 // Check modules
 export { BaseCheck, type CheckConfig as BaseCheckConfig } from './checks/base-check.js';
 export { LintCheck } from './checks/lint-check.js';

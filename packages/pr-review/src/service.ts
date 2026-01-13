@@ -3,6 +3,9 @@ import { PRDetector } from './detector.js';
 import { ReviewTracker, type DatabaseClient } from './tracker.js';
 import { ResultAggregator, type AggregatedResult } from './aggregator.js';
 import { BaseCheck } from './checks/base-check.js';
+import { GitHubStatusClient } from './github-status.js';
+import { MergeGuardian, type MergeDecision } from './merge-guardian.js';
+import { BranchProtectionManager } from './branch-protection.js';
 
 /**
  * Check configuration
@@ -28,12 +31,28 @@ export class ReviewService {
   private tracker: ReviewTracker;
   private aggregator: ResultAggregator;
   private config: ServiceConfig;
+  private statusClient?: GitHubStatusClient;
+  private guardian: MergeGuardian;
+  private protectionManager?: BranchProtectionManager;
 
-  constructor(db: DatabaseClient, config: ServiceConfig) {
+  constructor(
+    db: DatabaseClient,
+    config: ServiceConfig,
+    githubToken?: string,
+    dashboardUrl?: string
+  ) {
     this.detector = new PRDetector();
     this.tracker = new ReviewTracker(db);
     this.aggregator = new ResultAggregator();
     this.config = config;
+
+    // Optional GitHub integration
+    if (githubToken) {
+      this.statusClient = new GitHubStatusClient(githubToken, dashboardUrl);
+      this.protectionManager = new BranchProtectionManager(githubToken);
+    }
+
+    this.guardian = new MergeGuardian(this.tracker, this.statusClient);
   }
 
   /**
@@ -51,11 +70,15 @@ export class ReviewService {
       return null;
     }
 
+    // Get head SHA from latest commit
+    const headSha = context.commits[context.commits.length - 1]?.sha || 'unknown';
+
     // Create review
     const review = await this.tracker.createReview({
       repoOwner: context.owner,
       repoName: context.repo,
       prNumber: context.prNumber,
+      headSha,
       isAIGenerated: detection.isAI,
       detectionConfidence: detection.confidence,
       detectionReasons: detection.reasons,
@@ -205,8 +228,8 @@ export class ReviewService {
         metadata: result.metadata,
       });
 
-      // Update merge status after check completes
-      await this.updateMergeStatus(reviewId);
+      // Evaluate merge status and update GitHub
+      await this.evaluateAndReportStatus(reviewId);
 
       return updatedCheck;
     } catch (error) {
@@ -222,9 +245,103 @@ export class ReviewService {
         metadata: { error: message },
       });
 
-      await this.updateMergeStatus(reviewId);
+      await this.evaluateAndReportStatus(reviewId);
 
       return updatedCheck;
     }
+  }
+
+  /**
+   * Evaluate merge eligibility and report status to GitHub
+   */
+  async evaluateAndReportStatus(reviewId: string): Promise<MergeDecision> {
+    // Update merge status in database
+    await this.updateMergeStatus(reviewId);
+
+    // Evaluate with guardian
+    const decision = await this.guardian.evaluateAndUpdate(reviewId);
+
+    return decision;
+  }
+
+  /**
+   * Report current status to GitHub
+   */
+  async reportStatus(reviewId: string): Promise<void> {
+    if (!this.statusClient) {
+      return; // GitHub integration not configured
+    }
+
+    const review = await this.tracker.getReview(reviewId);
+    if (!review) {
+      throw new Error(`Review ${reviewId} not found`);
+    }
+
+    const decision = await this.guardian.canMerge(reviewId);
+    await this.statusClient.createStatusFromReview(
+      review.review,
+      !decision.allowed
+    );
+  }
+
+  /**
+   * Synchronize branch protection rules for a repository
+   *
+   * Ensures AI factory review is required on specified branches
+   */
+  async syncProtection(
+    owner: string,
+    repo: string,
+    branches: string[] = ['main', 'master']
+  ): Promise<Map<string, boolean>> {
+    if (!this.protectionManager) {
+      throw new Error('GitHub integration not configured');
+    }
+
+    return this.protectionManager.syncProtectionAcrossBranches(
+      owner,
+      repo,
+      branches
+    );
+  }
+
+  /**
+   * Emergency override to allow merge despite failures
+   */
+  async emergencyOverride(
+    reviewId: string,
+    user: string,
+    reason: string
+  ): Promise<MergeDecision> {
+    const decision = await this.guardian.override({
+      reviewId,
+      user,
+      reason,
+    });
+
+    // Update review status to completed
+    await this.tracker.updateReviewStatus(reviewId, 'completed');
+
+    return decision;
+  }
+
+  /**
+   * Check if PR can be merged
+   */
+  async canMerge(reviewId: string): Promise<MergeDecision> {
+    return this.guardian.canMerge(reviewId);
+  }
+
+  /**
+   * Get check summary for a review
+   */
+  async getCheckSummary(reviewId: string): Promise<{
+    total: number;
+    required: number;
+    passed: number;
+    failed: number;
+    pending: number;
+  }> {
+    return this.guardian.getCheckSummary(reviewId);
   }
 }

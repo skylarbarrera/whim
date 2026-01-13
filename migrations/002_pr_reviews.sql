@@ -35,6 +35,7 @@ CREATE TABLE pr_reviews (
   repo_owner VARCHAR(255) NOT NULL,
   repo_name VARCHAR(255) NOT NULL,
   pr_number INTEGER NOT NULL,
+  head_sha VARCHAR(40) NOT NULL,
   status review_status NOT NULL DEFAULT 'pending',
   is_ai_generated BOOLEAN NOT NULL,
   detection_confidence DECIMAL(3,2) NOT NULL,

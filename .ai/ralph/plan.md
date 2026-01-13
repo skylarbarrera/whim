@@ -1,81 +1,107 @@
-# Iteration 1: Build Testing Integration
+# Plan: Create Merge Blocking System
 
 ## Goal
-Implement test integration for the PR review system, following the same composable pattern established with the lint integration. This includes test runner infrastructure, test check implementation, configuration support, and blocking mechanism integration.
+Implement the merge blocking system that enforces review requirements through branch protection rules and status checks, preventing merges when required checks fail.
+
+## Current State
+- PR review core functionality complete (detection, tracking, aggregation)
+- Lint and test checks implemented with BaseCheck framework
+- Database schema includes merge_blocked flag on pr_reviews table
+- No integration with GitHub Branch Protection or Status API yet
 
 ## Files to Create/Modify
-- `packages/pr-review/src/checks/test-runner.ts` - Test execution infrastructure
-- `packages/pr-review/src/checks/test-check.ts` - TestCheck class extending BaseCheck
-- `packages/pr-review/src/config.ts` - Add test configuration types and defaults
-- `packages/pr-review/example.pr-review.yml` - Update with test configuration examples
-- `packages/pr-review/tests/test-runner.test.ts` - Unit tests for test runner
-- `packages/pr-review/tests/test-check.test.ts` - Unit tests for TestCheck
-- `packages/pr-review/tests/config.test.ts` - Update with test config tests
-- `packages/pr-review/src/index.ts` - Export TestCheck
+
+### New Files
+1. `packages/pr-review/src/github-status.ts` - GitHub Status API client
+2. `packages/pr-review/src/branch-protection.ts` - Branch protection manager
+3. `packages/pr-review/src/merge-guardian.ts` - Merge prevention logic
+4. `packages/pr-review/tests/github-status.test.ts` - Status API tests
+5. `packages/pr-review/tests/branch-protection.test.ts` - Protection tests
+6. `packages/pr-review/tests/merge-guardian.test.ts` - Guardian tests
+
+### Modified Files
+1. `packages/pr-review/src/service.ts` - Integrate status reporting
+2. `packages/pr-review/src/index.ts` - Export new modules
+3. `packages/shared/src/types.ts` - Add GitHub status types if needed
 
 ## Implementation Steps
 
-1. **Create TestRunner** (similar to LintRunner)
-   - Support multiple test frameworks (Jest, Vitest, Bun test, npm test)
-   - Parse test output for all supported frameworks
-   - Extract test counts (passed, failed, skipped)
-   - Collect failure details (test names, error messages, stack traces)
-   - Handle timeouts gracefully
-   - Return structured TestRunResult
+### Step 1: GitHub Status API Client
+Create `github-status.ts` with:
+- `GitHubStatusClient` class
+- `createStatus()` - POST to /repos/:owner/:repo/statuses/:sha
+- `getStatuses()` - GET statuses for a commit
+- Status context: "ai-factory/pr-review"
+- States: pending, success, failure, error
+- Target URL to dashboard review page
+- Description with check summary
 
-2. **Create TestCheck** (extending BaseCheck)
-   - Configure test commands via YAML
-   - Execute tests using TestRunner
-   - Aggregate results from multiple test commands
-   - Generate human-readable summaries
-   - Store results via ReviewTracker
-   - Support failure thresholds (e.g., allow skipped tests)
+### Step 2: Branch Protection Manager
+Create `branch-protection.ts` with:
+- `BranchProtectionManager` class
+- `getProtection()` - GET branch protection rules
+- `updateProtection()` - PUT branch protection rules
+- `addRequiredStatusCheck()` - Add "ai-factory/pr-review" to required checks
+- `removeRequiredStatusCheck()` - Remove from required checks
+- Handle repos without branch protection gracefully
+- Support multiple branch patterns (main, master, develop, etc.)
 
-3. **Update Configuration System**
-   - Add TestConfig interface
-   - Add test command configuration
-   - Add timeout and threshold settings
-   - Update example YAML with test section
-   - Deep merge test config with defaults
+### Step 3: Merge Prevention Logic
+Create `merge-guardian.ts` with:
+- `MergeGuardian` class
+- `canMerge(reviewId)` - Check if PR can be merged
+- `blockMerge(reviewId, reason)` - Update status to blocked
+- `allowMerge(reviewId)` - Update status to allowed
+- `isOverridden(reviewId)` - Check override status
+- Logic:
+  - All required checks must be 'success'
+  - No required checks in 'pending' or 'running' state
+  - No failed required checks (unless overridden)
+  - Returns MergeDecision with allowed flag, reason, failedChecks[]
 
-4. **Integration with ReviewService**
-   - TestCheck is already composable via runCheck() method
-   - No changes needed to service - design is composable
+### Step 4: Emergency Override
+Add to `merge-guardian.ts`:
+- `override(reviewId, user, reason)` - Emergency override
+- Records override in database (calls tracker.markOverridden)
+- Updates GitHub status to success with override note
+- Sends notification (console log for now, webhook later)
+- Validates user has permission (accept any for now)
 
-5. **Add Comprehensive Tests**
-   - TestRunner: parsing for each framework, timeout handling
-   - TestCheck: success/failure scenarios, threshold logic
-   - Config: test configuration loading and merging
+### Step 5: Integrate with ReviewService
+Update `service.ts`:
+- Inject GitHubStatusClient and MergeGuardian
+- After check completion in runCheck():
+  - Call guardian.canMerge()
+  - Call statusClient.createStatus() with result
+  - Update merge_blocked in database
+- Add new methods:
+  - `syncProtection(repo, branch)` - Ensure protection rules exist
+  - `reportStatus(reviewId)` - Update GitHub status
+  - `overrideReview(reviewId, user, reason)` - Emergency override
 
-## Test Strategy
-- Unit tests for TestRunner with mocked child_process
-- Unit tests for TestCheck with mocked TestRunner
-- Test all supported test framework output formats
-- Verify configuration loading and merging
-- Verify failure blocking mechanism via ResultAggregator
+### Step 6: Tests
+Write comprehensive tests:
+- Mock Octokit for GitHub API calls
+- Test status creation (pending, success, failure)
+- Test branch protection updates
+- Test merge decision logic (all checks pass, some fail, override)
+- Test override recording and status update
+- Edge cases: no checks, all optional, already overridden
 
 ## Exit Criteria
-- [ ] TestRunner created and handles Jest, Vitest, Bun test, npm test
-- [ ] TestCheck extends BaseCheck and integrates with ReviewTracker
-- [ ] Configuration system supports test commands and settings
-- [ ] Example YAML updated with test configuration
-- [ ] 20+ unit tests added covering all scenarios
-- [ ] All tests pass with `bun test`
-- [ ] Package builds successfully with `bun run build`
-- [ ] All 4 sub-bullets in SPEC.md completed
+- [x] GitHubStatusClient reports check results to GitHub
+- [x] BranchProtectionManager configures required status checks
+- [x] MergeGuardian determines merge eligibility from check results
+- [x] Emergency override mechanism works and records audit trail
+- [x] ReviewService integrates all components
+- [x] All tests pass (aim for 15+ new tests)
+- [x] Package builds without errors
+- [x] Types integrate with @factory/shared
 
-## Integration Points
-- Uses BaseCheck (already exists)
-- Uses ReviewTracker (already exists)
-- Uses ResultAggregator (already exists, handles blocking)
-- Uses ConfigLoader (already exists)
-- Follows exact same pattern as LintCheck
+## Sub-bullets from SPEC.md
+- [ ] Implement branch protection rules
+- [ ] Add status check requirements
+- [ ] Create merge prevention logic
+- [ ] Add override mechanisms for emergencies
 
-## Technical Notes
-- Reuse patterns from existing LintRunner and LintCheck
-- Test output parsing needs to handle different formats
-- Jest: JSON reporter, TAP format, or default format
-- Vitest: JSON reporter or default format
-- Bun test: Default format
-- npm test: Delegates to package.json test script
-- Timeout should be longer for tests (default 5 minutes vs 2 minutes for lint)
+All 4 sub-bullets will be completed in this iteration.

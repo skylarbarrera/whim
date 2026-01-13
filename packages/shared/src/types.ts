@@ -206,6 +206,7 @@ export interface PRReview {
   repoOwner: string;
   repoName: string;
   prNumber: number;
+  headSha: string;
   status: ReviewStatus;
   isAIGenerated: boolean;
   detectionConfidence: number;

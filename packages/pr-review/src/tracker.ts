@@ -76,21 +76,23 @@ export class ReviewTracker {
     repoOwner: string;
     repoName: string;
     prNumber: number;
+    headSha: string;
     isAIGenerated: boolean;
     detectionConfidence: number;
     detectionReasons: string[];
   }): Promise<PRReview> {
     const result = await this.db.queryOne<PRReviewRow>(
       `INSERT INTO pr_reviews (
-        repo_owner, repo_name, pr_number, status,
+        repo_owner, repo_name, pr_number, head_sha, status,
         is_ai_generated, detection_confidence, detection_reasons,
         started_at, merge_blocked
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
       RETURNING *`,
       [
         params.repoOwner,
         params.repoName,
         params.prNumber,
+        params.headSha,
         'pending',
         params.isAIGenerated,
         params.detectionConfidence,
