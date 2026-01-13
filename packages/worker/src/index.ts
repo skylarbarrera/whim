@@ -8,6 +8,7 @@ import {
   getNewLearningsPath,
 } from "./learnings.js";
 import { runRalph } from "./ralph.js";
+import { runMockRalph } from "./mock-ralph.js";
 import { runTests } from "./testing.js";
 
 interface WorkerConfig {
@@ -87,16 +88,32 @@ async function main(): Promise<void> {
   await loadLearnings(client, config.workItem.repo, learningsPath);
   console.log("Learnings loaded");
 
-  console.log("Starting Ralph...");
-  const result = await runRalph(repoDir, client, {
-    maxIterations: config.workItem.maxIterations,
-    onEvent: (event) => {
-      console.log(`[RALPH:${event.type}]`, event.data);
-    },
-    onOutput: (line) => {
-      console.log(line);
-    },
-  });
+  // Use mock Ralph for testing lifecycle without burning Claude tokens
+  const useMock = process.env.MOCK_RALPH === "1" || process.env.MOCK_RALPH === "true";
+
+  if (useMock) {
+    console.log("Starting Mock Ralph (MOCK_RALPH=1)...");
+  } else {
+    console.log("Starting Ralph...");
+  }
+
+  const onOutput = (line: string) => {
+    console.log(line);
+  };
+
+  const result = useMock
+    ? await runMockRalph(repoDir, client, {
+        toolDelay: 200,
+        toolCount: 15,
+        totalDuration: 3000,
+        shouldSucceed: process.env.MOCK_FAIL !== "1",
+        shouldGetStuck: process.env.MOCK_STUCK === "1",
+        onOutput,
+      })
+    : await runRalph(repoDir, client, {
+        maxIterations: config.workItem.maxIterations,
+        onOutput,
+      });
 
   console.log("Ralph completed:", result.success ? "SUCCESS" : "FAILED");
 

@@ -130,6 +130,11 @@ export async function runRalph(
       }
 
       case "tool": {
+        // Send heartbeat on every tool call to prevent stale detection
+        await client.heartbeat(iteration, "running", {
+          in: metrics.tokensIn,
+          out: metrics.tokensOut,
+        });
         if (event.type === "write" && event.path) {
           metrics.filesModified++;
           await client.lockFile([event.path as string]);

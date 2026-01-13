@@ -53,8 +53,13 @@ services:
       MAX_WORKERS: ${MAX_WORKERS:-2}
       DAILY_BUDGET: ${DAILY_BUDGET:-200}
       COOLDOWN_SECONDS: ${COOLDOWN_SECONDS:-60}
+      STALE_THRESHOLD: ${STALE_THRESHOLD:-300}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # Mock mode for testing lifecycle without Claude tokens
+      MOCK_RALPH: ${MOCK_RALPH:-}
+      MOCK_FAIL: ${MOCK_FAIL:-}
+      MOCK_STUCK: ${MOCK_STUCK:-}
       PORT: 3000
     ports:
       - "3002:3000"

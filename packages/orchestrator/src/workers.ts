@@ -101,6 +101,10 @@ export class WorkerManager {
         `ORCHESTRATOR_URL=${this.config.orchestratorUrl}`,
         `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
         `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
+        // Pass through mock mode for testing lifecycle without Claude
+        `MOCK_RALPH=${process.env.MOCK_RALPH ?? ""}`,
+        `MOCK_FAIL=${process.env.MOCK_FAIL ?? ""}`,
+        `MOCK_STUCK=${process.env.MOCK_STUCK ?? ""}`,
       ],
       HostConfig: {
         AutoRemove: false,  // Keep for debugging
@@ -223,6 +227,11 @@ export class WorkerManager {
       throw new Error(`Worker not found: ${workerId}`);
     }
 
+    // Only allow completion from active workers
+    if (worker.status !== "starting" && worker.status !== "running") {
+      throw new Error(`Worker ${workerId} is not active (status: ${worker.status})`);
+    }
+
     // Update worker status
     await this.db.execute(
       `UPDATE workers SET status = 'completed', completed_at = NOW() WHERE id = $1`,
@@ -280,6 +289,11 @@ export class WorkerManager {
     const worker = await this.db.getWorker(workerId);
     if (!worker) {
       throw new Error(`Worker not found: ${workerId}`);
+    }
+
+    // Only allow failure from active workers
+    if (worker.status !== "starting" && worker.status !== "running") {
+      throw new Error(`Worker ${workerId} is not active (status: ${worker.status})`);
     }
 
     // Update worker status

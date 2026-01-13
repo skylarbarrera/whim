@@ -223,77 +223,43 @@ export class Database {
 
   /**
    * Convert a WorkItemRow to WorkItem
+   * Note: Row is already converted to camelCase by queryOne
    */
   private rowToWorkItem(row: WorkItemRow): WorkItem {
-    return {
-      id: row.id,
-      repo: row.repo,
-      branch: row.branch,
-      spec: row.spec,
-      priority: row.priority,
-      status: row.status,
-      workerId: row.worker_id,
-      iteration: row.iteration,
-      maxIterations: row.max_iterations,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      completedAt: row.completed_at,
-      error: row.error,
-      prUrl: row.pr_url,
-      metadata: row.metadata,
-    };
+    // Row is already in camelCase from queryOne, just cast it
+    return row as unknown as WorkItem;
   }
 
   /**
    * Convert a WorkerRow to Worker
+   * Note: Row is already converted to camelCase by queryOne
    */
   private rowToWorker(row: WorkerRow): Worker {
-    return {
-      id: row.id,
-      workItemId: row.work_item_id,
-      status: row.status,
-      iteration: row.iteration,
-      lastHeartbeat: row.last_heartbeat,
-      startedAt: row.started_at,
-      completedAt: row.completed_at,
-      containerId: row.container_id,
-      error: row.error,
-    };
+    // Row is already in camelCase from queryOne, just cast it
+    return row as unknown as Worker;
   }
 
   /**
    * Convert a LearningRow to Learning
+   * Note: Row is already converted to camelCase by queryOne
    */
   private rowToLearning(row: LearningRow): Learning {
+    const camelRow = row as unknown as Record<string, unknown>;
     return {
-      id: row.id,
-      repo: row.repo,
-      spec: row.spec,
-      content: row.content,
-      embedding: row.embedding ? JSON.parse(row.embedding) : null,
-      createdAt: row.created_at,
-      workItemId: row.work_item_id,
+      ...(camelRow as unknown as Learning),
+      embedding: camelRow.embedding ? JSON.parse(camelRow.embedding as string) : null,
     };
   }
 
   /**
    * Convert a WorkerMetricsRow to WorkerMetrics
+   * Note: Row is already converted to camelCase by queryOne
    */
   private rowToWorkerMetrics(row: WorkerMetricsRow): WorkerMetrics {
+    const camelRow = row as unknown as Record<string, unknown>;
     return {
-      id: row.id,
-      workerId: row.worker_id,
-      workItemId: row.work_item_id,
-      iteration: row.iteration,
-      tokensIn: row.tokens_in,
-      tokensOut: row.tokens_out,
-      duration: row.duration,
-      filesModified: row.files_modified,
-      testsRun: row.tests_run,
-      testsPassed: row.tests_passed,
-      testsFailed: row.tests_failed ?? 0,
-      testStatus: row.test_status as WorkerMetrics["testStatus"],
-      timestamp: row.timestamp,
+      ...(camelRow as unknown as WorkerMetrics),
+      testsFailed: (camelRow.testsFailed as number) ?? 0,
     };
   }
 
