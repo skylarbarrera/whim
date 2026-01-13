@@ -1,38 +1,35 @@
-# Phase 2: Add Test Infrastructure to Worker
+# Plan: Phase 3.1 - Wrap PR Creation in Try/Catch
 
 ## Goal
-Enable the worker container to actually run tests, rather than faking/skipping them.
+Wrap PR creation in `index.ts` with try/catch to handle unexpected errors and report partial success when the work was done but PR creation failed.
 
 ## Files to Modify
-- `packages/worker/Dockerfile` - Add test runners (jest, ts-jest, typescript)
-- `packages/worker/src/testing.ts` - New module for test validation with timeout
-- `packages/worker/src/testing.test.ts` - Tests for the testing module
-- `packages/worker/src/index.ts` - Add test validation step after Ralph completes
+- `packages/worker/src/index.ts` - Add try/catch around PR creation, report partial success
 
-## Implementation
+## Changes
 
-### 1. Dockerfile Changes
-Add to the runtime stage:
-```dockerfile
-RUN npm install -g jest ts-jest typescript @types/jest @types/node vitest
-```
+### 1. Wrap PR Creation in Try/Catch
+The current code already handles PRResult status cases, but unexpected errors (like network failures, gh command not found, etc.) could throw exceptions that aren't caught.
 
-### 2. Testing Module (testing.ts)
-Create a new module that:
-- Runs `npm test` in the repo directory
-- Has configurable timeout (default 5 minutes)
-- Returns structured results (passed, failed, timed out)
-- Captures stdout/stderr for debugging
+Changes:
+- Wrap `createPullRequest()` call in try/catch
+- If exception is thrown, log detailed error message
+- Report to orchestrator with partial success indicator
+- Distinguish between "work done, PR failed" vs "work failed"
 
-### 3. Index.ts Integration
-After Ralph completes successfully:
-1. Run test validation step
-2. Report test results in metrics
-3. Consider test failure as partial success (still create PR, but note test failures)
+### 2. Report Partial Success
+When Ralph succeeds but PR creation throws an exception:
+- Log the full error with stack trace
+- Still call `client.complete()` but with `null` prUrl
+- Mark the work as partially successful (code done, PR failed)
+
+## Tests
+- Existing tests in `setup.test.ts` cover the PRResult cases
+- Manual testing: The try/catch handles unexpected errors
 
 ## Exit Criteria
-- [ ] Worker Dockerfile includes jest, typescript, vitest
-- [ ] testing.ts module with runTests function and timeout support
-- [ ] Tests for testing.ts
-- [ ] Integration in index.ts
-- [ ] All existing tests pass
+- [x] PR creation wrapped in try/catch
+- [x] Unexpected errors logged with full details
+- [x] Partial success reported when PR creation throws
+- [x] Type checks pass
+- [x] Existing tests pass

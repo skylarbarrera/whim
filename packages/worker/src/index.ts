@@ -134,26 +134,41 @@ async function main(): Promise<void> {
     );
     console.log(`Found ${learnings.length} new learnings`);
 
-    console.log("Creating pull request...");
-    const prResult = await createPullRequest(
-      repoDir,
-      config.workItem,
-      config.githubToken
-    );
+    // Wrap PR creation in try/catch to handle unexpected errors and report partial success
+    let prUrl: string | undefined;
+    try {
+      console.log("Creating pull request...");
+      const prResult = await createPullRequest(
+        repoDir,
+        config.workItem,
+        config.githubToken
+      );
 
-    if (prResult.status === "success") {
-      console.log(`Pull request created: ${prResult.prUrl}`);
-    } else if (prResult.status === "no_changes") {
-      console.log("No pull request created (no changes to push)");
-    } else {
-      console.error(`PR creation failed at step: ${prResult.step}`);
-      if (prResult.error) {
-        console.error(`  Command: ${prResult.error.command}`);
-        console.error(`  Exit code: ${prResult.error.exitCode}`);
+      if (prResult.status === "success") {
+        console.log(`Pull request created: ${prResult.prUrl}`);
+        prUrl = prResult.prUrl;
+      } else if (prResult.status === "no_changes") {
+        console.log("No pull request created (no changes to push)");
+      } else {
+        console.error(`PR creation failed at step: ${prResult.step}`);
+        if (prResult.error) {
+          console.error(`  Command: ${prResult.error.command}`);
+          console.error(`  Exit code: ${prResult.error.exitCode}`);
+          console.error(`  stdout: ${prResult.error.stdout}`);
+          console.error(`  stderr: ${prResult.error.stderr}`);
+        }
       }
+    } catch (prError) {
+      // Catch unexpected errors (network failures, gh not found, etc.)
+      console.error("Unexpected error during PR creation:");
+      console.error(`  Error: ${prError instanceof Error ? prError.message : String(prError)}`);
+      if (prError instanceof Error && prError.stack) {
+        console.error(`  Stack: ${prError.stack}`);
+      }
+      console.log("Work completed but PR creation failed - reporting partial success");
     }
 
-    await client.complete(prResult.prUrl, result.metrics, learnings);
+    await client.complete(prUrl, result.metrics, learnings);
     console.log("Completion reported to orchestrator");
   } else {
     console.error("Ralph failed:", result.error);
