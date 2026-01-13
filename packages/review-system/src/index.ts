@@ -6,3 +6,6 @@ export * from './plugin/index.js';
 
 // Detection module exports
 export * from './detection/index.js';
+
+// Orchestrator module exports
+export * from './orchestrator/index.js';

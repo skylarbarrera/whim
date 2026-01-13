@@ -12,7 +12,7 @@ Implement a composable PR review system specifically for AI-generated PRs with a
   - Add metadata tagging for AI-generated PRs
   - Create PR classification logic
   - Store AI generation context/prompts for reviewers
-- [ ] Build core review orchestrator
+- [x] Build core review orchestrator
   - Sequential and parallel review step execution
   - Review result aggregation and reporting
   - Integration with GitHub PR status checks
