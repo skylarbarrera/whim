@@ -32,6 +32,11 @@ export interface ServerDependencies {
   conflicts: ConflictDetector;
   rateLimiter: RateLimiter;
   metrics: MetricsCollector;
+  db: {
+    query<T>(text: string, values?: unknown[]): Promise<T[]>;
+    queryOne<T>(text: string, values?: unknown[]): Promise<T | null>;
+    execute(text: string, values?: unknown[]): Promise<{ rowCount: number }>;
+  };
 }
 
 /**
@@ -423,6 +428,248 @@ export function createServer(deps: ServerDependencies): express.Application {
 
       const learnings = await deps.metrics.getLearnings(options);
       res.json(learnings);
+    })
+  );
+
+  // ==========================================================================
+  // PR Review API
+  // ==========================================================================
+
+  /**
+   * GET /api/pr-reviews - List all PR reviews with optional filters
+   */
+  app.get(
+    "/api/pr-reviews",
+    asyncHandler(async (req, res) => {
+      const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 50;
+      const offset = typeof req.query.offset === "string" ? parseInt(req.query.offset, 10) : 0;
+
+      let query = `
+        SELECT * FROM pr_reviews
+        WHERE 1=1
+      `;
+      const values: unknown[] = [];
+      let paramCount = 0;
+
+      if (typeof req.query.repoOwner === "string") {
+        paramCount++;
+        query += ` AND repo_owner = $${paramCount}`;
+        values.push(req.query.repoOwner);
+      }
+
+      if (typeof req.query.repoName === "string") {
+        paramCount++;
+        query += ` AND repo_name = $${paramCount}`;
+        values.push(req.query.repoName);
+      }
+
+      if (typeof req.query.status === "string") {
+        paramCount++;
+        query += ` AND status = $${paramCount}`;
+        values.push(req.query.status);
+      }
+
+      query += ` ORDER BY created_at DESC`;
+
+      // Count total for pagination
+      const countQuery = query.replace("SELECT *", "SELECT COUNT(*)");
+      const countResult = await deps.db.queryOne<{ count: string }>(countQuery, values);
+      const total = countResult ? parseInt(countResult.count, 10) : 0;
+
+      // Add pagination
+      paramCount++;
+      query += ` LIMIT $${paramCount}`;
+      values.push(limit);
+      paramCount++;
+      query += ` OFFSET $${paramCount}`;
+      values.push(offset);
+
+      const reviews = await deps.db.query<any>(query, values);
+
+      res.json({
+        reviews,
+        total,
+        hasMore: offset + limit < total,
+      });
+    })
+  );
+
+  /**
+   * GET /api/pr-reviews/:id - Get details for a specific PR review
+   */
+  app.get(
+    "/api/pr-reviews/:id",
+    asyncHandler(async (req, res) => {
+      const { id } = req.params;
+
+      const review = await deps.db.queryOne<any>(
+        "SELECT * FROM pr_reviews WHERE id = $1",
+        [id]
+      );
+
+      if (!review) {
+        res.status(404).json(errorResponse("PR review not found", "NOT_FOUND"));
+        return;
+      }
+
+      const checks = await deps.db.query<any>(
+        "SELECT * FROM pr_review_checks WHERE review_id = $1 ORDER BY created_at ASC",
+        [id]
+      );
+
+      res.json({
+        review,
+        checks,
+      });
+    })
+  );
+
+  /**
+   * POST /api/pr-reviews/:id/override - Emergency override for a PR review
+   */
+  app.post(
+    "/api/pr-reviews/:id/override",
+    asyncHandler(async (req, res) => {
+      const { id } = req.params;
+
+      if (typeof req.body.reason !== "string" || req.body.reason.length === 0) {
+        res.status(400).json(errorResponse("Override reason is required", "VALIDATION_ERROR"));
+        return;
+      }
+
+      if (typeof req.body.user !== "string" || req.body.user.length === 0) {
+        res.status(400).json(errorResponse("Override user is required", "VALIDATION_ERROR"));
+        return;
+      }
+
+      const review = await deps.db.queryOne<any>(
+        "SELECT * FROM pr_reviews WHERE id = $1",
+        [id]
+      );
+
+      if (!review) {
+        res.status(404).json(errorResponse("PR review not found", "NOT_FOUND"));
+        return;
+      }
+
+      const updatedReview = await deps.db.queryOne<any>(
+        `UPDATE pr_reviews
+         SET merge_blocked = false,
+             override_user = $2,
+             override_reason = $3,
+             override_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [id, req.body.user, req.body.reason]
+      );
+
+      res.json({
+        success: true,
+        review: updatedReview,
+      });
+    })
+  );
+
+  /**
+   * POST /api/pr-reviews/:id/manual-review - Submit a manual review
+   */
+  app.post(
+    "/api/pr-reviews/:id/manual-review",
+    asyncHandler(async (req, res) => {
+      const { id } = req.params;
+
+      if (!["approve", "reject"].includes(req.body.action)) {
+        res.status(400).json(errorResponse("Action must be 'approve' or 'reject'", "VALIDATION_ERROR"));
+        return;
+      }
+
+      if (typeof req.body.comment !== "string" || req.body.comment.length === 0) {
+        res.status(400).json(errorResponse("Comment is required", "VALIDATION_ERROR"));
+        return;
+      }
+
+      if (typeof req.body.reviewer !== "string" || req.body.reviewer.length === 0) {
+        res.status(400).json(errorResponse("Reviewer is required", "VALIDATION_ERROR"));
+        return;
+      }
+
+      const review = await deps.db.queryOne<any>(
+        "SELECT * FROM pr_reviews WHERE id = $1",
+        [id]
+      );
+
+      if (!review) {
+        res.status(404).json(errorResponse("PR review not found", "NOT_FOUND"));
+        return;
+      }
+
+      // Create or update manual review check
+      const checkStatus = req.body.action === "approve" ? "success" : "failure";
+      const checkName = "manual-review";
+
+      const existingCheck = await deps.db.queryOne<any>(
+        "SELECT * FROM pr_review_checks WHERE review_id = $1 AND check_name = $2",
+        [id, checkName]
+      );
+
+      let check;
+      if (existingCheck) {
+        check = await deps.db.queryOne<any>(
+          `UPDATE pr_review_checks
+           SET status = $3,
+               summary = $4,
+               details = $5,
+               completed_at = NOW(),
+               metadata = jsonb_set(metadata, '{reviewer}', to_jsonb($6::text))
+           WHERE id = $1 AND review_id = $2
+           RETURNING *`,
+          [existingCheck.id, id, checkStatus, `Manual review: ${req.body.action}`, req.body.comment, req.body.reviewer]
+        );
+      } else {
+        check = await deps.db.queryOne<any>(
+          `INSERT INTO pr_review_checks
+           (id, review_id, check_name, check_type, status, required, summary, details, error_count, warning_count, started_at, completed_at, metadata)
+           VALUES (gen_random_uuid(), $1, $2, 'manual', $3, true, $4, $5, 0, 0, NOW(), NOW(), jsonb_build_object('reviewer', $6))
+           RETURNING *`,
+          [id, checkName, checkStatus, `Manual review: ${req.body.action}`, req.body.comment, req.body.reviewer]
+        );
+      }
+
+      // Update review merge_blocked status based on all checks
+      const allChecks = await deps.db.query<any>(
+        "SELECT * FROM pr_review_checks WHERE review_id = $1 AND required = true",
+        [id]
+      );
+
+      const anyFailed = allChecks.some((c: any) => c.status === "failure" || c.status === "error");
+      const anyPending = allChecks.some((c: any) => c.status === "pending" || c.status === "running");
+
+      const mergeBlocked = anyFailed || anyPending;
+
+      await deps.db.execute(
+        `UPDATE pr_reviews
+         SET merge_blocked = $2,
+             status = CASE
+               WHEN $3 THEN 'failed'
+               WHEN $4 THEN 'running'
+               ELSE 'completed'
+             END,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [id, mergeBlocked, anyFailed, anyPending]
+      );
+
+      const updatedReview = await deps.db.queryOne<any>(
+        "SELECT * FROM pr_reviews WHERE id = $1",
+        [id]
+      );
+
+      res.json({
+        success: true,
+        review: updatedReview,
+        check,
+      });
     })
   );
 

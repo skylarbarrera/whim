@@ -353,6 +353,37 @@ export interface ListReviewsRequest {
 
 export interface OverrideReviewRequest {
   reason: string;
+  user: string;
+}
+
+export interface ManualReviewRequest {
+  action: "approve" | "reject";
+  comment: string;
+  reviewer: string;
+}
+
+// PR Review API Responses
+
+export interface ListReviewsResponse {
+  reviews: PRReview[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface ReviewDetailResponse {
+  review: PRReview;
+  checks: PRReviewCheck[];
+}
+
+export interface OverrideReviewResponse {
+  success: boolean;
+  review: PRReview;
+}
+
+export interface ManualReviewResponse {
+  success: boolean;
+  review: PRReview;
+  check: PRReviewCheck;
 }
 
 // Error Response
