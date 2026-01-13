@@ -174,3 +174,89 @@
 - Uses Database.transaction() for getNext to ensure atomicity
 - QueueStatsResponse matches @factory/shared types
 - First of 5 core components in Phase 4.3
+
+---
+
+## Session 7 - 2025-01-12
+
+### Task: Phase 4.3 - RateLimiter (Core Components)
+
+**Commit:** 276d246
+
+**Files Created:**
+- `packages/orchestrator/src/rate-limits.ts` - RateLimiter class
+- `packages/orchestrator/src/rate-limits.test.ts` - Unit tests
+
+**RateLimiter Methods:**
+1. `canSpawnWorker()` - Check if spawn allowed (capacity, cooldown, budget)
+2. `recordSpawn()` - Record worker spawn
+3. `recordWorkerDone()` - Record worker completion
+4. `recordIteration()` - Record iteration for daily budget
+5. `checkDailyReset()` - Reset daily limits at midnight
+6. `getStatus()` - Get current rate limit status
+
+**Features:**
+- Redis-backed state for distributed operation
+- Configurable max workers, daily budget, cooldown
+- Auto-resets daily iteration count at midnight
+- Environment variable configuration
+
+---
+
+## Session 8 - 2025-01-12
+
+### Task: Phase 4.3 - ConflictDetector (Core Components)
+
+**Commit:** d16b10c
+
+**Files Created:**
+- `packages/orchestrator/src/conflicts.ts` - ConflictDetector class
+- `packages/orchestrator/src/conflicts.test.ts` - Unit tests
+
+**ConflictDetector Methods:**
+1. `acquireLocks(workerId, files)` - Acquire file locks (atomic)
+2. `releaseLocks(workerId, files)` - Release specific locks
+3. `releaseAllLocks(workerId)` - Release all locks for worker
+4. `getLocksForWorker(workerId)` - Get all locks held by worker
+5. `getLockHolder(filePath)` - Get worker holding a lock
+
+**Features:**
+- PostgreSQL-backed with UNIQUE constraint for exclusivity
+- Idempotent lock acquisition (re-acquiring own lock succeeds)
+- Partial success on multi-file locks (returns acquired/blocked)
+- Handles race conditions gracefully via unique constraint violation
+
+---
+
+## Session 9 - 2025-01-12
+
+### Task: Phase 4.3 - WorkerManager (Core Components)
+
+**Commit:** 5959d3b
+
+**Files Created:**
+- `packages/orchestrator/src/workers.ts` - WorkerManager class
+- `packages/orchestrator/src/workers.test.ts` - Unit tests (26 tests)
+
+**WorkerManager Methods:**
+1. `hasCapacity()` - Check if can spawn (delegates to RateLimiter)
+2. `spawn(workItem)` - Spawn Docker container, create worker record
+3. `register(workItemId)` - Worker self-registration, returns worker/workItem
+4. `heartbeat(workerId, data)` - Update heartbeat timestamp and iteration
+5. `complete(workerId, data)` - Handle completion, release locks, record metrics
+6. `fail(workerId, error, iteration)` - Handle failure, release locks
+7. `stuck(workerId, reason, attempts)` - Handle stuck state
+8. `healthCheck()` - Find stale workers (no heartbeat in N seconds)
+9. `kill(workerId, reason)` - Kill worker container, cleanup
+10. `list()` - List all workers ordered by started_at
+11. `getStats()` - Get statistics by status, avg iterations/duration
+
+**Features:**
+- Integrates with Database, RateLimiter, ConflictDetector, Docker
+- Configurable stale threshold (default 60s)
+- Proper cleanup on completion/failure/kill (lock release, rate limiter update)
+- Graceful handling of missing containers
+
+**Notes:**
+- Fourth of 5 core components in Phase 4.3
+- Next: MetricsCollector

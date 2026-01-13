@@ -83,7 +83,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - `releaseLocks(workerId, files)` - release specific locks
   - `releaseAllLocks(workerId)` - release all locks for worker
 
-- [ ] Create `packages/orchestrator/src/workers.ts` - WorkerManager class:
+- [x] Create `packages/orchestrator/src/workers.ts` - WorkerManager class:
   - `hasCapacity()` - check if can spawn
   - `spawn(workItem)` - spawn Docker container
   - `register(workItemId)` - worker self-registration
