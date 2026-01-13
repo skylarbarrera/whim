@@ -1,77 +1,55 @@
-# Task 2: Implement Interactive Spec Creation Flow
+# Plan: Design Composable PR Review System Architecture
 
 ## Goal
-Implement a user interface for spec creation through guided questioning, allowing users to manually create specifications through an interactive process.
+Design the architecture for a composable PR review system that can handle AI-generated PRs with automated lint and testing hooks. This includes defining interfaces, plugin system, and configuration schema.
 
-## Current State
-- Ralph v0.3.0 already includes `/create-spec` skill for interactive spec creation
-- This skill uses LLM-powered interview and review process
-- Skill is available in Claude Code CLI
-- Documentation exists in Ralph repository
-- No integration with factory system yet
+## Sub-tasks from SPEC
+- Define review step interfaces and contracts
+- Create plugin system for custom review steps
+- Design configuration schema for review workflows
 
-## Implementation Approach
+## Approach
 
-### Option 1: Expose Ralph's /create-spec skill via API
-- Add new API endpoint to orchestrator: POST /api/spec/interactive
-- Endpoint spawns a Claude Code session with /create-spec skill
-- Captures Q&A interaction and returns generated spec
-- Challenges: Complex to stream Q&A through HTTP API
+### 1. Review Step Interfaces
+Create TypeScript interfaces for:
+- `ReviewStep`: Base interface for all review steps (lint, test, custom)
+- `ReviewStepResult`: Standard result format with status, messages, errors
+- `ReviewContext`: Shared context passed to each step (PR metadata, files changed, etc.)
+- `ReviewStepConfig`: Configuration for individual steps
 
-### Option 2: CLI-based interactive workflow (RECOMMENDED)
-- Document how users can run `/create-spec` skill locally
-- User runs `claude` CLI with `/create-spec` in their repo
-- Generated SPEC.md can be submitted to factory via existing API
-- Simpler, leverages existing Ralph tooling
-- No factory code changes needed
+### 2. Plugin System
+Design a plugin architecture that allows:
+- Dynamic loading of review steps
+- Step registration and discovery
+- Step lifecycle hooks (initialize, execute, cleanup)
+- Step dependencies and ordering
 
-### Option 3: Wrapper script for local usage
-- Create `scripts/create-spec.sh` wrapper
-- Script runs Claude CLI with appropriate settings
-- Guides user through the interview process
-- Outputs SPEC.md that can be submitted to factory
-- Provides better UX than raw CLI
-
-## Recommendation: Option 3 (Wrapper Script)
-
-This approach:
-- Leverages Ralph's existing `/create-spec` skill
-- Provides simple UX without complex API streaming
-- Works with local repos before submission to factory
-- Maintains separation between spec creation and execution
-- Easy to document and use
-
-## Implementation Plan
-
-### 1. Create wrapper script
-- `scripts/create-spec.sh` - Bash script for interactive spec creation
-- Checks prerequisites (Claude CLI installed)
-- Validates repo context
-- Runs Claude CLI with /create-spec skill
-- Saves SPEC.md to specified location
-
-### 2. Add configuration
-- `.env.example` - Add any needed config vars
-- Document ANTHROPIC_API_KEY requirement
-
-### 3. Update documentation
-- README.md - Add section on interactive spec creation
-- Document the workflow: create spec → submit to factory
-- Add examples and screenshots if possible
-
-### 4. Test the workflow
-- Run the script manually
-- Verify SPEC.md generation
-- Ensure it works with factory submission
+### 3. Configuration Schema
+Create YAML/JSON schema for:
+- Workflow definitions (steps, order, parallel vs sequential)
+- Repository-specific overrides
+- Environment-specific rules
+- Step-specific configurations
 
 ## Files to Create/Modify
-- `scripts/create-spec.sh` (NEW) - Interactive spec creation wrapper
-- `README.md` - Document interactive workflow
-- `.env.example` - Add ANTHROPIC_API_KEY if not present
+- `packages/review-system/` - New package
+- `packages/review-system/src/types/review-step.ts` - Core interfaces
+- `packages/review-system/src/types/review-context.ts` - Context types
+- `packages/review-system/src/types/review-result.ts` - Result types
+- `packages/review-system/src/types/config.ts` - Configuration schema
+- `packages/review-system/src/plugin/registry.ts` - Plugin registry
+- `packages/review-system/package.json` - Package definition
+- `packages/review-system/tsconfig.json` - TypeScript config
+
+## Tests
+- Unit tests for type definitions
+- Schema validation tests
+- Plugin registry tests
 
 ## Exit Criteria
-- [ ] Wrapper script created and executable
-- [ ] Script checks prerequisites and provides helpful errors
-- [ ] Documentation explains interactive workflow
-- [ ] Users can create specs interactively and submit to factory
-- [ ] Integration with existing factory submission API confirmed
+- [ ] All TypeScript interfaces defined with JSDoc
+- [ ] Plugin registry skeleton implemented
+- [ ] Configuration schema documented and typed
+- [ ] Package builds without errors (`bun run build`)
+- [ ] Tests pass (`bun test`)
+- [ ] Files committed to git
