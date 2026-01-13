@@ -1,0 +1,60 @@
+# Factory Orchestrator Dockerfile
+# Multi-stage build using Bun for consistency with monorepo
+
+# =============================================================================
+# Stage 1: Builder
+# =============================================================================
+FROM oven/bun:1 AS builder
+
+WORKDIR /app
+
+# Copy root package files
+COPY package.json bun.lock turbo.json ./
+
+# Copy workspace packages
+COPY packages/shared ./packages/shared
+COPY packages/orchestrator ./packages/orchestrator
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Build all packages (shared first, then orchestrator)
+RUN bun run build
+
+# =============================================================================
+# Stage 2: Production
+# =============================================================================
+FROM oven/bun:1-slim
+
+WORKDIR /app
+
+# Install only production dependencies
+COPY package.json bun.lock ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/orchestrator/package.json ./packages/orchestrator/
+
+# Copy built artifacts
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/orchestrator/dist ./packages/orchestrator/dist
+
+# Install production dependencies only
+RUN bun install --frozen-lockfile --production
+
+# Set working directory to orchestrator package
+WORKDIR /app/packages/orchestrator
+
+# Environment variables with defaults
+ENV PORT=3000
+ENV LOOP_INTERVAL_MS=5000
+ENV DATABASE_URL=postgres://factory:factory@postgres:5432/factory
+ENV REDIS_URL=redis://redis:6379
+
+# Expose the API port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Run the orchestrator
+CMD ["bun", "run", "dist/index.js"]

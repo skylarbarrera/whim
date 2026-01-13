@@ -1,60 +1,110 @@
-# Plan: Phase 4.4 - API Server
+# Plan: Phase 4.5 - Orchestrator Entry Point and Dockerfile
 
 ## Goal
-Create `packages/orchestrator/src/server.ts` with Express API server implementing all orchestrator endpoints.
+
+Complete the orchestrator package by implementing:
+1. `src/index.ts` - Entry point that initializes all components and runs the main loop
+2. `Dockerfile` - Container build for the orchestrator service
 
 ## Files to Create/Modify
-- **Create**: `packages/orchestrator/src/server.ts` - Express API server with all endpoints
-- **Create**: `packages/orchestrator/src/server.test.ts` - Unit tests for server
 
-## API Endpoints (from SPEC.md)
+### src/index.ts - Entry Point
 
-### Work Item Routes
-- POST `/api/work` - add work item (uses QueueManager.add)
-- GET `/api/work/:id` - get work item (uses QueueManager.get)
-- POST `/api/work/:id/cancel` - cancel work item (uses QueueManager.cancel)
+**Responsibilities:**
+- Initialize Database and Redis clients
+- Create all component instances (QueueManager, RateLimiter, ConflictDetector, WorkerManager, MetricsCollector)
+- Create and start the Express server
+- Run main loop with:
+  - Check for worker capacity
+  - Get next queued work item
+  - Spawn workers for available items
+  - Run health checks on existing workers
+  - Sleep between iterations
 
-### Worker Routes
-- POST `/api/worker/register` - worker registration (uses WorkerManager.register)
-- POST `/api/worker/:id/heartbeat` - worker heartbeat (uses WorkerManager.heartbeat)
-- POST `/api/worker/:id/lock` - request file locks (uses ConflictDetector.acquireLocks)
-- POST `/api/worker/:id/unlock` - release file locks (uses ConflictDetector.releaseLocks)
-- POST `/api/worker/:id/complete` - worker completed (uses WorkerManager.complete)
-- POST `/api/worker/:id/fail` - worker failed (uses WorkerManager.fail)
-- POST `/api/worker/:id/stuck` - worker stuck (uses WorkerManager.stuck)
+**Structure:**
+```typescript
+// Configuration from environment
+const config = {
+  port: process.env.PORT ?? 3000,
+  loopIntervalMs: parseInt(process.env.LOOP_INTERVAL_MS ?? "5000", 10),
+};
 
-### Management Routes
-- GET `/api/status` - overall status (uses RateLimiter.getStatus + QueueManager.list)
-- GET `/api/workers` - list workers (uses WorkerManager.list)
-- POST `/api/workers/:id/kill` - kill worker (uses WorkerManager.kill)
-- GET `/api/queue` - queue contents (uses QueueManager.list + QueueManager.getStats)
-- GET `/api/metrics` - metrics (uses MetricsCollector.getSummary)
-- GET `/api/learnings` - learnings (uses MetricsCollector.getLearnings)
+// Initialize clients
+const db = createDatabase();
+const redis = createRedisClient();
 
-## Implementation Details
+// Initialize components
+const queue = new QueueManager(db);
+const rateLimiter = new RateLimiter(redis);
+const conflicts = new ConflictDetector(db);
+const docker = new Docker();
+const workers = new WorkerManager(db, rateLimiter, conflicts, docker);
+const metrics = new MetricsCollector(db);
 
-### Server Factory Pattern
-Export `createServer` function that takes dependencies (QueueManager, WorkerManager, etc.) and returns Express app. This enables testing with mocks.
+// Create server
+const app = createServer({ queue, workers, conflicts, rateLimiter, metrics });
 
-### Request Validation
-Use type guards to validate request bodies against shared types.
+// Main loop
+async function runMainLoop() {
+  while (true) {
+    // 1. Check for stale workers
+    const stale = await workers.healthCheck();
+    for (const w of stale) await workers.kill(w.id, "heartbeat timeout");
 
-### Error Handling
-- Wrap all handlers in try/catch
-- Return consistent error format using ErrorResponse type
-- Use appropriate HTTP status codes
+    // 2. Check capacity and spawn workers for queued items
+    while (await workers.hasCapacity()) {
+      const workItem = await queue.getNext();
+      if (!workItem) break;
+      await workers.spawn(workItem);
+    }
 
-### Response Format
-- Success: Return appropriate response type from @factory/shared
-- Error: Return ErrorResponse with `{ error, code?, details? }`
+    // 3. Sleep
+    await sleep(config.loopIntervalMs);
+  }
+}
+
+// Start
+async function main() {
+  await db.connect();
+  await redis.connect();
+  app.listen(config.port, () => console.log(`Orchestrator listening on :${config.port}`));
+  runMainLoop().catch(console.error);
+}
+
+main().catch(console.error);
+```
+
+### Dockerfile
+
+Based on Bun runtime for consistency with monorepo:
+```dockerfile
+FROM oven/bun:1 AS builder
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY packages/shared ./packages/shared
+COPY packages/orchestrator ./packages/orchestrator
+RUN bun install --frozen-lockfile
+RUN bun run build --filter=@factory/orchestrator
+
+FROM oven/bun:1
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/orchestrator/dist ./packages/orchestrator/dist
+COPY --from=builder /app/packages/orchestrator/package.json ./packages/orchestrator/
+WORKDIR /app/packages/orchestrator
+CMD ["bun", "run", "start"]
+```
 
 ## Tests
-- Unit tests with mocked dependencies
-- Test each endpoint's happy path
-- Test error handling (validation errors, not found, etc.)
+
+No new tests needed for index.ts (integration-level, tested via docker-compose in Phase 10).
 
 ## Exit Criteria
-- [ ] server.ts compiles without errors
-- [ ] All 16 endpoints implemented
-- [ ] Tests pass for key endpoints
-- [ ] Type check passes
+
+- [ ] `src/index.ts` initializes DB, Redis, all components, starts server, runs main loop
+- [ ] `Dockerfile` builds and runs the orchestrator
+- [ ] `bun run build` succeeds
+- [ ] `bun run typecheck` succeeds
+- [ ] Existing tests still pass
