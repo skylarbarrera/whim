@@ -1,149 +1,81 @@
-# Plan: Build Lint Integration
+# Iteration 1: Build Testing Integration
 
 ## Goal
-Implement lint checking integration for the PR review system, including configurable lint rules, result reporting, and blocking mechanisms.
+Implement test integration for the PR review system, following the same composable pattern established with the lint integration. This includes test runner infrastructure, test check implementation, configuration support, and blocking mechanism integration.
 
-## Context
-Phases 1 and 2 are complete:
-- Phase 1: PR review system architecture designed
-- Phase 2: Core PR review functionality implemented (detector, tracker, aggregator, service)
-
-Now we need to implement lint integration (Phase 3):
-1. Set up pre-commit lint hooks
-2. Configure lint rules and standards
-3. Implement lint result reporting
-4. Add lint failure blocking mechanism
-
-## Approach
-
-### 1. Define Base Check Interface
-Create abstraction for all check types:
-- `BaseCheck` abstract class with standard interface
-- `run()`: Execute the check
-- `getName()`: Return check name
-- `isRequired()`: Check if required or optional
-- `timeout`: Maximum execution time
-
-### 2. Implement LintRunner
-Low-level lint execution:
-- Support ESLint, Prettier, Biome
-- Execute lint commands via child_process
-- Parse lint output (JSON for ESLint, text for others)
-- Handle timeouts and errors
-- Return structured violations
-
-### 3. Implement LintCheck
-High-level check orchestration:
-- Extends BaseCheck
-- Uses LintRunner to execute lints
-- Converts violations to CheckResult
-- Configurable via pr-review.yml
-- Supports multiple lint tools
-- Respects failureThreshold
-
-### 4. Configuration System
-Load configuration from `.ai/pr-review.yml`:
-```yaml
-lint:
-  enabled: true
-  required: true
-  timeout: 60000
-  tools:
-    - name: eslint
-      command: "npx eslint . --format json"
-      enabled: true
-    - name: prettier
-      command: "npx prettier --check ."
-      enabled: true
-  failureThreshold: 0  # 0 = any violation fails
-```
-
-### 5. Result Reporting
-Map lint violations to CheckResult:
-- status: "success" | "failure" | "error"
-- summary: Human-readable message
-- details: Full violation list with file/line/rule
-- startedAt, completedAt timestamps
-- Store in pr_review_checks table via ReviewTracker
-
-### 6. Blocking Mechanism
-- LintCheck returns failure if violations >= threshold
-- ResultAggregator uses failure to block merge (already implemented)
-- Override mechanism available (already implemented)
-
-## Files to Create
-
-### Core Implementation
-- `packages/pr-review/src/checks/base-check.ts` - Base interface
-- `packages/pr-review/src/checks/lint-check.ts` - LintCheck implementation
-- `packages/pr-review/src/checks/index.ts` - Export all checks
-- `packages/pr-review/src/lint-runner.ts` - Execute lint tools
-- `packages/pr-review/src/config.ts` - Load pr-review.yml
-
-### Configuration
-- `.ai/pr-review.example.yml` - Example configuration
-
-### Tests
-- `packages/pr-review/tests/base-check.test.ts` - Base class tests
-- `packages/pr-review/tests/lint-runner.test.ts` - Lint execution tests
-- `packages/pr-review/tests/lint-check.test.ts` - LintCheck tests
-- `packages/pr-review/tests/config.test.ts` - Config loading tests
-
-## Files to Modify
-- `packages/pr-review/src/service.ts` - Integrate LintCheck
-- `packages/pr-review/package.json` - Add yaml parser, lint tools as devDeps
+## Files to Create/Modify
+- `packages/pr-review/src/checks/test-runner.ts` - Test execution infrastructure
+- `packages/pr-review/src/checks/test-check.ts` - TestCheck class extending BaseCheck
+- `packages/pr-review/src/config.ts` - Add test configuration types and defaults
+- `packages/pr-review/example.pr-review.yml` - Update with test configuration examples
+- `packages/pr-review/tests/test-runner.test.ts` - Unit tests for test runner
+- `packages/pr-review/tests/test-check.test.ts` - Unit tests for TestCheck
+- `packages/pr-review/tests/config.test.ts` - Update with test config tests
+- `packages/pr-review/src/index.ts` - Export TestCheck
 
 ## Implementation Steps
 
-1. **Base Check Interface** (30 min)
-   - Define abstract class
-   - Document interface contract
-   - Add CheckResult type to shared if needed
+1. **Create TestRunner** (similar to LintRunner)
+   - Support multiple test frameworks (Jest, Vitest, Bun test, npm test)
+   - Parse test output for all supported frameworks
+   - Extract test counts (passed, failed, skipped)
+   - Collect failure details (test names, error messages, stack traces)
+   - Handle timeouts gracefully
+   - Return structured TestRunResult
 
-2. **Configuration Loader** (30 min)
-   - Install yaml parser
-   - Implement loadConfig()
-   - Default config if file missing
-   - Validate config schema
+2. **Create TestCheck** (extending BaseCheck)
+   - Configure test commands via YAML
+   - Execute tests using TestRunner
+   - Aggregate results from multiple test commands
+   - Generate human-readable summaries
+   - Store results via ReviewTracker
+   - Support failure thresholds (e.g., allow skipped tests)
 
-3. **LintRunner** (1 hour)
-   - Implement ESLint JSON parsing
-   - Implement Prettier text parsing
-   - Add timeout handling
-   - Error handling for missing tools
+3. **Update Configuration System**
+   - Add TestConfig interface
+   - Add test command configuration
+   - Add timeout and threshold settings
+   - Update example YAML with test section
+   - Deep merge test config with defaults
 
-4. **LintCheck** (1 hour)
-   - Extend BaseCheck
-   - Load configuration
-   - Use LintRunner
-   - Format results
-   - Handle disabled state
+4. **Integration with ReviewService**
+   - TestCheck is already composable via runCheck() method
+   - No changes needed to service - design is composable
 
-5. **Integration** (30 min)
-   - Add LintCheck to ReviewService
-   - Wire up configuration
-   - Test end-to-end flow
+5. **Add Comprehensive Tests**
+   - TestRunner: parsing for each framework, timeout handling
+   - TestCheck: success/failure scenarios, threshold logic
+   - Config: test configuration loading and merging
 
-6. **Testing** (1.5 hours)
-   - Mock child_process.spawn
-   - Test all lint tools
-   - Test error cases
-   - Test configuration loading
+## Test Strategy
+- Unit tests for TestRunner with mocked child_process
+- Unit tests for TestCheck with mocked TestRunner
+- Test all supported test framework output formats
+- Verify configuration loading and merging
+- Verify failure blocking mechanism via ResultAggregator
 
 ## Exit Criteria
-- [ ] BaseCheck abstract class defined
-- [ ] Configuration loads from .ai/pr-review.yml
-- [ ] LintRunner executes ESLint and Prettier
-- [ ] LintCheck implements BaseCheck interface
-- [ ] Violations reported in structured format
-- [ ] Merge blocked when violations >= threshold
-- [ ] 25+ unit tests passing
-- [ ] Package builds with `bun run build`
-- [ ] Types compile with no errors
+- [ ] TestRunner created and handles Jest, Vitest, Bun test, npm test
+- [ ] TestCheck extends BaseCheck and integrates with ReviewTracker
+- [ ] Configuration system supports test commands and settings
+- [ ] Example YAML updated with test configuration
+- [ ] 20+ unit tests added covering all scenarios
+- [ ] All tests pass with `bun test`
+- [ ] Package builds successfully with `bun run build`
+- [ ] All 4 sub-bullets in SPEC.md completed
 
-## Notes
-- Don't actually run lint tools in tests; mock the execution
-- Use child_process.spawn with timeout support
-- ESLint provides JSON output; Prettier outputs text
-- Consider Biome as future enhancement
-- Autofix capability out of scope for now
+## Integration Points
+- Uses BaseCheck (already exists)
+- Uses ReviewTracker (already exists)
+- Uses ResultAggregator (already exists, handles blocking)
+- Uses ConfigLoader (already exists)
+- Follows exact same pattern as LintCheck
+
+## Technical Notes
+- Reuse patterns from existing LintRunner and LintCheck
+- Test output parsing needs to handle different formats
+- Jest: JSON reporter, TAP format, or default format
+- Vitest: JSON reporter or default format
+- Bun test: Default format
+- npm test: Delegates to package.json test script
+- Timeout should be longer for tests (default 5 minutes vs 2 minutes for lint)

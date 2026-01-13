@@ -7,12 +7,16 @@ export { ReviewService, type CheckConfig, type ServiceConfig } from './service.j
 // Check modules
 export { BaseCheck, type CheckConfig as BaseCheckConfig } from './checks/base-check.js';
 export { LintCheck } from './checks/lint-check.js';
+export { TestCheck } from './checks/test-check.js';
 
 // Configuration
 export { loadConfig, getLintConfig, getTestConfig, type PRReviewConfig, type LintConfig, type TestConfig, type LintToolConfig } from './config.js';
 
 // Lint runner
 export { runLintTool, runLintTools, type LintResult } from './lint-runner.js';
+
+// Test runner
+export { runTests, parseTestOutput, type TestResult, type TestStats, type TestFailure } from './test-runner.js';
 
 // Re-export types from shared
 export type {

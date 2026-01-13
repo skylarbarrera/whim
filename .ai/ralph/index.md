@@ -1569,3 +1569,93 @@ This integration provides:
 - Tests use bun:test mocking (not runnable without bun)
 - Configuration is flexible and extensible
 - Ready for Phase 4: Build testing integration
+
+---
+
+## Session 33 - 2026-01-13
+
+### Task: Build Testing Integration
+
+**Files Created:**
+- `packages/pr-review/src/test-runner.ts` - Test execution infrastructure (508 lines)
+- `packages/pr-review/src/checks/test-check.ts` - TestCheck class extending BaseCheck (210 lines)
+- `packages/pr-review/example.pr-review.yml` - Example configuration with test section
+- `packages/pr-review/tests/test-runner.test.ts` - 30 tests for test output parsing
+- `packages/pr-review/tests/test-check.test.ts` - 10 tests for TestCheck class
+
+**Files Modified:**
+- `packages/pr-review/src/config.ts` - Already had TestConfig (no changes needed)
+- `packages/pr-review/src/index.ts` - Added exports for TestCheck and test-runner
+- `packages/pr-review/tests/config.test.ts` - Added 3 tests for test config loading
+
+**Implementation Details:**
+
+1. **TestRunner** (src/test-runner.ts):
+   - `runTests(command, workdir, timeout)` - Execute test command
+   - `parseTestOutput(stdout, stderr)` - Parse test output for statistics
+   - Supports multiple frameworks:
+     - Jest: text format ("Tests: N passed, M total") and JSON reporter
+     - Vitest: text format ("Test Files N passed | M failed") and JSON
+     - Bun test: text format ("N pass, M fail")
+     - Generic: keyword-based parsing ("passed: N", "failed: M")
+   - Extracts TestStats: total, passed, failed, skipped, passPercentage
+   - Collects TestFailure details: name, message, stack, file, line
+   - Handles timeouts with graceful termination
+   - Error handling for spawn failures and parsing errors
+
+2. **TestCheck** (src/checks/test-check.ts):
+   - Extends BaseCheck with standardized interface
+   - Configurable via TestConfig from YAML
+   - Executes tests using runTests()
+   - Validates pass percentage against minPassPercentage threshold
+   - Generates human-readable summaries:
+     - "N tests passed" (all passing)
+     - "N tests failed, M passed (X% pass rate)" (with failures)
+   - Detailed reports with:
+     - Exit code and status
+     - Statistics table
+     - Failed test details with names, messages, stacks
+     - Error output (stderr) when present
+     - Truncated stdout for context
+   - Returns CheckResult with status, summary, details, metadata
+
+3. **Configuration** (already in config.ts):
+   - TestConfig interface: command, minPassPercentage (0-100)
+   - Default: npm test, 100% pass required, 5 minute timeout
+   - Loaded from .ai/pr-review.yml with deep merge
+   - Example YAML includes test section with comments
+
+4. **Tests**:
+   - test-runner.test.ts: 30 tests covering:
+     - Jest text/JSON parsing
+     - Vitest text/JSON parsing
+     - Bun test format
+     - Generic keyword-based parsing
+     - Error handling and edge cases
+     - Pass percentage calculations
+   - test-check.test.ts: 10 tests covering:
+     - Success/failure scenarios
+     - Threshold validation
+     - Disabled check handling
+     - Metadata and reporting
+   - config.test.ts: +3 tests for test config loading
+   - Total: 43 new tests (54 total in package)
+
+**Integration:**
+- TestCheck uses BaseCheck infrastructure (timeout, enable/disable)
+- ReviewTracker stores test results in pr_review_checks table
+- ResultAggregator determines merge blocked status from test failures
+- Composable design: add TestCheck to ReviewService checks list
+
+**TypeScript Fixes:**
+- Added null checks for regex match groups (match[1], match[4], etc.)
+- Ensures all parseInt() calls have validated string inputs
+- Package builds cleanly with no type errors
+
+**Notes:**
+- All 4 sub-bullets completed in single iteration
+- Follows exact same pattern as LintCheck for consistency
+- Test parsing is flexible and supports unknown test runners
+- Default timeout is 5 minutes (vs 60s for lint)
+- Ready for Phase 5: Create merge blocking system
+

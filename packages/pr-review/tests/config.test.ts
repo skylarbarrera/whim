@@ -110,4 +110,59 @@ lint:
     expect(config.tools[0].name).toBe("custom-linter");
     expect(config.tools[0].command).toBe("custom lint --strict");
   });
+
+  it("should load custom test config", () => {
+    const configContent = `
+test:
+  enabled: false
+  timeout: 600000
+  command: "bun test"
+  minPassPercentage: 90
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = getTestConfig(tempDir);
+
+    expect(config.enabled).toBe(false);
+    expect(config.timeout).toBe(600000);
+    expect(config.command).toBe("bun test");
+    expect(config.minPassPercentage).toBe(90);
+  });
+
+  it("should merge custom test config with defaults", () => {
+    const configContent = `
+test:
+  command: "npx vitest run"
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = getTestConfig(tempDir);
+
+    // User override
+    expect(config.command).toBe("npx vitest run");
+
+    // Default values
+    expect(config.enabled).toBe(true);
+    expect(config.required).toBe(true);
+    expect(config.timeout).toBe(300000);
+    expect(config.minPassPercentage).toBe(100);
+  });
+
+  it("should load both lint and test config simultaneously", () => {
+    const configContent = `
+lint:
+  enabled: false
+test:
+  enabled: false
+`;
+
+    fs.writeFileSync(path.join(tempDir, ".ai", "pr-review.yml"), configContent);
+
+    const config = loadConfig(tempDir);
+
+    expect(config.lint?.enabled).toBe(false);
+    expect(config.test?.enabled).toBe(false);
+  });
 });
