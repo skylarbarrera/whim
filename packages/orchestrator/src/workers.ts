@@ -195,6 +195,10 @@ export class WorkerManager {
    * @param data - Heartbeat data including iteration and optional metrics
    */
   async heartbeat(workerId: string, data: WorkerHeartbeatRequest): Promise<void> {
+    // Get current iteration to check if it increased
+    const worker = await this.db.getWorker(workerId);
+    const previousIteration = worker?.iteration ?? 0;
+
     const result = await this.db.execute(
       `UPDATE workers
        SET last_heartbeat = NOW(), iteration = $2, status = 'running'
@@ -206,8 +210,10 @@ export class WorkerManager {
       throw new Error(`Worker not found or not active: ${workerId}`);
     }
 
-    // Record iteration with rate limiter
-    await this.rateLimiter.recordIteration();
+    // Only record iteration when it actually increases (not on every heartbeat)
+    if (data.iteration > previousIteration) {
+      await this.rateLimiter.recordIteration();
+    }
   }
 
   /**
