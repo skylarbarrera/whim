@@ -52,236 +52,112 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 4: Orchestrator Package (`packages/orchestrator`)
 
-### 4.1 Setup
-- [x] Create `packages/orchestrator/package.json` with name `@factory/orchestrator`
-- [x] Create `packages/orchestrator/tsconfig.json`
-- [x] Add dependencies: express, pg, ioredis, dockerode, uuid
+- [x] Setup package (package.json, tsconfig.json, dependencies: express, pg, ioredis, dockerode, uuid)
 
-### 4.2 Database & Redis Clients
-- [x] Create `packages/orchestrator/src/db.ts` - PostgreSQL client wrapper
-- [x] Create `packages/orchestrator/src/redis.ts` - Redis client wrapper
+- [x] Create database and Redis clients
+  - `src/db.ts` - PostgreSQL client wrapper
+  - `src/redis.ts` - Redis client wrapper
 
-### 4.3 Core Components
-- [x] Create `packages/orchestrator/src/queue.ts` - QueueManager class:
-  - `add(input)` - add work item to queue
-  - `get(id)` - get work item by ID
-  - `getNext()` - get highest priority queued item (with row locking)
-  - `cancel(id)` - cancel work item
-  - `list()` - list active work items
-  - `getStats()` - get queue statistics
+- [x] Implement core components
+  - `src/queue.ts` - QueueManager class (add, get, getNext, cancel, list, getStats)
+  - `src/rate-limits.ts` - RateLimiter class (canSpawnWorker, recordSpawn, recordWorkerDone, recordIteration, checkDailyReset, getStatus)
+  - `src/conflicts.ts` - ConflictDetector class (acquireLocks, releaseLocks, releaseAllLocks)
+  - `src/workers.ts` - WorkerManager class (hasCapacity, spawn, register, heartbeat, complete, fail, stuck, healthCheck, kill, list, getStats)
+  - `src/metrics.ts` - MetricsCollector class (getSummary, getAll, getLearnings)
 
-- [x] Create `packages/orchestrator/src/rate-limits.ts` - RateLimiter class:
-  - `canSpawnWorker()` - check if spawn allowed
-  - `recordSpawn()` - record worker spawn
-  - `recordWorkerDone()` - record worker completion
-  - `recordIteration()` - record iteration for daily budget
-  - `checkDailyReset()` - reset daily limits at midnight
-  - `getStatus()` - get current rate limit status
+- [x] Create API server (`src/server.ts`) with all endpoints:
+  - Work items: POST /api/work, GET /api/work/:id, POST /api/work/:id/cancel
+  - Worker lifecycle: POST /api/worker/register, POST /api/worker/:id/heartbeat, POST /api/worker/:id/complete, POST /api/worker/:id/fail, POST /api/worker/:id/stuck
+  - File locks: POST /api/worker/:id/lock, POST /api/worker/:id/unlock
+  - Admin: GET /api/status, GET /api/workers, POST /api/workers/:id/kill, GET /api/queue, GET /api/metrics, GET /api/learnings
 
-- [x] Create `packages/orchestrator/src/conflicts.ts` - ConflictDetector class:
-  - `acquireLocks(workerId, files)` - acquire file locks
-  - `releaseLocks(workerId, files)` - release specific locks
-  - `releaseAllLocks(workerId)` - release all locks for worker
-
-- [x] Create `packages/orchestrator/src/workers.ts` - WorkerManager class:
-  - `hasCapacity()` - check if can spawn
-  - `spawn(workItem)` - spawn Docker container
-  - `register(workItemId)` - worker self-registration
-  - `heartbeat(workerId, data)` - update heartbeat
-  - `complete(workerId, data)` - handle completion
-  - `fail(workerId, error, iteration)` - handle failure
-  - `stuck(workerId, reason, attempts)` - handle stuck state
-  - `healthCheck()` - check for stale workers
-  - `kill(workerId, reason)` - kill worker container
-  - `list()` - list all workers
-  - `getStats()` - get worker statistics
-
-- [x] Create `packages/orchestrator/src/metrics.ts` - MetricsCollector class:
-  - `getSummary()` - get factory metrics summary
-  - `getAll()` - get all metrics
-  - `getLearnings(options)` - get learnings with optional filters
-
-### 4.4 API Server
-- [x] Create `packages/orchestrator/src/server.ts` with Express app:
-  - POST `/api/work` - add work item
-  - GET `/api/work/:id` - get work item
-  - POST `/api/work/:id/cancel` - cancel work item
-  - POST `/api/worker/register` - worker registration
-  - POST `/api/worker/:id/heartbeat` - worker heartbeat
-  - POST `/api/worker/:id/lock` - request file locks
-  - POST `/api/worker/:id/unlock` - release file locks
-  - POST `/api/worker/:id/complete` - worker completed
-  - POST `/api/worker/:id/fail` - worker failed
-  - POST `/api/worker/:id/stuck` - worker stuck
-  - GET `/api/status` - overall status
-  - GET `/api/workers` - list workers
-  - POST `/api/workers/:id/kill` - kill worker
-  - GET `/api/queue` - queue contents
-  - GET `/api/metrics` - metrics
-  - GET `/api/learnings` - learnings
-
-### 4.5 Entry Point
-- [ ] Create `packages/orchestrator/src/index.ts`:
-  - Initialize DB and Redis connections
-  - Initialize all components
-  - Start Express server
-  - Run main loop (check capacity, spawn workers, health checks)
-
-### 4.6 Dockerfile
-- [ ] Create `packages/orchestrator/Dockerfile`
+- [ ] Complete orchestrator package (entry point and Dockerfile)
+  - `src/index.ts` - Initialize DB/Redis, init components, start server, run main loop (check capacity, spawn workers, health checks)
+  - `Dockerfile` - Build and run orchestrator
 
 ---
 
 ## Phase 5: Worker Package (`packages/worker`)
 
-### 5.1 Setup
-- [ ] Create `packages/worker/package.json` with name `@factory/worker`
-- [ ] Create `packages/worker/tsconfig.json`
+- [ ] Implement worker package core
+  - `package.json` with name `@factory/worker`
+  - `tsconfig.json`
+  - `src/client.ts` - OrchestratorClient class (heartbeat, lockFile, complete, fail, stuck, getLearnings)
+  - `src/setup.ts` - setupWorkspace(workItem): clone repo, create branch, write SPEC.md, copy Claude config
+  - `src/learnings.ts` - loadLearnings (fetch → `.ai/learnings.md`), saveLearnings (parse `.ai/new-learnings.md`)
+  - `src/ralph.ts` - runRalph spawns Ralph, parses events (ITERATION→heartbeat, FILE_EDIT→lock, STUCK→report, COMPLETE→metrics, FAILED→report)
+  - `src/index.ts` - Parse env vars, setup workspace, load learnings, run Ralph, extract learnings, create PR, report completion
 
-### 5.2 Orchestrator Client
-- [ ] Create `packages/worker/src/client.ts` - OrchestratorClient class:
-  - `heartbeat(data)` - send heartbeat
-  - `lockFile(file)` - request file lock
-  - `complete(data)` - report completion
-  - `fail(data)` - report failure
-  - `stuck(reason, attempts)` - report stuck
-  - `getLearnings(repo, spec)` - get relevant learnings
-
-### 5.3 Workspace Setup
-- [ ] Create `packages/worker/src/setup.ts`:
-  - `setupWorkspace(workItem)` - clone repo, create branch, write SPEC.md, copy Claude config
-
-### 5.4 Learnings
-- [ ] Create `packages/worker/src/learnings.ts`:
-  - `loadLearnings(client, workItem)` - fetch and write learnings to `.ai/learnings.md`
-  - `saveLearnings(workspace)` - parse `.ai/new-learnings.md` and return learnings
-
-### 5.5 Ralph Event Parser
-- [ ] Create `packages/worker/src/ralph.ts`:
-  - `runRalph(workspace, workItem, client)` - spawn Ralph process
-  - Parse `[RALPH:*]` events from stdout (see SPEC-ralph.md for event contract)
-  - On `ITERATION` event → send heartbeat to orchestrator
-  - On `FILE_EDIT` event → request file lock from orchestrator
-  - On `STUCK` event → report stuck to orchestrator
-  - On `COMPLETE` event → extract metrics for completion report
-  - On `FAILED` event → report failure to orchestrator
-
-### 5.6 Entry Point
-- [ ] Create `packages/worker/src/index.ts`:
-  - Parse environment variables (WORKER_ID, WORK_ITEM, ORCHESTRATOR_URL)
-  - Setup workspace
-  - Load learnings
-  - Run Ralph
-  - Extract new learnings
-  - Create PR via `gh pr create`
-  - Report completion
-
-### 5.7 Claude Config
-- [ ] Create `packages/worker/.claude/CLAUDE.md` with worker instructions
-- [ ] Create `packages/worker/.claude/mcp.json` with MCP server config (playwright, context7)
-- [ ] Create `packages/worker/.claude/settings.json` if needed
-
-### 5.8 Dockerfile
-- [ ] Create `packages/worker/Dockerfile`:
-  - Install git, curl, gh CLI
-  - Install Claude Code
-  - Copy and build worker package
-  - Copy Claude config
+- [ ] Worker package config and Dockerfile
+  - `.claude/CLAUDE.md` - Worker instructions
+  - `.claude/mcp.json` - MCP server config (playwright, context7)
+  - `.claude/settings.json` - If needed
+  - `Dockerfile` - Install git, curl, gh CLI, Claude Code; copy and build worker; copy Claude config
 
 ---
 
 ## Phase 6: Intake Package (`packages/intake`)
 
-### 6.1 Setup
-- [ ] Create `packages/intake/package.json` with name `@factory/intake`
-- [ ] Create `packages/intake/tsconfig.json`
-- [ ] Add dependencies: @octokit/rest, @anthropic-ai/sdk
-
-### 6.2 GitHub Adapter
-- [ ] Create `packages/intake/src/github.ts` - GitHubAdapter class:
-  - `poll()` - poll repos for issues with intake label
-  - `addLabel(issue, label)` - add label to issue
-  - `removeLabel(issue, label)` - remove label from issue
-
-### 6.3 Spec Generator
-- [ ] Create `packages/intake/src/spec-gen.ts` - SpecGenerator class:
-  - `generate(issue)` - convert GitHub issue to SPEC.md using Claude
-
-### 6.4 Entry Point
-- [ ] Create `packages/intake/src/index.ts`:
-  - Poll GitHub for labeled issues
-  - Generate spec from issue
-  - Submit to orchestrator
-  - Update issue labels
-
-### 6.5 Dockerfile
-- [ ] Create `packages/intake/Dockerfile`
+- [ ] Implement intake package
+  - `package.json` with name `@factory/intake`
+  - `tsconfig.json`
+  - Dependencies: @octokit/rest, @anthropic-ai/sdk
+  - `src/github.ts` - GitHubAdapter class (poll, addLabel, removeLabel)
+  - `src/spec-gen.ts` - SpecGenerator class (generate: issue → SPEC.md using Claude)
+  - `src/index.ts` - Poll GitHub, generate spec, submit to orchestrator, update labels
+  - `Dockerfile`
 
 ---
 
 ## Phase 7: Docker Infrastructure
 
-- [ ] Create `docker/` directory
-- [ ] Create `docker/docker-compose.yml` with:
-  - postgres (pgvector/pgvector:pg16)
-  - redis (redis:7-alpine)
-  - orchestrator service
-  - intake service
-  - dashboard service (placeholder)
-  - Volumes for postgres_data and redis_data
+- [ ] Create Docker infrastructure
+  - `docker/` directory
+  - `docker/docker-compose.yml` with:
+    - postgres (pgvector/pgvector:pg16)
+    - redis (redis:7-alpine)
+    - orchestrator service
+    - intake service
+    - dashboard service (placeholder)
+    - Volumes for postgres_data and redis_data
 
 ---
 
 ## Phase 8: Scripts
 
-- [ ] Create `scripts/` directory
-- [ ] Create `scripts/setup.sh`:
-  - Check prerequisites (docker, bun)
-  - Create .env if not exists
-  - Install dependencies
-  - Build worker image
-  - Start postgres and redis
-  - Run migrations
-- [ ] Create `scripts/migrate.sh` - run SQL migrations
-- [ ] Create `scripts/dev.sh` - start dev environment
-- [ ] Make all scripts executable
+- [ ] Create setup and dev scripts
+  - `scripts/setup.sh` - Check prerequisites (docker, bun), create .env, install deps, build worker image, start postgres/redis, run migrations
+  - `scripts/migrate.sh` - Run SQL migrations
+  - `scripts/dev.sh` - Start dev environment
+  - Make all scripts executable
 
 ---
 
 ## Phase 9: Dashboard MVP (`packages/dashboard`)
 
-### 9.1 Setup
-- [ ] Create `packages/dashboard/package.json` with name `@factory/dashboard`
-- [ ] Initialize Next.js 14+ app with App Router
-- [ ] Configure for API proxy to orchestrator
+- [ ] Setup dashboard package
+  - `package.json` with name `@factory/dashboard`
+  - Initialize Next.js 14+ with App Router
+  - Configure API proxy to orchestrator
+  - `Dockerfile`
 
-### 9.2 Pages
-- [ ] Create overview page (`app/page.tsx`) - factory status summary
-- [ ] Create workers page (`app/workers/page.tsx`) - list workers, kill button
-- [ ] Create queue page (`app/queue/page.tsx`) - list queue, cancel button
-- [ ] Create learnings page (`app/learnings/page.tsx`) - browse learnings
-- [ ] Create metrics page (`app/metrics/page.tsx`) - basic charts
-
-### 9.3 Components
-- [ ] Create status card component
-- [ ] Create data table component
-- [ ] Create navigation component
-
-### 9.4 Dockerfile
-- [ ] Create `packages/dashboard/Dockerfile`
+- [ ] Implement dashboard pages and components
+  - `app/page.tsx` - Overview/factory status summary
+  - `app/workers/page.tsx` - List workers, kill button
+  - `app/queue/page.tsx` - List queue, cancel button
+  - `app/learnings/page.tsx` - Browse learnings
+  - `app/metrics/page.tsx` - Basic charts
+  - Shared components: status card, data table, navigation
 
 ---
 
 ## Phase 10: Integration & Testing
 
-- [ ] Verify all packages build with `bun build`
-- [ ] Test docker-compose up brings all services online
-- [ ] Test end-to-end flow:
-  - Create work item via API
-  - Verify worker spawns
-  - Verify heartbeats received
-  - Verify completion/PR creation
-- [ ] Document any issues in `.ai/new-learnings.md`
+- [ ] Integration testing and validation
+  - Verify all packages build with `bun build`
+  - Test docker-compose up brings all services online
+  - Test end-to-end: create work item → worker spawns → heartbeats → PR created
+  - Document issues in `.ai/new-learnings.md`
 
 ---
 
