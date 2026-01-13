@@ -44,3 +44,38 @@
 - All types are exported as interfaces/types only (no runtime code)
 - Build produces proper .d.ts declaration files
 - All Phase 2 tasks completed in single iteration
+
+---
+
+## Session 3 - 2025-01-12
+
+### Task: Phase 3 - Database Schema
+
+**Commit:** 7b332c2
+
+**Files Created:**
+- `migrations/001_initial.sql` - Initial PostgreSQL schema with all tables
+
+**Tables Created:**
+1. `work_items` - Stores work items (specs) with status, priority, metadata
+2. `workers` - Tracks worker lifecycle and heartbeats
+3. `learnings` - Persisted learnings with pgvector embeddings
+4. `worker_metrics` - Per-iteration metrics (tokens, duration, tests)
+5. `file_locks` - Prevents concurrent edits to same files
+
+**Enums Created:**
+- `work_item_status` (queued, assigned, in_progress, completed, failed, cancelled)
+- `priority` (low, medium, high, critical)
+- `worker_status` (starting, running, completed, failed, stuck, killed)
+
+**Features:**
+- pgvector extension for semantic similarity search
+- HNSW index on learnings.embedding for fast vector search
+- Partial indexes for queue ordering and active worker lookup
+- Auto-updating `updated_at` trigger on work_items
+- Proper foreign key relationships
+
+**Notes:**
+- Using 1536-dimension vectors (OpenAI ada-002 compatible)
+- All column names use snake_case (PostgreSQL convention)
+- All Phase 3 tasks completed in single iteration
