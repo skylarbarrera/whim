@@ -19,6 +19,9 @@
   - 7.1: docker-compose.yml with postgres, redis, orchestrator, intake, dashboard services
 - Phase 8: Scripts (1 task)
   - 8.1: setup.sh, migrate.sh, dev.sh scripts with options and health checks
+- Phase 9: Dashboard MVP (all 2 tasks)
+  - 9.1: Dashboard package setup (Next.js 14+, API proxy, Dockerfile)
+  - 9.2: Dashboard pages and components (Overview, Workers, Queue, Learnings, Metrics)
 
 ## In Progress
-- Phase 9: Dashboard MVP (next)
+- Phase 10: Integration & Testing (next)

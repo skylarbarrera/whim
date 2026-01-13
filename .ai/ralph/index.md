@@ -638,3 +638,56 @@ Management Routes:
 - Type checks pass
 - Phase 8 (Scripts) now complete
 - Next: Phase 9 Dashboard MVP
+
+---
+
+## Session 18 - 2025-01-13
+
+### Task: Phase 9 - Dashboard MVP
+
+**Commits:** 063a912, f53955b
+
+**Files Created:**
+- `packages/dashboard/package.json` - Package config with name @factory/dashboard
+- `packages/dashboard/tsconfig.json` - Next.js TypeScript config
+- `packages/dashboard/next.config.js` - API proxy to orchestrator
+- `packages/dashboard/next-env.d.ts` - Next.js type definitions
+- `packages/dashboard/Dockerfile` - Multi-stage Next.js production build
+- `packages/dashboard/app/layout.tsx` - Root layout with navigation
+- `packages/dashboard/app/page.tsx` - Overview page with factory status
+- `packages/dashboard/app/workers/page.tsx` - Workers list with kill button
+- `packages/dashboard/app/queue/page.tsx` - Queue list with cancel button
+- `packages/dashboard/app/learnings/page.tsx` - Learnings browser with search
+- `packages/dashboard/app/metrics/page.tsx` - Metrics summary page
+- `packages/dashboard/components/Navigation.tsx` - Navigation bar component
+- `packages/dashboard/components/StatusCard.tsx` - Status card component
+- `packages/dashboard/components/DataTable.tsx` - Generic data table component
+- `packages/dashboard/components/index.ts` - Component exports
+
+**Dashboard Pages:**
+1. **Overview** (`/`) - Factory status, active workers, queue size, daily budget, metrics
+2. **Workers** (`/workers`) - List workers, status colors, kill button for active workers
+3. **Queue** (`/queue`) - List work items, stats by status, cancel button for queued items
+4. **Learnings** (`/learnings`) - Browse learnings with repo/spec filters
+5. **Metrics** (`/metrics`) - Factory summary and recent worker metrics
+
+**Components:**
+1. **Navigation** - Responsive nav bar with active state highlighting
+2. **StatusCard** - Colored card for displaying status values (success/warning/error/neutral)
+3. **DataTable** - Generic typed table with custom column renderers
+
+**Features:**
+- Next.js 14+ with App Router
+- API proxy to orchestrator via next.config.js rewrites
+- Auto-refresh on all data pages (5-10s intervals)
+- Standalone output for Docker deployment
+- TypeScript strict mode
+- Uses @factory/shared types
+
+**Notes:**
+- All 190+ tests pass
+- Type checks pass
+- Build succeeds with 5 routes
+- Added .next to .gitignore
+- Phase 9 (Dashboard MVP) now complete
+- Next: Phase 10 Integration & Testing

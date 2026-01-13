@@ -135,13 +135,13 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## Phase 9: Dashboard MVP (`packages/dashboard`)
 
-- [ ] Setup dashboard package
+- [x] Setup dashboard package
   - `package.json` with name `@factory/dashboard`
   - Initialize Next.js 14+ with App Router
   - Configure API proxy to orchestrator
   - `Dockerfile`
 
-- [ ] Implement dashboard pages and components
+- [x] Implement dashboard pages and components
   - `app/page.tsx` - Overview/factory status summary
   - `app/workers/page.tsx` - List workers, kill button
   - `app/queue/page.tsx` - List queue, cancel button
