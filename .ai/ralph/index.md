@@ -915,3 +915,41 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All 98 tests pass (17 new in testing.test.ts)
 - Build and type checks pass
 - Phase 2 (Add Test Infrastructure to Worker) now complete
+
+---
+
+## Session 24 - 2026-01-13
+
+### Task: Bug Fix Phase 3.1 - Wrap PR Creation in Try/Catch
+
+**Commit:** 2dade29
+
+**Files Modified:**
+- `packages/worker/src/index.ts` - Added try/catch around PR creation
+
+**Changes Made:**
+
+1. **Wrapped createPullRequest() in try/catch:**
+   - Catches unexpected errors (network failures, gh not found, etc.)
+   - Logs error message and stack trace for debugging
+   - Reports partial success when work completes but PR creation throws
+
+2. **Enhanced error logging for PRResult:**
+   - Added stdout/stderr logging when PRResult status is "error"
+   - Full error details now visible in worker logs
+
+3. **Partial success reporting:**
+   - When Ralph succeeds but PR creation fails, still calls client.complete()
+   - PR URL is undefined (null) but work item marked completed
+   - Allows manual follow-up on failed PR creation
+
+**Technical Details:**
+- try/catch wraps the entire PR creation block
+- Error message extracted with `error instanceof Error ? error.message : String(error)`
+- Stack trace logged if available
+- PRResult.error now logs: command, exitCode, stdout, stderr
+
+**Notes:**
+- All 98 tests pass
+- Build and type checks pass
+- First task of Phase 3 (Improve Error Handling) complete

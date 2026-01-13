@@ -59,3 +59,8 @@ The AI Software Factory implementation is complete.
   - Integrated test validation in index.ts after Ralph completes
   - Supports Jest, Vitest, and Bun test output parsing
   - 5-minute default timeout with graceful shutdown
+- Phase 3.1: Wrap PR creation in try/catch
+  - Wraps createPullRequest() call in try/catch for unexpected errors
+  - Logs error message and stack trace on exception
+  - Reports partial success (work done, PR failed) to orchestrator
+  - Adds stdout/stderr logging for PRResult error cases

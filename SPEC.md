@@ -37,7 +37,11 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Graceful SIGTERM followed by SIGKILL after 5s
 
 ### Phase 3: Improve Error Handling
-- [ ] In `index.ts`, wrap PR creation in try/catch and report partial success
+- [x] In `index.ts`, wrap PR creation in try/catch and report partial success
+  - Wraps createPullRequest() in try/catch for unexpected errors
+  - Logs error message and stack trace on exception
+  - Reports partial success (work done, PR failed) to orchestrator
+  - Adds stdout/stderr logging for PRResult error cases
 - [ ] Log full stderr/stdout from failed git/gh commands
 - [ ] Add retry logic for transient network failures (push, gh api)
 
