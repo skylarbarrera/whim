@@ -42,6 +42,8 @@ RUN bun run build
 # Build dashboard
 WORKDIR /app/packages/dashboard
 ENV NEXT_TELEMETRY_DISABLED=1
+# Set orchestrator URL for Next.js rewrites (baked at build time)
+ENV ORCHESTRATOR_URL=http://orchestrator:3000
 RUN npm run build
 
 # =============================================================================
