@@ -1046,3 +1046,46 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All 110 tests pass (12 new: 6 in src/, 6 in dist/)
 - Build and type checks pass
 - Phase 3 (Improve Error Handling) now complete
+
+---
+
+## Session 27 - 2026-01-13
+
+### Task: Bug Fix Phase 4.3 - Track and Report Test Execution Results
+
+**Commit:** a125806
+
+**Files Modified:**
+- `packages/shared/src/types.ts` - Added testsFailed/testStatus to metrics types
+- `packages/worker/src/ralph.ts` - Added testsFailed/testStatus to RalphMetrics
+- `packages/worker/src/index.ts` - Reports testsFailed and testStatus
+- `packages/orchestrator/src/db.ts` - Added fields to WorkerMetricsRow
+- Various test files - Updated to include new metric fields
+
+**Changes Made:**
+
+1. **Updated shared types:**
+   - WorkerMetrics: Added testsFailed (number), testStatus (optional enum)
+   - WorkerCompleteRequest.metrics: Added testsFailed, testStatus
+
+2. **Updated RalphMetrics:**
+   - Added testsFailed and testStatus fields
+   - Default testsFailed = 0, testStatus = undefined
+
+3. **Updated worker index.ts:**
+   - Now sets result.metrics.testsFailed from testResult
+   - Now sets result.metrics.testStatus from testResult.status
+
+4. **Updated orchestrator db.ts:**
+   - WorkerMetricsRow now includes tests_failed, test_status
+   - rowToWorkerMetrics maps new fields with defaults
+
+**Test Updates:**
+- client.test.ts: Include testsFailed/testStatus in complete test
+- metrics.test.ts: Include in mock metrics
+- workers.test.ts: Include in complete metrics test
+
+**Notes:**
+- All tests pass
+- Build and type checks pass
+- Phase 4 (Observability) now complete

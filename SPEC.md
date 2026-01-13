@@ -60,7 +60,10 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Already implemented: git log --oneline -5 shown before push
 - [x] Log the actual `gh pr create` command being run
   - Already implemented: "[PR] Running: gh pr create ..." logged
-- [ ] Track and report test execution results in worker metrics
+- [x] Track and report test execution results in worker metrics
+  - Added testsFailed and testStatus to WorkerMetrics
+  - Added testsFailed and testStatus to WorkerCompleteRequest
+  - Worker now reports complete test metrics to orchestrator
 
 ## Acceptance Criteria
 - [ ] Worker successfully pushes Ralph's commits to GitHub
