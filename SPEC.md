@@ -96,7 +96,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - `list()` - list all workers
   - `getStats()` - get worker statistics
 
-- [ ] Create `packages/orchestrator/src/metrics.ts` - MetricsCollector class:
+- [x] Create `packages/orchestrator/src/metrics.ts` - MetricsCollector class:
   - `getSummary()` - get factory metrics summary
   - `getAll()` - get all metrics
   - `getLearnings(options)` - get learnings with optional filters

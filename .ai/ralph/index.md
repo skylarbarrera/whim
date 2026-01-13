@@ -260,3 +260,33 @@
 **Notes:**
 - Fourth of 5 core components in Phase 4.3
 - Next: MetricsCollector
+
+---
+
+## Session 10 - 2025-01-12
+
+### Task: Phase 4.3 - MetricsCollector (Core Components)
+
+**Commit:** 8fbae5e
+
+**Files Created:**
+- `packages/orchestrator/src/metrics.ts` - MetricsCollector class
+- `packages/orchestrator/src/metrics.test.ts` - Unit tests (13 tests)
+
+**MetricsCollector Methods:**
+1. `getSummary()` - Get factory metrics summary (FactoryMetrics)
+   - activeWorkers, queuedItems, completedToday, failedToday
+   - iterationsToday, dailyBudget, avgCompletionTime, successRate
+2. `getAll()` - Get all worker metrics ordered by timestamp
+3. `getLearnings(options?)` - Get learnings with optional filters
+   - Filter by repo, spec (partial match via ILIKE), limit
+
+**Features:**
+- Aggregates metrics from work_items, workers, worker_metrics, learnings
+- Success rate calculated as completed / (completed + failed)
+- Daily budget configurable via environment/constructor
+- SQL injection safe with parameterized queries
+
+**Notes:**
+- Fifth and final core component in Phase 4.3
+- Phase 4.3 complete, next: Phase 4.4 API Server
