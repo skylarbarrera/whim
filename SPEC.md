@@ -78,7 +78,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - `checkDailyReset()` - reset daily limits at midnight
   - `getStatus()` - get current rate limit status
 
-- [ ] Create `packages/orchestrator/src/conflicts.ts` - ConflictDetector class:
+- [x] Create `packages/orchestrator/src/conflicts.ts` - ConflictDetector class:
   - `acquireLocks(workerId, files)` - acquire file locks
   - `releaseLocks(workerId, files)` - release specific locks
   - `releaseAllLocks(workerId)` - release all locks for worker
