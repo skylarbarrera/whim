@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AI Software Factory - Development Script
-# Starts the development environment with all services
+# Hot-reload development with auto-rebuilding worker image
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 success() { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
@@ -22,32 +22,22 @@ error() { echo -e "${RED}✗${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}ℹ${NC} $1"; }
 
 # Parse arguments
-DASHBOARD=false
-REBUILD=false
-DETACH=false
+MODE="local"  # local or docker
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --dashboard|-d)
-            DASHBOARD=true
-            shift
-            ;;
-        --rebuild|-r)
-            REBUILD=true
-            shift
-            ;;
-        --detach|-D)
-            DETACH=true
+        --docker)
+            MODE="docker"
             shift
             ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -d, --dashboard    Include dashboard service"
-            echo "  -r, --rebuild      Rebuild all images"
-            echo "  -D, --detach       Run in background (detached)"
-            echo "  -h, --help         Show this help"
+            echo "  --docker    Run everything in Docker (no hot reload)"
+            echo "  -h, --help  Show this help"
+            echo ""
+            echo "Default: Run services locally with hot reload"
             exit 0
             ;;
         *)
@@ -70,59 +60,114 @@ if ! docker info &> /dev/null 2>&1; then
 fi
 
 # Check .env exists
-if [ ! -f ".env" ]; then
-    warn "No .env file found. Run ./scripts/setup.sh first."
+if [ ! -f "docker/.env" ]; then
+    warn "No docker/.env file found. Run ./scripts/setup.sh first."
     exit 1
 fi
 
-# Load .env for display
-source .env 2>/dev/null || true
+# Load env
+set -a
+source docker/.env
+set +a
 
-# Build compose command
-cd docker
-COMPOSE_CMD="docker compose"
-
-# Add profile for dashboard if requested
-if [ "$DASHBOARD" = true ]; then
-    COMPOSE_CMD="$COMPOSE_CMD --profile with-dashboard"
-    info "Dashboard enabled"
+if [ "$MODE" = "docker" ]; then
+    # Docker mode - just run everything in containers
+    info "Starting all services in Docker..."
+    cd docker
+    docker compose up --build -d
+    docker compose logs -f
+    exit 0
 fi
 
-# Rebuild if requested
-if [ "$REBUILD" = true ]; then
-    info "Rebuilding images..."
-    $COMPOSE_CMD build
-    success "Images rebuilt"
-fi
+# Local hot-reload mode
+info "Starting local development with hot reload..."
 
-# Start services
+# Cleanup on exit
+PIDS=()
+cleanup() {
+    echo ""
+    info "Shutting down..."
+    for pid in "${PIDS[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+    exit 0
+}
+trap cleanup SIGINT SIGTERM EXIT
+
+# Start infra in Docker
+info "Starting infrastructure (postgres, redis)..."
+docker compose -f docker/docker-compose.yml up -d postgres redis
+
+# Wait for postgres
+info "Waiting for postgres..."
+until docker exec factory-postgres pg_isready -U claude -d ai_factory > /dev/null 2>&1; do
+    sleep 1
+done
+success "Postgres ready"
+
+# Build shared first
+info "Building shared package..."
+(cd packages/shared && bun run build)
+success "Shared package built"
+
+# Build worker image
+info "Building worker Docker image..."
+docker build -t factory-worker -f packages/worker/Dockerfile . -q
+success "Worker image built"
+
+# Start worker watcher in background
+info "Starting worker code watcher..."
+(
+    LAST_HASH=""
+    while true; do
+        # Compute hash of worker and shared source files
+        HASH=$(find packages/worker/src packages/shared/src -type f -name "*.ts" -exec cat {} \; 2>/dev/null | md5 || echo "")
+        if [ "$HASH" != "$LAST_HASH" ] && [ -n "$LAST_HASH" ]; then
+            echo -e "${YELLOW}[worker]${NC} Code changed, rebuilding image..."
+            (cd packages/shared && bun run build) 2>/dev/null
+            docker build -t factory-worker -f packages/worker/Dockerfile . -q 2>/dev/null && \
+            echo -e "${GREEN}[worker]${NC} Image rebuilt"
+        fi
+        LAST_HASH="$HASH"
+        sleep 2
+    done
+) &
+PIDS+=($!)
+
+# Export env vars for local services
+export DATABASE_URL="${DATABASE_URL:-postgresql://claude:claude_dev@localhost:5432/ai_factory}"
+export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
+export ORCHESTRATOR_URL="http://localhost:3000"
+export PORT=3000
+
 echo ""
-if [ "$DETACH" = true ]; then
-    info "Starting services in background..."
-    $COMPOSE_CMD up -d
-else
-    info "Starting services (Ctrl+C to stop)..."
-    echo ""
-fi
-
-echo "Services:"
-echo "  • PostgreSQL:   localhost:5432"
-echo "  • Redis:        localhost:6379"
-echo "  • Orchestrator: http://localhost:3002"
-if [ "$DASHBOARD" = true ]; then
-    echo "  • Dashboard:    http://localhost:3003"
-fi
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  Orchestrator:  http://localhost:3000${NC}"
+echo -e "${GREEN}  Dashboard:     http://localhost:3001${NC}"
+echo -e "${GREEN}  Worker image:  auto-rebuilds on code changes${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-if [ "$DETACH" = true ]; then
-    $COMPOSE_CMD up -d
-    echo ""
-    success "Services started in background"
-    echo ""
-    echo "Useful commands:"
-    echo "  docker compose -f docker/docker-compose.yml logs -f    # View logs"
-    echo "  docker compose -f docker/docker-compose.yml ps         # Check status"
-    echo "  docker compose -f docker/docker-compose.yml down       # Stop services"
-else
-    $COMPOSE_CMD up
-fi
+# Run services with hot reload
+info "Starting orchestrator..."
+(cd packages/orchestrator && bun --watch src/index.ts 2>&1 | sed 's/^/[orchestrator] /') &
+PIDS+=($!)
+
+sleep 1
+
+info "Starting intake..."
+(cd packages/intake && bun --watch src/index.ts 2>&1 | sed 's/^/[intake] /') &
+PIDS+=($!)
+
+sleep 1
+
+info "Starting dashboard..."
+(cd packages/dashboard && PORT=3001 bun run dev 2>&1 | sed 's/^/[dashboard] /') &
+PIDS+=($!)
+
+echo ""
+success "All services running. Press Ctrl+C to stop."
+echo ""
+
+# Wait for any process to exit
+wait
