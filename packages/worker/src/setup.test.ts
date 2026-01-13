@@ -4,11 +4,11 @@ import { PRStep } from "./setup";
 describe("setup", () => {
   describe("PRStep enum", () => {
     it("should have all expected steps", () => {
-      expect(PRStep.STAGE).toBe("stage");
-      expect(PRStep.COMMIT).toBe("commit");
-      expect(PRStep.CHECK_UNPUSHED).toBe("check_unpushed");
-      expect(PRStep.PUSH).toBe("push");
-      expect(PRStep.CREATE_PR).toBe("create_pr");
+      expect(PRStep.STAGE).toBe("stage" as unknown as PRStep);
+      expect(PRStep.COMMIT).toBe("commit" as unknown as PRStep);
+      expect(PRStep.CHECK_UNPUSHED).toBe("check_unpushed" as unknown as PRStep);
+      expect(PRStep.PUSH).toBe("push" as unknown as PRStep);
+      expect(PRStep.CREATE_PR).toBe("create_pr" as unknown as PRStep);
     });
   });
 
@@ -35,10 +35,11 @@ describe("setup", () => {
     });
 
     it("should handle undefined tokens", () => {
-      const token: string | undefined = undefined;
-      const tokenLength = token?.length || 0;
+      const token = undefined as string | undefined;
+      const tokenStr = token ?? "";
+      const tokenLength = tokenStr.length;
       const tokenMask = tokenLength > 0
-        ? `${token!.substring(0, 4)}...(${tokenLength} chars)`
+        ? `${tokenStr.substring(0, 4)}...(${tokenLength} chars)`
         : "(empty)";
 
       expect(tokenMask).toBe("(empty)");

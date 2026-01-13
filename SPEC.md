@@ -25,11 +25,16 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Preserves `GH_HOST` for GitHub Enterprise scenarios
 
 ### Phase 2: Add Test Infrastructure to Worker
-- [ ] Install Node.js test runners in worker Dockerfile
-  - Add `npm install -g jest ts-jest @types/jest` or vitest
-  - Ensure TypeScript compilation works (`tsc` available)
-- [ ] Consider adding a validation step that actually runs `npm test` after Ralph completes
-- [ ] Add timeout for test execution to prevent hung workers
+- [x] Install Node.js test runners in worker Dockerfile
+  - Added `npm install -g jest ts-jest typescript @types/jest @types/node vitest`
+  - TypeScript compilation now available via global `tsc`
+- [x] Consider adding a validation step that actually runs `npm test` after Ralph completes
+  - Added `testing.ts` module with `runTests()` function
+  - Supports Jest, Vitest, and Bun test output parsing
+  - Integrated in `index.ts` after Ralph completes
+- [x] Add timeout for test execution to prevent hung workers
+  - Default 5-minute timeout with configurable option
+  - Graceful SIGTERM followed by SIGKILL after 5s
 
 ### Phase 3: Improve Error Handling
 - [ ] In `index.ts`, wrap PR creation in try/catch and report partial success

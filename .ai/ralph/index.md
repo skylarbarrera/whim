@@ -860,3 +860,58 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All tests pass
 - Build and type checks pass
 - Phase 1 (Fix PR Creation Flow) now complete
+
+---
+
+## Session 23 - 2026-01-13
+
+### Task: Bug Fix Phase 2 - Add Test Infrastructure to Worker
+
+**Files Modified:**
+- `packages/worker/Dockerfile` - Added global test runners
+- `packages/worker/src/index.ts` - Added test validation step
+- `packages/worker/src/setup.test.ts` - Fixed TypeScript enum comparisons
+
+**Files Created:**
+- `packages/worker/src/testing.ts` - Test execution module
+- `packages/worker/src/testing.test.ts` - Tests for testing module (17 tests)
+
+**Changes Made:**
+
+1. **Dockerfile - Test runners installed:**
+   - Added `npm install -g jest ts-jest typescript @types/jest @types/node vitest`
+   - TypeScript compilation now available via global `tsc`
+
+2. **testing.ts - New module for test validation:**
+   - `hasTestScript(repoDir)` - Check if package.json has a real test script
+   - `parseTestOutput(stdout, stderr)` - Parse test counts from Jest/Vitest/Bun output
+   - `runTests(repoDir, options)` - Run tests with configurable timeout
+
+3. **Test result parsing:**
+   - Jest format: "Tests: X passed, Y total"
+   - Vitest format: "Tests X passed (Y)"
+   - Bun format: "X pass, Y fail, Z total"
+   - Fallback: count PASS/FAIL occurrences
+
+4. **TestResult interface:**
+   - status: "passed" | "failed" | "timeout" | "skipped" | "error"
+   - testsRun, testsPassed, testsFailed counts
+   - duration in ms
+   - stdout, stderr capture
+   - error message on failure
+
+5. **Timeout handling:**
+   - Default 5-minute timeout
+   - Graceful SIGTERM, then SIGKILL after 5s
+   - Returns status: "timeout" with duration
+
+6. **Integration in index.ts:**
+   - Runs test validation after Ralph completes
+   - Updates metrics with actual test counts
+   - Logs test results (passed/failed/timeout/skipped/error)
+   - Continues to PR creation regardless of test result
+
+**Notes:**
+- All 98 tests pass (17 new in testing.test.ts)
+- Build and type checks pass
+- Phase 2 (Add Test Infrastructure to Worker) now complete

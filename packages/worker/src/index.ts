@@ -8,6 +8,7 @@ import {
   getNewLearningsPath,
 } from "./learnings.js";
 import { runRalph } from "./ralph.js";
+import { runTests } from "./testing.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;
@@ -100,6 +101,30 @@ async function main(): Promise<void> {
   console.log("Ralph completed:", result.success ? "SUCCESS" : "FAILED");
 
   if (result.success) {
+    // Validate tests after Ralph completes
+    console.log("Validating tests...");
+    const testResult = await runTests(repoDir, {
+      timeout: 5 * 60 * 1000, // 5 minutes
+    });
+
+    console.log(`Test validation: ${testResult.status}`);
+    if (testResult.status === "passed") {
+      console.log(`  Tests: ${testResult.testsPassed}/${testResult.testsRun} passed`);
+    } else if (testResult.status === "failed") {
+      console.log(`  Tests: ${testResult.testsPassed}/${testResult.testsRun} passed, ${testResult.testsFailed} failed`);
+      console.log(`  Stderr: ${testResult.stderr.slice(0, 500)}`);
+    } else if (testResult.status === "timeout") {
+      console.log(`  Tests timed out after ${testResult.duration}ms`);
+    } else if (testResult.status === "skipped") {
+      console.log(`  No test script found, skipping validation`);
+    } else if (testResult.status === "error") {
+      console.log(`  Test execution error: ${testResult.error}`);
+    }
+
+    // Update metrics with actual test results
+    result.metrics.testsRun = testResult.testsRun;
+    result.metrics.testsPassed = testResult.testsPassed;
+
     console.log("Extracting new learnings...");
     const newLearningsPath = getNewLearningsPath(repoDir);
     const learnings = await saveLearnings(

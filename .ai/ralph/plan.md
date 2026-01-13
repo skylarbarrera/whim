@@ -1,35 +1,38 @@
-# Plan: Pass GH_TOKEN properly to gh command
+# Phase 2: Add Test Infrastructure to Worker
 
 ## Goal
-Ensure the GitHub CLI (`gh`) command receives authentication tokens reliably in containerized environments.
-
-## Problem
-The current implementation passes `GH_TOKEN` via environment variable only:
-```typescript
-const prResult = await exec("gh", prArgs, {
-  cwd: repoDir,
-  env: { GH_TOKEN: githubToken },
-});
-```
-
-This may not work reliably because:
-1. The `exec` helper merges `process.env` with the passed env, but only sets `GH_TOKEN`
-2. Some containerized environments may strip or not propagate env vars properly
-3. The `gh` CLI also looks for `GITHUB_TOKEN` as a fallback
-
-## Solution
-1. Pass both `GH_TOKEN` and `GITHUB_TOKEN` environment variables (for redundancy)
-2. Preserve `GH_HOST` if set (for GitHub Enterprise scenarios)
-3. Log that token is being provided (without revealing the token)
-4. Add a token validation step before attempting PR creation
+Enable the worker container to actually run tests, rather than faking/skipping them.
 
 ## Files to Modify
-- `packages/worker/src/setup.ts` - Update `createPullRequest` function
+- `packages/worker/Dockerfile` - Add test runners (jest, ts-jest, typescript)
+- `packages/worker/src/testing.ts` - New module for test validation with timeout
+- `packages/worker/src/testing.test.ts` - Tests for the testing module
+- `packages/worker/src/index.ts` - Add test validation step after Ralph completes
 
-## Tests
-- `packages/worker/src/__tests__/setup.test.ts` - Add test for token passing
+## Implementation
+
+### 1. Dockerfile Changes
+Add to the runtime stage:
+```dockerfile
+RUN npm install -g jest ts-jest typescript @types/jest @types/node vitest
+```
+
+### 2. Testing Module (testing.ts)
+Create a new module that:
+- Runs `npm test` in the repo directory
+- Has configurable timeout (default 5 minutes)
+- Returns structured results (passed, failed, timed out)
+- Captures stdout/stderr for debugging
+
+### 3. Index.ts Integration
+After Ralph completes successfully:
+1. Run test validation step
+2. Report test results in metrics
+3. Consider test failure as partial success (still create PR, but note test failures)
 
 ## Exit Criteria
-- [ ] Both `GH_TOKEN` and `GITHUB_TOKEN` are passed to `gh` command
-- [ ] Token presence is logged (masked)
-- [ ] Tests verify token behavior
+- [ ] Worker Dockerfile includes jest, typescript, vitest
+- [ ] testing.ts module with runTests function and timeout support
+- [ ] Tests for testing.ts
+- [ ] Integration in index.ts
+- [ ] All existing tests pass
