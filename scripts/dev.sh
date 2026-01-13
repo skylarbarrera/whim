@@ -100,7 +100,7 @@ docker compose -f docker/docker-compose.yml up -d postgres redis
 
 # Wait for postgres
 info "Waiting for postgres..."
-until docker exec factory-postgres pg_isready -U claude -d ai_factory > /dev/null 2>&1; do
+until docker exec factory-postgres pg_isready -U factory -d factory > /dev/null 2>&1; do
     sleep 1
 done
 success "Postgres ready"
@@ -134,11 +134,12 @@ info "Starting worker code watcher..."
 ) &
 PIDS+=($!)
 
-# Export env vars for local services
-export DATABASE_URL="${DATABASE_URL:-postgresql://claude:claude_dev@localhost:5432/ai_factory}"
-export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
+# Env vars already loaded from docker/.env via set -a
+# Just set additional vars for local dev
 export ORCHESTRATOR_URL="http://localhost:3000"
 export PORT=3000
+
+info "Using DATABASE_URL: ${DATABASE_URL}"
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
