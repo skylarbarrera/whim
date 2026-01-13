@@ -1,25 +1,17 @@
-# Phase 7: Docker Infrastructure
+# Phase 8: Scripts
 
 ## Goal
-Create Docker infrastructure with docker-compose.yml that orchestrates all services (postgres, redis, orchestrator, intake, dashboard placeholder).
+Create setup, migration, and development scripts for the AI Software Factory.
 
 ## Files to Create
-- `docker/docker-compose.yml` - Complete service definitions
+- `scripts/setup.sh` - One-time project setup (prerequisites, .env, deps, images, services, migrations)
+- `scripts/migrate.sh` - Database migration runner
+- `scripts/dev.sh` - Development environment launcher
 
 ## Exit Criteria
-- [x] `docker/docker-compose.yml` exists with all required services
-- [x] Services configured: postgres (pgvector), redis, orchestrator, intake, dashboard
-- [x] Volumes defined for postgres_data and redis_data
-- [x] All services have proper environment variables and dependencies
-- [x] Network configuration allows inter-service communication
-
-## Implementation Steps
-1. Create `docker/` directory
-2. Create `docker/docker-compose.yml` with:
-   - postgres service (pgvector/pgvector:pg16)
-   - redis service (redis:7-alpine)
-   - orchestrator service (depends on postgres, redis)
-   - intake service (depends on orchestrator)
-   - dashboard service placeholder (depends on orchestrator)
-   - Named volumes for persistence
-   - Health checks for dependencies
+1. All three scripts created and executable
+2. `scripts/setup.sh` checks for docker/bun, creates .env, installs deps, builds worker image, starts postgres/redis, runs migrations
+3. `scripts/migrate.sh` runs SQL migrations against database
+4. `scripts/dev.sh` starts dev environment with docker-compose
+5. All existing tests pass
+6. Type checks pass
