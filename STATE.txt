@@ -4,10 +4,12 @@
 - Phase 1: Project Scaffolding (all 5 tasks)
 - Phase 2: Shared Package (all 4 tasks)
 - Phase 3: Database Schema (all 2 tasks)
-- Phase 4.1: Orchestrator Package Setup (all 3 tasks)
-- Phase 4.2: Database & Redis Clients (all 2 tasks)
-- Phase 4.3: Core Components - QueueManager, RateLimiter, ConflictDetector, WorkerManager, and MetricsCollector complete
-- Phase 4.4: API Server complete (16 endpoints, 24 tests)
+- Phase 4: Orchestrator Package (all 5 tasks)
+  - 4.1: Package setup
+  - 4.2: Database & Redis Clients
+  - 4.3: Core Components (QueueManager, RateLimiter, ConflictDetector, WorkerManager, MetricsCollector)
+  - 4.4: API Server (16 endpoints, 24 tests)
+  - 4.5: Entry Point & Dockerfile
 
 ## Current
-- Phase 4.5: Entry Point next
+- Phase 5: Worker Package next

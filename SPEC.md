@@ -71,7 +71,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - File locks: POST /api/worker/:id/lock, POST /api/worker/:id/unlock
   - Admin: GET /api/status, GET /api/workers, POST /api/workers/:id/kill, GET /api/queue, GET /api/metrics, GET /api/learnings
 
-- [ ] Complete orchestrator package (entry point and Dockerfile)
+- [x] Complete orchestrator package (entry point and Dockerfile)
   - `src/index.ts` - Initialize DB/Redis, init components, start server, run main loop (check capacity, spawn workers, health checks)
   - `Dockerfile` - Build and run orchestrator
 

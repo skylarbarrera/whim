@@ -342,3 +342,47 @@ Management Routes:
 **Notes:**
 - All 24 tests pass
 - Phase 4.4 complete, next: Phase 4.5 Entry Point
+
+---
+
+## Session 12 - 2025-01-12
+
+### Task: Phase 4.5 - Entry Point and Dockerfile
+
+**Commit:** e004429
+
+**Files Created/Modified:**
+- `packages/orchestrator/src/index.ts` - Main entry point
+- `packages/orchestrator/Dockerfile` - Container build
+
+**Entry Point Features:**
+1. `loadConfig()` - Load configuration from environment variables
+2. `log()` - Timestamped logging utility
+3. `runMainLoop()` - Main orchestrator loop:
+   - Health check for stale workers (kill if no heartbeat)
+   - Spawn workers for queued items when capacity available
+   - Configurable loop interval (default 5s)
+4. `setupGracefulShutdown()` - Handle SIGTERM/SIGINT signals
+5. `main()` - Initialize all components and start server
+
+**Component Initialization Order:**
+1. Database (PostgreSQL via pg pool)
+2. Redis (ioredis client)
+3. Docker (dockerode)
+4. QueueManager (db)
+5. RateLimiter (redis)
+6. ConflictDetector (db)
+7. WorkerManager (db, rateLimiter, conflicts, docker)
+8. MetricsCollector (db)
+9. Express server (with all deps injected)
+
+**Dockerfile Features:**
+- Multi-stage build (builder + slim production)
+- Bun runtime for consistency with monorepo
+- Health check at /health endpoint
+- Default environment variables for database and Redis
+
+**Notes:**
+- All existing tests still pass (160 tests)
+- Phase 4 (Orchestrator Package) now complete
+- Next: Phase 5 Worker Package
