@@ -337,3 +337,92 @@ All sub-bullets completed:
 - ✅ Add status check requirements (GitHub Status API integration)
 - ✅ Create merge prevention logic (MergeGuardian decision engine)
 - ✅ Add override mechanisms for emergencies (override() with audit trail)
+
+### Phase 6: Build Review Dashboard/UI - Complete (Session 35)
+- Added PR review API types to shared package
+  - OverrideReviewRequest with user and reason fields
+  - ManualReviewRequest for approve/reject actions
+  - ListReviewsResponse, ReviewDetailResponse, OverrideReviewResponse, ManualReviewResponse
+  - All types properly exported from shared package
+- Added PR review API endpoints to orchestrator
+  - GET /api/pr-reviews - List all reviews with filters (status, repo, pagination)
+  - GET /api/pr-reviews/:id - Get review details with all checks
+  - POST /api/pr-reviews/:id/override - Emergency override with reason and user
+  - POST /api/pr-reviews/:id/manual-review - Submit manual approval/rejection
+  - Added db to ServerDependencies for database queries
+  - Updated index.ts to pass db client to server
+  - Fixed server.test.ts to include db mock
+- Created PR reviews list page (packages/dashboard/app/pr-reviews/page.tsx)
+  - List view with status filters (all, pending, running, completed, failed)
+  - Summary cards showing total reviews, AI-generated count, merge blocked count
+  - Review cards with status badges, merge blocked warnings, override info
+  - Links to detail page for each review
+  - Responsive design matching existing dashboard style
+- Created PR review detail page (packages/dashboard/app/pr-reviews/[id]/page.tsx)
+  - Full review details with PR info and detection confidence
+  - Status cards for passed/failed checks, errors, warnings
+  - Emergency override form with user and reason inputs
+  - Manual review form with approve/reject radio buttons and comment
+  - Check results displayed with icons, status badges, error/warning counts
+  - Expandable details for each check with formatted output
+  - Merge blocked warnings and override notifications
+  - Back navigation to list page
+- Updated navigation to include PR Reviews link
+  - Added /pr-reviews to Navigation.tsx navItems
+  - Positioned between Queue and Learnings for logical flow
+- Type checking and build verification
+  - Compiled shared package with new types
+  - Fixed server.test.ts to include db mock in ServerDependencies
+  - Dashboard pages use proper TypeScript types from @factory/shared
+  - All files compile successfully
+
+All sub-bullets completed:
+- ✅ Display review status and results (list and detail pages)
+- ✅ Show lint and test feedback (check cards with error/warning counts)
+- ✅ Provide manual review interface (approval/rejection form)
+- ✅ Add review history tracking (timeline of checks and status changes displayed)
+
+### Phase 7: Add Configuration System - Complete (Session 36)
+- Expanded configuration schema with 6 sections
+  - DetectionConfig: PR detection rules, confidence thresholds, branch/label/author patterns
+  - LintConfig: Enhanced with file include/exclude patterns, tool selection
+  - TestConfig: Added minCoverage option for code coverage requirements
+  - MergeBlockingConfig: Override users, required checks, reason requirements
+  - BranchProtectionConfig: Automated branch protection setup with review requirements
+  - GitHubConfig: Status context, target URL, sync settings
+- Created config-validator.ts for comprehensive validation
+  - Type checking for all configuration fields
+  - Range validation (percentages 0-100, timeouts ≥1000ms, etc.)
+  - Array and object structure validation
+  - Field path tracking for precise error messages
+  - 25+ test cases covering valid/invalid configs
+- Updated example.pr-review.yml
+  - Documented 100+ configuration options with inline comments
+  - Organized into 6 clear sections with headers
+  - Added common scenario examples (strict, lenient, custom tools)
+  - Included best practices and usage tips
+- Added helper functions
+  - getDetectionConfig() for PR detection settings
+  - getMergeBlockingConfig() for merge rules
+  - getBranchProtectionConfig() for branch protection
+  - getGitHubConfig() for GitHub integration
+  - All functions return type-safe config objects
+- Created comprehensive unit tests
+  - config-validator.test.ts: 25 validation test cases
+  - config.test.ts: 11 new tests for all config sections
+  - Total: 43 test cases covering valid/invalid scenarios
+  - Tests for config loading, merging, and validation
+- Created detailed documentation
+  - docs/pr-review-configuration.md: Complete configuration reference
+  - Field-by-field documentation with examples
+  - Common configuration scenarios (strict, lenient, high security)
+  - Troubleshooting guide for common issues
+  - Best practices for configuration management
+  - Programmatic API usage examples
+- Package builds successfully with TypeScript
+- All exports added to index.ts
+
+All sub-bullets completed:
+- ✅ Create review rule configuration
+- ✅ Add lint/test tool selection
+- ✅ Implement review criteria customization
