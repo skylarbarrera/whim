@@ -102,7 +102,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
   - `getLearnings(options)` - get learnings with optional filters
 
 ### 4.4 API Server
-- [ ] Create `packages/orchestrator/src/server.ts` with Express app:
+- [x] Create `packages/orchestrator/src/server.ts` with Express app:
   - POST `/api/work` - add work item
   - GET `/api/work/:id` - get work item
   - POST `/api/work/:id/cancel` - cancel work item

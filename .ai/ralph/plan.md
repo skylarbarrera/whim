@@ -1,53 +1,60 @@
-# WorkerManager Implementation Plan
+# Plan: Phase 4.4 - API Server
 
 ## Goal
-Implement `packages/orchestrator/src/workers.ts` - WorkerManager class that handles worker lifecycle management including spawning Docker containers, registration, heartbeats, completion, failure, and health checks.
+Create `packages/orchestrator/src/server.ts` with Express API server implementing all orchestrator endpoints.
 
 ## Files to Create/Modify
-- `packages/orchestrator/src/workers.ts` - New file with WorkerManager class
-- `packages/orchestrator/src/workers.test.ts` - Tests for WorkerManager
+- **Create**: `packages/orchestrator/src/server.ts` - Express API server with all endpoints
+- **Create**: `packages/orchestrator/src/server.test.ts` - Unit tests for server
 
-## Methods to Implement
+## API Endpoints (from SPEC.md)
 
-Per SPEC.md Phase 4.3:
-- `hasCapacity()` - Check if can spawn based on rate limiter
-- `spawn(workItem)` - Spawn Docker container for a work item
-- `register(workItemId)` - Worker self-registration, creates worker record
-- `heartbeat(workerId, data)` - Update heartbeat timestamp and iteration
-- `complete(workerId, data)` - Handle completion (update status, release locks, record metrics)
-- `fail(workerId, error, iteration)` - Handle failure (update status, release locks)
-- `stuck(workerId, reason, attempts)` - Handle stuck state
-- `healthCheck()` - Check for stale workers (no heartbeat in N seconds)
-- `kill(workerId, reason)` - Kill worker container
-- `list()` - List all workers
-- `getStats()` - Get worker statistics
+### Work Item Routes
+- POST `/api/work` - add work item (uses QueueManager.add)
+- GET `/api/work/:id` - get work item (uses QueueManager.get)
+- POST `/api/work/:id/cancel` - cancel work item (uses QueueManager.cancel)
 
-## Dependencies
-- Database (from `./db.ts`) - For worker table operations
-- RateLimiter (from `./rate-limits.ts`) - For spawn capacity checks
-- ConflictDetector (from `./conflicts.ts`) - For releasing file locks
-- Dockerode - For container management
+### Worker Routes
+- POST `/api/worker/register` - worker registration (uses WorkerManager.register)
+- POST `/api/worker/:id/heartbeat` - worker heartbeat (uses WorkerManager.heartbeat)
+- POST `/api/worker/:id/lock` - request file locks (uses ConflictDetector.acquireLocks)
+- POST `/api/worker/:id/unlock` - release file locks (uses ConflictDetector.releaseLocks)
+- POST `/api/worker/:id/complete` - worker completed (uses WorkerManager.complete)
+- POST `/api/worker/:id/fail` - worker failed (uses WorkerManager.fail)
+- POST `/api/worker/:id/stuck` - worker stuck (uses WorkerManager.stuck)
 
-## Design Decisions
-1. Constructor accepts db, rateLimiter, conflictDetector, and Docker client
-2. Worker IDs are UUIDs generated on registration
-3. Container IDs are stored for kill operations
-4. Health check threshold is configurable (default 60s)
-5. Follow patterns from existing files (queue.ts, conflicts.ts)
+### Management Routes
+- GET `/api/status` - overall status (uses RateLimiter.getStatus + QueueManager.list)
+- GET `/api/workers` - list workers (uses WorkerManager.list)
+- POST `/api/workers/:id/kill` - kill worker (uses WorkerManager.kill)
+- GET `/api/queue` - queue contents (uses QueueManager.list + QueueManager.getStats)
+- GET `/api/metrics` - metrics (uses MetricsCollector.getSummary)
+- GET `/api/learnings` - learnings (uses MetricsCollector.getLearnings)
+
+## Implementation Details
+
+### Server Factory Pattern
+Export `createServer` function that takes dependencies (QueueManager, WorkerManager, etc.) and returns Express app. This enables testing with mocks.
+
+### Request Validation
+Use type guards to validate request bodies against shared types.
+
+### Error Handling
+- Wrap all handlers in try/catch
+- Return consistent error format using ErrorResponse type
+- Use appropriate HTTP status codes
+
+### Response Format
+- Success: Return appropriate response type from @factory/shared
+- Error: Return ErrorResponse with `{ error, code?, details? }`
 
 ## Tests
-- `hasCapacity()` - Delegates to rateLimiter.canSpawnWorker()
-- `register()` - Creates worker record, returns worker ID
-- `heartbeat()` - Updates heartbeat timestamp and iteration
-- `complete()` - Updates status, releases locks, updates work item
-- `fail()` - Updates status, releases locks, updates work item
-- `stuck()` - Updates status to stuck
-- `healthCheck()` - Returns stale workers
-- `list()` - Returns all workers
-- `getStats()` - Returns statistics by status
+- Unit tests with mocked dependencies
+- Test each endpoint's happy path
+- Test error handling (validation errors, not found, etc.)
 
 ## Exit Criteria
-- [ ] WorkerManager class implemented with all methods
-- [ ] Tests pass for all methods
-- [ ] Type checks pass (`bun run typecheck`)
-- [ ] Code follows existing patterns in the codebase
+- [ ] server.ts compiles without errors
+- [ ] All 16 endpoints implemented
+- [ ] Tests pass for key endpoints
+- [ ] Type check passes

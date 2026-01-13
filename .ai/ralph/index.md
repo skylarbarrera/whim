@@ -290,3 +290,55 @@
 **Notes:**
 - Fifth and final core component in Phase 4.3
 - Phase 4.3 complete, next: Phase 4.4 API Server
+
+---
+
+## Session 11 - 2025-01-12
+
+### Task: Phase 4.4 - API Server
+
+**Commit:** f82cc21
+
+**Files Created:**
+- `packages/orchestrator/src/server.ts` - Express API server
+- `packages/orchestrator/src/server.test.ts` - Unit tests (24 tests)
+
+**API Endpoints Implemented (16 total):**
+
+Work Item Routes:
+1. POST `/api/work` - Add work item to queue
+2. GET `/api/work/:id` - Get work item by ID
+3. POST `/api/work/:id/cancel` - Cancel work item
+
+Worker Routes:
+4. POST `/api/worker/register` - Worker self-registration
+5. POST `/api/worker/:id/heartbeat` - Worker heartbeat
+6. POST `/api/worker/:id/lock` - Request file locks
+7. POST `/api/worker/:id/unlock` - Release file locks
+8. POST `/api/worker/:id/complete` - Worker completed
+9. POST `/api/worker/:id/fail` - Worker failed
+10. POST `/api/worker/:id/stuck` - Worker stuck
+
+Management Routes:
+11. GET `/api/status` - Overall factory status
+12. GET `/api/workers` - List all workers
+13. POST `/api/workers/:id/kill` - Kill worker
+14. GET `/api/queue` - Queue contents and stats
+15. GET `/api/metrics` - Factory metrics summary
+16. GET `/api/learnings` - Learnings with optional filters
+
+**Features:**
+- Dependency injection via createServer(deps) for testability
+- Type guards for request body validation
+- Async error handling wrapper
+- Consistent error response format using ErrorResponse type
+- 404 handler for unknown routes
+- 500 handler for internal errors
+
+**Dependencies Added:**
+- supertest (dev) - HTTP testing
+- @types/supertest (dev)
+
+**Notes:**
+- All 24 tests pass
+- Phase 4.4 complete, next: Phase 4.5 Entry Point
