@@ -66,11 +66,21 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Worker now reports complete test metrics to orchestrator
 
 ## Acceptance Criteria
-- [ ] Worker successfully pushes Ralph's commits to GitHub
-- [ ] PR is created with link returned to orchestrator
-- [ ] Tests actually execute (not just marked as passed)
-- [ ] Failed steps produce actionable error messages
-- [ ] Work item status updated to 'completed' with prUrl populated
+- [x] Worker successfully pushes Ralph's commits to GitHub
+  - Fixed: createPullRequest checks for unpushed commits, not uncommitted changes
+  - Retry logic handles transient network failures
+- [x] PR is created with link returned to orchestrator
+  - Fixed: gh pr create runs with proper token environment
+  - Retry logic handles GitHub API failures
+- [x] Tests actually execute (not just marked as passed)
+  - Added: testing.ts module with runTests() function
+  - Worker runs npm test and parses output for real test counts
+- [x] Failed steps produce actionable error messages
+  - Added: Comprehensive logging with [SETUP], [PR], [RETRY] prefixes
+  - All git/gh commands log full stdout/stderr on failure
+- [x] Work item status updated to 'completed' with prUrl populated
+  - Fixed: client.complete() called with prUrl after successful PR creation
+  - Metrics include testsFailed and testStatus
 
 ## Technical Notes
 
