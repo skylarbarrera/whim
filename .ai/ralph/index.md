@@ -1367,3 +1367,101 @@ This integration provides:
 - Foundation for lint, test, and custom review steps
 - Task 1 of 8 complete in SPEC.md
 
+
+---
+
+## Session 31 - 2026-01-13
+
+### Task: Implement AI PR Detection Mechanism
+
+**Commit:** (pending)
+
+**Files Created:**
+- `packages/review-system/src/detection/ai-detector.ts` - AIDetector class
+- `packages/review-system/src/detection/pr-tagger.ts` - PRTagger class
+- `packages/review-system/src/detection/context-store.ts` - ContextStore class
+- `packages/review-system/src/detection/index.ts` - Detection module exports
+- `packages/review-system/src/__tests__/ai-detector.test.ts` - AIDetector tests (14 tests)
+- `packages/review-system/src/__tests__/pr-tagger.test.ts` - PRTagger tests (13 tests)
+- `packages/review-system/src/__tests__/context-store.test.ts` - ContextStore tests (9 tests)
+
+**Files Modified:**
+- `packages/review-system/src/index.ts` - Added detection module exports
+
+**AIDetector Class:**
+
+Detection Heuristics:
+- Commit co-author patterns (Claude, Anthropic)
+- Commit message markers ([RALPH:*] events, worker IDs)
+- PR description markers (AI Factory, Claude Code, structured templates)
+- PR labels (ai-generated, claude, factory, etc.)
+- PR metadata (workerId, aiContext)
+
+Features:
+- Confidence scoring (0-100) with weighted indicators
+- 50 threshold for AI detection
+- Extracts metadata (aiSystem, modelVersion, workerId)
+- Multiple indicator types: commit-coauthor, commit-message, pr-description, pr-label, pr-metadata
+
+**PRTagger Class:**
+
+Features:
+- Add/remove GitHub labels on PRs
+- Store metadata as PR comments (visible + hidden JSON)
+- Update existing comments instead of creating duplicates
+- Configurable tagging behavior (labels, visible/hidden comments)
+- Error handling with graceful degradation
+
+Comment Format:
+- Visible section: confidence score, AI system info, generation context
+- Hidden JSON section: full detection result and context for machine reading
+- Bot username identification for comment updates
+
+**ContextStore Class:**
+
+Features:
+- Retrieve stored AI generation context from PR comments
+- Parse hidden JSON from metadata comments
+- Batch context retrieval for multiple PRs
+- Separate getters for detection result and generation context
+- Graceful handling of missing or malformed data
+
+**Test Coverage:**
+
+AIDetector Tests (14):
+- Factory-generated PRs with high confidence
+- Claude co-authored PRs
+- Ralph event markers
+- Claude Code references
+- Manual PRs (low confidence)
+- AI labels detection
+- Structured PR templates
+- Model version extraction
+- Worker ID patterns
+- Multiple indicators aggregation
+- Edge cases (no commits, undefined metadata)
+
+PRTagger Tests (13):
+- Label addition and removal
+- Custom label configuration
+- Metadata comment creation
+- Generation context in comments
+- Comment updates (not duplicates)
+- Visible/hidden comment configuration
+- Error handling
+
+ContextStore Tests (9):
+- Context retrieval from comments
+- Missing context handling
+- Invalid JSON handling
+- hasContext checks
+- Separate getters for detection/context
+- Batch retrieval
+
+**Notes:**
+- All tests type-check successfully
+- Package builds without errors
+- 36 new tests added (98 total in review-system package)
+- Detection system ready for integration with review orchestrator
+- Task 2 of 8 complete in SPEC.md
+

@@ -8,7 +8,7 @@ Implement a composable PR review system specifically for AI-generated PRs with a
   - Define review step interfaces and contracts
   - Create plugin system for custom review steps
   - Design configuration schema for review workflows
-- [ ] Implement AI PR detection mechanism
+- [x] Implement AI PR detection mechanism
   - Add metadata tagging for AI-generated PRs
   - Create PR classification logic
   - Store AI generation context/prompts for reviewers

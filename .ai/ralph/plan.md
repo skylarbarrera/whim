@@ -1,55 +1,78 @@
-# Plan: Design Composable PR Review System Architecture
+# Plan: Implement AI PR Detection Mechanism
 
 ## Goal
-Design the architecture for a composable PR review system that can handle AI-generated PRs with automated lint and testing hooks. This includes defining interfaces, plugin system, and configuration schema.
+Implement a system to detect and tag AI-generated PRs with metadata that includes generation context and prompts for reviewers.
 
-## Sub-tasks from SPEC
-- Define review step interfaces and contracts
-- Create plugin system for custom review steps
-- Design configuration schema for review workflows
-
-## Approach
-
-### 1. Review Step Interfaces
-Create TypeScript interfaces for:
-- `ReviewStep`: Base interface for all review steps (lint, test, custom)
-- `ReviewStepResult`: Standard result format with status, messages, errors
-- `ReviewContext`: Shared context passed to each step (PR metadata, files changed, etc.)
-- `ReviewStepConfig`: Configuration for individual steps
-
-### 2. Plugin System
-Design a plugin architecture that allows:
-- Dynamic loading of review steps
-- Step registration and discovery
-- Step lifecycle hooks (initialize, execute, cleanup)
-- Step dependencies and ordering
-
-### 3. Configuration Schema
-Create YAML/JSON schema for:
-- Workflow definitions (steps, order, parallel vs sequential)
-- Repository-specific overrides
-- Environment-specific rules
-- Step-specific configurations
+## Sub-tasks from SPEC.md
+- Add metadata tagging for AI-generated PRs
+- Create PR classification logic
+- Store AI generation context/prompts for reviewers
 
 ## Files to Create/Modify
-- `packages/review-system/` - New package
-- `packages/review-system/src/types/review-step.ts` - Core interfaces
-- `packages/review-system/src/types/review-context.ts` - Context types
-- `packages/review-system/src/types/review-result.ts` - Result types
-- `packages/review-system/src/types/config.ts` - Configuration schema
-- `packages/review-system/src/plugin/registry.ts` - Plugin registry
-- `packages/review-system/package.json` - Package definition
-- `packages/review-system/tsconfig.json` - TypeScript config
+
+### New Files
+1. `packages/review-system/src/detection/ai-detector.ts`
+   - AIDetector class
+   - Detection heuristics (commit patterns, PR description markers)
+   - Confidence scoring
+
+2. `packages/review-system/src/detection/pr-tagger.ts`
+   - PRTagger class
+   - GitHub labels management
+   - PR metadata storage (comments, labels, custom fields)
+
+3. `packages/review-system/src/detection/context-store.ts`
+   - ContextStore class
+   - Store AI generation context (prompts, model info)
+   - Retrieve context for reviewers
+
+4. `packages/review-system/src/__tests__/ai-detector.test.ts`
+   - Test detection heuristics
+   - Test confidence scoring
+
+5. `packages/review-system/src/__tests__/pr-tagger.test.ts`
+   - Test label management
+   - Test metadata storage
+
+6. `packages/review-system/src/__tests__/context-store.test.ts`
+   - Test context storage and retrieval
+
+### Export Files
+7. `packages/review-system/src/detection/index.ts` - Export detection module
+8. `packages/review-system/src/index.ts` - Add detection exports
+
+## Implementation Details
+
+### AIDetector
+- Check for AI markers in commit messages (co-authored by Claude, Ralph events)
+- Check PR description for AI generation indicators
+- Check for [RALPH:*] events in commit messages
+- Check for factory worker metadata
+- Return confidence score (0-100)
+
+### PRTagger
+- Add/remove GitHub labels (ai-generated, needs-review, etc.)
+- Store metadata as PR comments (hidden or visible)
+- Support custom GitHub PR fields if available
+
+### ContextStore
+- Store generation context in PR body or comments
+- Include: prompts, model version, iteration count, token usage
+- Format for reviewer visibility
+- Support retrieval by PR number
 
 ## Tests
-- Unit tests for type definitions
-- Schema validation tests
-- Plugin registry tests
+- Test detection with factory-generated PRs (high confidence)
+- Test detection with Claude co-authorship (medium confidence)
+- Test detection with manual PRs (low confidence)
+- Test label addition/removal
+- Test context storage and retrieval
+- Test metadata formatting
 
 ## Exit Criteria
-- [ ] All TypeScript interfaces defined with JSDoc
-- [ ] Plugin registry skeleton implemented
-- [ ] Configuration schema documented and typed
-- [ ] Package builds without errors (`bun run build`)
-- [ ] Tests pass (`bun test`)
-- [ ] Files committed to git
+- [ ] AIDetector class implemented with confidence scoring
+- [ ] PRTagger class implemented with label and metadata management
+- [ ] ContextStore class implemented for context storage/retrieval
+- [ ] All tests passing (expect 30+ tests)
+- [ ] Types exported from package
+- [ ] Documentation in JSDoc format

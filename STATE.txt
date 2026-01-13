@@ -148,3 +148,13 @@ All acceptance criteria met:
   - Implemented ReviewStepRegistry for plugin management
   - 62 tests passing, package builds successfully
   - Support for sequential/parallel execution, conditional steps, blocking/non-blocking modes
+
+- [x] Task 2: Implement AI PR detection mechanism (Session 31)
+  - Created detection module with AIDetector, PRTagger, and ContextStore classes
+  - AIDetector analyzes PRs using multiple heuristics (commit patterns, PR body, labels, metadata)
+  - Confidence scoring system (0-100) with 50 threshold for AI detection
+  - PRTagger manages GitHub labels and metadata comments on PRs
+  - ContextStore retrieves stored generation context from PR comments
+  - 14 tests for AIDetector, 13 tests for PRTagger, 9 tests for ContextStore (36 new tests)
+  - All tests type-check successfully, package builds without errors
+  - Detection covers: Claude co-authorship, Ralph events, factory workers, structured templates
