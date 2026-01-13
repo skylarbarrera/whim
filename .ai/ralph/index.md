@@ -820,3 +820,43 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 **Notes:**
 - All 56 tests pass
 - Build and type checks pass
+
+---
+
+## Session 22 - 2026-01-13
+
+### Task: Bug Fix Phase 1.3 - Pass GH_TOKEN Properly
+
+**Files Modified:**
+- `packages/worker/src/setup.ts` - Enhanced token handling for gh CLI
+
+**Files Created:**
+- `packages/worker/src/setup.test.ts` - Tests for setup module (4 tests)
+
+**Changes Made:**
+
+1. **Enhanced token passing to gh CLI:**
+   - Now passes both `GH_TOKEN` and `GITHUB_TOKEN` environment variables
+   - `gh` CLI checks GH_TOKEN first, then GITHUB_TOKEN - redundancy ensures compatibility
+   - Preserves `GH_HOST` environment variable if set (for GitHub Enterprise scenarios)
+
+2. **Added token presence logging:**
+   - Logs masked token: first 4 chars + length (e.g., "ghp_...(40 chars)")
+   - Helps debug authentication issues without exposing secrets
+
+3. **Added command logging:**
+   - Logs the full `gh pr create` command before execution
+
+4. **Added setup.test.ts:**
+   - Tests PRStep enum values
+   - Tests token masking logic (normal tokens, empty tokens, undefined tokens)
+
+**Technical Details:**
+- env object now explicitly sets: `{ GH_TOKEN, GITHUB_TOKEN, GH_HOST? }`
+- Token masking: `token.substring(0, 4)...(${length} chars)` or "(empty)"
+- All 60 tests pass (4 new in setup.test.ts)
+
+**Notes:**
+- All tests pass
+- Build and type checks pass
+- Phase 1 (Fix PR Creation Flow) now complete

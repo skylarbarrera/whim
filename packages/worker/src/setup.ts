@@ -319,6 +319,14 @@ export async function createPullRequest(
 
   // Step 5: Create PR
   console.log("[PR] Step 5/5: Creating pull request...");
+
+  // Log token presence (masked for security)
+  const tokenLength = githubToken?.length || 0;
+  const tokenMask = tokenLength > 0
+    ? `${githubToken.substring(0, 4)}...(${tokenLength} chars)`
+    : "(empty)";
+  console.log(`[PR] Using GitHub token: ${tokenMask}`);
+
   const prArgs = [
     "pr",
     "create",
@@ -329,9 +337,22 @@ export async function createPullRequest(
     "--head",
     workItem.branch,
   ];
+
+  // Pass both GH_TOKEN and GITHUB_TOKEN for maximum compatibility
+  // gh CLI checks GH_TOKEN first, then GITHUB_TOKEN
+  // Also preserve GH_HOST if set (for GitHub Enterprise)
+  const ghEnv: NodeJS.ProcessEnv = {
+    GH_TOKEN: githubToken,
+    GITHUB_TOKEN: githubToken,
+  };
+  if (process.env.GH_HOST) {
+    ghEnv.GH_HOST = process.env.GH_HOST;
+  }
+
+  console.log("[PR] Running: gh", prArgs.join(" "));
   const prResult = await exec("gh", prArgs, {
     cwd: repoDir,
-    env: { GH_TOKEN: githubToken },
+    env: ghEnv,
   });
 
   if (prResult.code !== 0) {

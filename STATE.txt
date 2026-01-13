@@ -47,3 +47,8 @@ The AI Software Factory implementation is complete.
   - PRResult type with status (success/no_changes/error), step, prUrl, error details
   - logCommandFailure helper logs full command, exit code, stdout, stderr
   - Callers can distinguish "no changes" from actual errors
+- Phase 1.3: Pass GH_TOKEN properly to gh command
+  - Now passes both GH_TOKEN and GITHUB_TOKEN for maximum compatibility
+  - Logs masked token presence (first 4 chars + length) for debugging
+  - Preserves GH_HOST environment variable for GitHub Enterprise
+  - Added setup.test.ts with token masking tests

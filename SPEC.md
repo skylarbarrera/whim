@@ -19,7 +19,10 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Always attempt push if there are commits ahead of origin
   - Remove the misleading "No changes to commit" early return
 - [x] Add better error logging to show exactly which step failed (stage, commit, push, pr create)
-- [ ] Pass `GH_TOKEN` properly to `gh` command (currently only sets env, may need `--token` flag)
+- [x] Pass `GH_TOKEN` properly to `gh` command (currently only sets env, may need `--token` flag)
+  - Now passes both `GH_TOKEN` and `GITHUB_TOKEN` for maximum compatibility
+  - Logs masked token presence for debugging
+  - Preserves `GH_HOST` for GitHub Enterprise scenarios
 
 ### Phase 2: Add Test Infrastructure to Worker
 - [ ] Install Node.js test runners in worker Dockerfile

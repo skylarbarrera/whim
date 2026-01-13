@@ -1,47 +1,35 @@
-# Plan: Add Better Error Logging to PR Creation
+# Plan: Pass GH_TOKEN properly to gh command
 
 ## Goal
-Add structured error logging to `createPullRequest` in `packages/worker/src/setup.ts` to show exactly which step failed (stage, commit, push, pr create) with full command details and output.
+Ensure the GitHub CLI (`gh`) command receives authentication tokens reliably in containerized environments.
 
-## Current State
-The function already has `[PR]` prefixed logging but:
-- Returns `null` on failure without indicating which specific step failed
-- Callers can't distinguish between "no commits to push" (expected) vs "push failed" (error)
-- Missing command details when failures occur
+## Problem
+The current implementation passes `GH_TOKEN` via environment variable only:
+```typescript
+const prResult = await exec("gh", prArgs, {
+  cwd: repoDir,
+  env: { GH_TOKEN: githubToken },
+});
+```
 
-## Changes
+This may not work reliably because:
+1. The `exec` helper merges `process.env` with the passed env, but only sets `GH_TOKEN`
+2. Some containerized environments may strip or not propagate env vars properly
+3. The `gh` CLI also looks for `GITHUB_TOKEN` as a fallback
 
-### 1. Add PRStep enum and PRResult type
-Define clear step identifiers and a result type that captures:
-- Success/failure status
-- Which step was reached
-- Error details (command, stdout, stderr)
-
-### 2. Modify createPullRequest to return structured result
-Instead of `string | null`, return `PRResult` with:
-- `status: 'success' | 'no_changes' | 'error'`
-- `step: PRStep` (where it completed or failed)
-- `prUrl?: string` (on success)
-- `error?: { step: PRStep, command: string, exitCode: number, stdout: string, stderr: string }`
-
-### 3. Add helper for logging failed commands
-Create `logCommandFailure(step, command, args, result)` that logs:
-- Step that failed
-- Full command with args
-- Exit code
-- stdout and stderr
+## Solution
+1. Pass both `GH_TOKEN` and `GITHUB_TOKEN` environment variables (for redundancy)
+2. Preserve `GH_HOST` if set (for GitHub Enterprise scenarios)
+3. Log that token is being provided (without revealing the token)
+4. Add a token validation step before attempting PR creation
 
 ## Files to Modify
-- `packages/worker/src/setup.ts` - Add types and improve logging
+- `packages/worker/src/setup.ts` - Update `createPullRequest` function
 
 ## Tests
-- Existing tests should still pass (run `bun test`)
-- Type check with `bun run build` in packages/worker
+- `packages/worker/src/__tests__/setup.test.ts` - Add test for token passing
 
 ## Exit Criteria
-- [ ] PRStep enum with: STAGE, COMMIT, CHECK_UNPUSHED, PUSH, CREATE_PR
-- [ ] PRResult type with status, step, prUrl, error fields
-- [ ] logCommandFailure helper logs full command details
-- [ ] createPullRequest returns PRResult instead of string | null
-- [ ] Type checks pass
-- [ ] Tests pass
+- [ ] Both `GH_TOKEN` and `GITHUB_TOKEN` are passed to `gh` command
+- [ ] Token presence is logged (masked)
+- [ ] Tests verify token behavior
