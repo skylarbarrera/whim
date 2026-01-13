@@ -1,6 +1,69 @@
-# Integration Testing - Learnings
+# Learnings
 
-## Date: 2026-01-13 (Phase 10)
+## Ralph v0.3.0 Integration - 2026-01-13
+
+### Ralph Spec Generation Capabilities
+
+**Ralph v0.3.0** introduces powerful spec creation tooling that can be integrated into the factory:
+
+1. **Headless Spec Generation** (`ralph spec --headless`)
+   - Autonomous spec creation from text descriptions
+   - Outputs JSON events for programmatic integration
+   - Includes automatic validation against Ralph conventions
+   - Returns structured data: task count, validation status, violations
+
+2. **Interactive Spec Creation** (`/create-spec` skill in Claude Code)
+   - Guided interview process for requirements gathering
+   - Asks about project type, stack, features, constraints
+   - Generates spec with LLM review to catch anti-patterns
+   - Only proceeds after passing validation checks
+
+3. **Spec Validation** (built-in)
+   - Checks for code snippets (forbidden in SPECs)
+   - Detects file:line references
+   - Flags shell commands in task descriptions
+   - Identifies implementation instructions vs requirements
+
+### Integration Pattern
+
+Created `RalphSpecGenerator` class in intake service:
+- Spawns `ralph spec --headless` as child process
+- Parses JSON event stream from stdout
+- Extracts generated SPEC.md file on success
+- Provides same interface as Anthropic SDK spec generator
+- Enables switching via `USE_RALPH_SPEC` environment variable
+
+**Benefits:**
+- Better spec quality through built-in validation
+- Consistent spec format across all issues
+- Reduced API costs (uses Claude Code CLI instead of SDK)
+- Fallback option if Ralph spec generation fails
+
+**Trade-offs:**
+- Requires Ralph CLI to be installed (already in worker Docker image)
+- Slightly longer generation time due to validation step
+- Creates temporary files in work directory
+
+### Configuration
+
+```env
+# Use Ralph CLI for spec generation (recommended)
+USE_RALPH_SPEC=true
+
+# Or fall back to Anthropic SDK
+USE_RALPH_SPEC=false
+ANTHROPIC_API_KEY=your_key_here
+```
+
+### Testing Notes
+
+- Unit tests for RalphSpecGenerator cover formatting and branch generation
+- Full integration requires Ralph CLI and Claude Code authentication
+- Fallback to Anthropic SDK ensures system remains operational
+
+---
+
+## Integration Testing - 2026-01-13 (Phase 10)
 
 ### Issues Found and Fixed
 

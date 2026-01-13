@@ -1,43 +1,53 @@
-# Plan: Phase 4.3 - Track and Report Test Execution Results in Worker Metrics
+# Task 1: Update Ralph Repository Integration
 
 ## Goal
-Enhance worker metrics to include testsFailed and testStatus for better observability.
+Pull latest changes from Ralph repo (v0.3.0), integrate updated spec tooling, and test headless spec creation functionality.
 
 ## Current State
-- Test results are already captured by runTests() in testing.ts
-- testsRun and testsPassed are already sent in WorkerCompleteRequest
-- testsFailed is available but not sent
-- testStatus (passed/failed/timeout/skipped/error) not tracked in metrics
+- Ralph is installed via `git clone` in worker Dockerfile (line 63-66)
+- Ralph v0.3.0 includes:
+  - Headless mode (`--headless` flag) with JSON events
+  - Autonomous spec generation (`ralph spec "description"`)
+  - Interactive spec creation skill (`/create-spec`)
+  - Spec validator and LLM review capabilities
+- Intake service uses Anthropic SDK directly for spec generation
+- Worker calls `ralph init` and `ralph run` successfully
 
-## Files to Modify
-- `packages/shared/src/types.ts` - Add testsFailed and testStatus to metrics
-- `packages/worker/src/ralph.ts` - Add testsFailed to RalphMetrics
-- `packages/worker/src/index.ts` - Include testsFailed and testStatus in metrics
+## Implementation Plan
 
-## Changes
+### 1. Document Ralph v0.3.0 Integration
+- Ralph is already at latest version (pulled from git on Docker build)
+- Document new capabilities in README/docs
+- No code changes needed for Ralph version itself
 
-### 1. Update shared types
-Add to WorkerCompleteRequest.metrics:
-- testsFailed: number
-- testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error"
+### 2. Integrate Ralph Spec Tooling in Intake Service
+Create a new `RalphSpecGenerator` class that:
+- Wraps `ralph spec --headless` CLI command
+- Parses JSON event output
+- Falls back to Anthropic SDK on failure
+- Add as alternative to current SpecGenerator
 
-Add to WorkerMetrics:
-- testsFailed: number
-- testStatus?: string
+### 3. Add Interactive Spec Creation Documentation
+- Document `/create-spec` skill for manual use
+- Add examples of both autonomous and interactive flows
+- Update factory README with workflow options
 
-### 2. Update ralph.ts RalphMetrics
-Add testsFailed field
+### 4. Test Integration
+- Test ralph spec generation with real GitHub issue
+- Verify JSON event parsing
+- Ensure fallback works
+- Integration test with orchestrator
 
-### 3. Update index.ts
-Include testsFailed and testStatus in the metrics sent to orchestrator
-
-## Tests
-- Existing tests should pass
-- Update client.test.ts to include new fields
+## Files to Modify/Create
+- `packages/intake/src/ralph-spec-gen.ts` (NEW) - Ralph CLI wrapper
+- `packages/intake/src/ralph-spec-gen.test.ts` (NEW) - Tests
+- `packages/intake/src/index.ts` - Add RalphSpecGenerator option
+- `README.md` - Document new spec creation flows
+- `.ai/learnings.md` - Document Ralph v0.3.0 capabilities
 
 ## Exit Criteria
-- [ ] testsFailed added to metrics types
-- [ ] testStatus added to metrics types
-- [ ] Worker sends complete test metrics to orchestrator
-- [ ] Type checks pass
-- [ ] All tests pass
+- [x] Ralph repository is at latest version (v0.3.0)
+- [ ] Ralph spec tooling integrated in intake service
+- [ ] Tests pass for Ralph spec generation
+- [ ] Documentation updated
+- [ ] Both spec generation methods work (Ralph + Anthropic SDK)

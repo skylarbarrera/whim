@@ -1089,3 +1089,73 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All tests pass
 - Build and type checks pass
 - Phase 4 (Observability) now complete
+
+---
+
+## Session 28 - 2026-01-13
+
+### Task: Update Ralph Repository Integration (Ralph v0.3.0)
+
+**Commits:** (pending)
+
+**Files Created:**
+- `packages/intake/src/ralph-spec-gen.ts` - RalphSpecGenerator class wrapping ralph CLI
+- `packages/intake/src/ralph-spec-gen.test.ts` - Unit tests for RalphSpecGenerator
+
+**Files Modified:**
+- `packages/intake/src/index.ts` - Added RalphSpecGenerator option with USE_RALPH_SPEC config
+- `.env.example` - Added USE_RALPH_SPEC and conditional ANTHROPIC_API_KEY
+- `README.md` - Added "Spec Creation Flows" section documenting both autonomous and interactive flows
+- `.ai/new-learnings.md` - Documented Ralph v0.3.0 capabilities and integration pattern
+- `SPEC.md` - Marked first task as complete
+
+**Ralph v0.3.0 Features Integrated:**
+1. **Headless spec generation** (`ralph spec --headless`)
+   - Autonomous spec creation from text descriptions
+   - JSON event output for programmatic integration
+   - Built-in validation against Ralph conventions
+
+2. **Interactive spec creation** (`/create-spec` skill)
+   - Guided interview process for requirements gathering
+   - LLM-powered spec review and validation
+   - Documented in README for manual use
+
+3. **Spec validation** (built-in)
+   - Checks for anti-patterns (code snippets, file refs, shell commands)
+   - Ensures requirements-focused specs vs implementation details
+
+**RalphSpecGenerator Implementation:**
+- Spawns `ralph spec --headless` as child process
+- Parses JSON event stream from stdout
+- Extracts generated SPEC.md file on success
+- Provides same interface as Anthropic SDK SpecGenerator
+- Configurable timeout (default 5 minutes)
+- Configurable work directory
+
+**Configuration:**
+- `USE_RALPH_SPEC=true` - Use Ralph CLI for spec generation
+- `USE_RALPH_SPEC=false` - Use Anthropic SDK (requires ANTHROPIC_API_KEY)
+- Backwards compatible: defaults to Anthropic SDK
+
+**Benefits:**
+- Better spec quality through built-in validation
+- Consistent spec format across all issues
+- Reduced API costs (uses Claude Code CLI instead of SDK)
+- Fallback option ensures operational continuity
+
+**Trade-offs:**
+- Requires Ralph CLI (already in worker Docker image)
+- Slightly longer generation time due to validation
+- Creates temporary files in work directory
+
+**Documentation:**
+- Added comprehensive "Spec Creation Flows" section to README
+- Documented both autonomous (Ralph + Anthropic) and interactive flows
+- Updated configuration table with new variables
+- Created learnings document with integration pattern
+
+**Notes:**
+- Ralph already at v0.3.0 in worker Dockerfile (git clone pulls latest)
+- Unit tests created for RalphSpecGenerator formatting logic
+- Full integration testing requires Claude Code CLI authentication
+- All existing functionality preserved with fallback to Anthropic SDK
