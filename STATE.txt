@@ -42,3 +42,8 @@ The AI Software Factory implementation is complete.
   - Adds extensive logging with [PR] prefix for debugging
   - Falls back to multiple refs (origin/HEAD, origin/main, origin/master)
   - Forces push attempt for new branches not yet on remote
+- Phase 1.2: Added structured error logging with step tracking
+  - PRStep enum identifies each step (STAGE, COMMIT, CHECK_UNPUSHED, PUSH, CREATE_PR)
+  - PRResult type with status (success/no_changes/error), step, prUrl, error details
+  - logCommandFailure helper logs full command, exit code, stdout, stderr
+  - Callers can distinguish "no changes" from actual errors

@@ -774,3 +774,49 @@ The `createPullRequest` function was checking for uncommitted changes using `git
 - All 224+ tests pass
 - Build and type checks pass
 - This also addresses part of the second task (better error logging)
+
+---
+
+## Session 21 - 2026-01-13
+
+### Task: Bug Fix Phase 1.2 - Add Better Error Logging
+
+**Files Modified:**
+- `packages/worker/src/setup.ts` - Added structured error types and logging
+- `packages/worker/src/index.ts` - Updated to handle new PRResult type
+
+**Changes Made:**
+
+1. **Added PRStep enum** - Identifies each step in the PR flow:
+   - STAGE, COMMIT, CHECK_UNPUSHED, PUSH, CREATE_PR
+
+2. **Added PRError interface** - Captures failure details:
+   - step, command, exitCode, stdout, stderr
+
+3. **Added PRResult interface** - Structured return type:
+   - status: "success" | "no_changes" | "error"
+   - step: which step completed/failed
+   - prUrl: on success
+   - error: PRError on failure
+
+4. **Added helper functions:**
+   - `logCommandFailure()` - Logs detailed failure info with [PR] prefix
+   - `createPRError()` - Creates PRError from command result
+
+5. **Updated createPullRequest():**
+   - Returns PRResult instead of string | null
+   - Logs step progress (Step X/5)
+   - Returns structured error on any failure
+
+6. **Updated index.ts:**
+   - Handles all three result statuses
+   - Logs which step failed with command details
+
+**Technical Details:**
+- Callers can now distinguish "no changes" (expected) from errors
+- Each failed step shows: step name, full command, exit code, stdout, stderr
+- Progress logging shows Step 1/5 through Step 5/5
+
+**Notes:**
+- All 56 tests pass
+- Build and type checks pass

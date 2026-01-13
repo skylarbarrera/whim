@@ -18,7 +18,7 @@ Claude marks "tests pass" but the worker container lacks test infrastructure (je
   - Use `git log origin/main..HEAD --oneline` or similar to detect unpushed commits
   - Always attempt push if there are commits ahead of origin
   - Remove the misleading "No changes to commit" early return
-- [ ] Add better error logging to show exactly which step failed (stage, commit, push, pr create)
+- [x] Add better error logging to show exactly which step failed (stage, commit, push, pr create)
 - [ ] Pass `GH_TOKEN` properly to `gh` command (currently only sets env, may need `--token` flag)
 
 ### Phase 2: Add Test Infrastructure to Worker
