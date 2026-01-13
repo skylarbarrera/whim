@@ -1,23 +1,31 @@
-# Plan: Phase 4.1 - Orchestrator Package Setup
+# Plan: Phase 4.2 - Database & Redis Clients
 
 ## Goal
-Set up the `@factory/orchestrator` package with proper configuration and dependencies.
+Create PostgreSQL and Redis client wrappers for the orchestrator package.
 
 ## Files to Create
-- `packages/orchestrator/package.json` - package definition
-- `packages/orchestrator/tsconfig.json` - TypeScript config
-- `packages/orchestrator/src/index.ts` - placeholder entry point
+1. `packages/orchestrator/src/db.ts` - PostgreSQL client wrapper
+2. `packages/orchestrator/src/redis.ts` - Redis client wrapper
 
-## Dependencies
-- express - HTTP server
-- pg - PostgreSQL client
-- ioredis - Redis client
-- dockerode - Docker SDK
-- uuid - UUID generation
-- @types/* for TypeScript support
+## Implementation Details
+
+### db.ts
+- Create a Database class wrapping the `pg` Pool
+- Provide typed query helper methods
+- Include helper functions for common operations (row to entity mapping)
+- Camelcase conversion for column names (snake_case DB → camelCase TS)
+- Connection management (connect/disconnect)
+
+### redis.ts
+- Create a RedisClient class wrapping `ioredis`
+- Provide typed methods for common operations (get, set, incr, expire)
+- Connection management (connect/disconnect)
+- Key prefix support for namespacing
+
+## Tests
+- Type checks via `bun run typecheck` in orchestrator package
 
 ## Exit Criteria
-- [x] package.json exists with correct name and dependencies
-- [x] tsconfig.json extends root config
-- [x] Package can be built without errors
-- [x] Turborepo recognizes the new package
+- [ ] Both files compile without errors
+- [ ] Types align with @factory/shared types
+- [ ] Code follows patterns established in shared package
