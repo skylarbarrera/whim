@@ -28,6 +28,7 @@ credentials.json
 # Build artifacts
 dist/
 build/
+.next/
 *.egg-info/
 *.tsbuildinfo
 
