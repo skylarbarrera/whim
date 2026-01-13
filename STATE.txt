@@ -4,6 +4,7 @@
 - Phase 1: Project Scaffolding (all 5 tasks)
 - Phase 2: Shared Package (all 4 tasks)
 - Phase 3: Database Schema (all 2 tasks)
+- Phase 4.1: Orchestrator Package Setup (all 3 tasks)
 
 ## Current
-- Phase 4: Orchestrator Package (next iteration)
+- Phase 4.2: Database & Redis Clients (next iteration)

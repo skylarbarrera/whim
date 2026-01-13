@@ -79,3 +79,28 @@
 - Using 1536-dimension vectors (OpenAI ada-002 compatible)
 - All column names use snake_case (PostgreSQL convention)
 - All Phase 3 tasks completed in single iteration
+
+---
+
+## Session 4 - 2025-01-12
+
+### Task: Phase 4.1 - Orchestrator Package Setup
+
+**Files Created:**
+- `packages/orchestrator/package.json` - Package config with name @factory/orchestrator
+- `packages/orchestrator/tsconfig.json` - Extends root config with reference to shared
+- `packages/orchestrator/src/index.ts` - Placeholder entry point
+
+**Dependencies Added:**
+- express ^4.21.0 - HTTP server
+- pg ^8.13.0 - PostgreSQL client
+- ioredis ^5.4.0 - Redis client
+- dockerode ^4.0.0 - Docker SDK
+- uuid ^11.0.0 - UUID generation
+- Type definitions for all the above
+
+**Notes:**
+- tsconfig.json includes reference to @factory/shared package
+- Build verifies successfully with `bun run build`
+- Turborepo recognizes and caches both packages
+- All Phase 4.1 tasks completed in single iteration

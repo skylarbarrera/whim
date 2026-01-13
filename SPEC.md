@@ -53,9 +53,9 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 ## Phase 4: Orchestrator Package (`packages/orchestrator`)
 
 ### 4.1 Setup
-- [ ] Create `packages/orchestrator/package.json` with name `@factory/orchestrator`
-- [ ] Create `packages/orchestrator/tsconfig.json`
-- [ ] Add dependencies: express, pg, ioredis, dockerode, uuid
+- [x] Create `packages/orchestrator/package.json` with name `@factory/orchestrator`
+- [x] Create `packages/orchestrator/tsconfig.json`
+- [x] Add dependencies: express, pg, ioredis, dockerode, uuid
 
 ### 4.2 Database & Redis Clients
 - [ ] Create `packages/orchestrator/src/db.ts` - PostgreSQL client wrapper
