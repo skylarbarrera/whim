@@ -1,40 +1,24 @@
-# Phase 5.2: Worker Config and Dockerfile
+# Phase 6: Intake Package
 
 ## Goal
-Create Claude Code configuration files and Dockerfile for the worker package.
+Implement the intake package that polls GitHub for issues with a specific label, generates specs from them using Claude, and submits work items to the orchestrator.
 
 ## Files to Create
-
-1. **`packages/worker/.claude/CLAUDE.md`** - Worker instructions telling Claude how to work through SPEC.md
-2. **`packages/worker/.claude/mcp.json`** - MCP server configuration (playwright, context7)
-3. **`packages/worker/.claude/settings.json`** - Claude Code settings
-4. **`packages/worker/Dockerfile`** - Container build for worker
-
-## Key Requirements
-
-### CLAUDE.md
-- Tell Claude it's "Ralph" running autonomously
-- Must emit `[RALPH:*]` events for worker parsing (see ralph.ts pattern)
-- Work through SPEC.md checkboxes
-- Report iterations, file edits, stuck states, completion
-
-### MCP Servers
-- playwright: Browser automation for E2E testing
-- context7: Library documentation lookup
-
-### Dockerfile
-- Base image with Node.js
-- Install: git, curl, gh CLI, Claude Code CLI
-- Copy and build worker package
-- Copy Claude config into image
-- Entry point runs the worker
+- `packages/intake/package.json` - Package config with @octokit/rest, @anthropic-ai/sdk
+- `packages/intake/tsconfig.json` - TypeScript config extending root
+- `packages/intake/src/github.ts` - GitHubAdapter class (poll, addLabel, removeLabel)
+- `packages/intake/src/spec-gen.ts` - SpecGenerator class (generate: issue → SPEC.md)
+- `packages/intake/src/index.ts` - Main entry: poll → generate → submit → update labels
+- `packages/intake/Dockerfile` - Docker build config
 
 ## Tests
-- Existing tests should pass
-- Type check should pass
+- `packages/intake/src/github.test.ts` - GitHubAdapter tests (mocked Octokit)
+- `packages/intake/src/spec-gen.test.ts` - SpecGenerator tests (mocked Anthropic)
+- `packages/intake/src/index.test.ts` - Integration tests
 
 ## Exit Criteria
-- [ ] All 4 files created
-- [ ] `bun test` passes in worker package
-- [ ] `bun tsc --noEmit` passes
-- [ ] Committed with clear message
+- [ ] All source files created with proper types
+- [ ] Tests pass with `bun test`
+- [ ] Type check passes with `bun run typecheck`
+- [ ] Dockerfile builds successfully
+- [ ] SPEC.md checkbox marked
