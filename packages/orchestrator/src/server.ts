@@ -39,13 +39,28 @@ export interface ServerDependencies {
 /**
  * Type guard for AddWorkItemRequest
  */
+// Validation constants
+const MAX_REPO_LENGTH = 200;
+const MAX_BRANCH_LENGTH = 250;
+const MAX_SPEC_LENGTH = 100_000;  // 100KB
+const REPO_PATTERN = /^[a-zA-Z0-9][-a-zA-Z0-9]*\/[a-zA-Z0-9._-]+$/;
+
 function isValidAddWorkItemRequest(body: unknown): body is AddWorkItemRequest {
   if (typeof body !== "object" || body === null) return false;
   const obj = body as Record<string, unknown>;
+  // Repo validation: required, format, length
   if (typeof obj.repo !== "string" || obj.repo.length === 0) return false;
+  if (obj.repo.length > MAX_REPO_LENGTH) return false;
+  if (!REPO_PATTERN.test(obj.repo)) return false;
+  // Spec validation: required, length
   if (typeof obj.spec !== "string" || obj.spec.length === 0) return false;
+  if (obj.spec.length > MAX_SPEC_LENGTH) return false;
+  // Branch validation: optional, length
   if (obj.branch !== undefined && typeof obj.branch !== "string") return false;
+  if (typeof obj.branch === "string" && obj.branch.length > MAX_BRANCH_LENGTH) return false;
+  // Priority validation
   if (obj.priority !== undefined && !["low", "medium", "high", "critical"].includes(obj.priority as string)) return false;
+  // Max iterations validation
   if (obj.maxIterations !== undefined && (typeof obj.maxIterations !== "number" || obj.maxIterations < 1)) return false;
   return true;
 }
@@ -74,7 +89,12 @@ function isValidWorkerHeartbeatRequest(body: unknown): body is WorkerHeartbeatRe
 function isValidWorkerLockRequest(body: unknown): body is WorkerLockRequest {
   if (typeof body !== "object" || body === null) return false;
   const obj = body as Record<string, unknown>;
-  return Array.isArray(obj.files) && obj.files.every((f) => typeof f === "string");
+  return (
+    typeof obj.repo === "string" &&
+    obj.repo.length > 0 &&
+    Array.isArray(obj.files) &&
+    obj.files.every((f) => typeof f === "string")
+  );
 }
 
 /**
@@ -140,7 +160,29 @@ export function createServer(deps: ServerDependencies): express.Application {
   const app = express();
 
   // Middleware
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));  // Limit request body size
+
+  // API Key authentication middleware
+  const apiKey = process.env.API_KEY;
+  if (apiKey) {
+    app.use((req, res, next) => {
+      // Skip auth for health check (for load balancers)
+      if (req.path === "/health") {
+        return next();
+      }
+      // Skip auth for worker endpoints (workers authenticate via WORKER_ID)
+      if (req.path.startsWith("/api/worker/")) {
+        return next();
+      }
+      // Check for API key in header
+      const providedKey = req.headers["x-api-key"] ||
+        req.headers.authorization?.replace("Bearer ", "");
+      if (providedKey !== apiKey) {
+        return res.status(401).json({ error: "Unauthorized", code: "UNAUTHORIZED" });
+      }
+      next();
+    });
+  }
 
   // Health check
   app.get("/health", (_req, res) => {
@@ -244,7 +286,7 @@ export function createServer(deps: ServerDependencies): express.Application {
         return;
       }
 
-      const result = await deps.conflicts.acquireLocks(req.params.id, req.body.files);
+      const result = await deps.conflicts.acquireLocks(req.params.id, req.body.repo, req.body.files);
       const acquired = result.blocked.length === 0;
       res.json({
         acquired,
@@ -264,7 +306,7 @@ export function createServer(deps: ServerDependencies): express.Application {
         return;
       }
 
-      await deps.conflicts.releaseLocks(req.params.id, req.body.files);
+      await deps.conflicts.releaseLocks(req.params.id, req.body.repo, req.body.files);
       res.json({ success: true });
     })
   );

@@ -19,6 +19,8 @@ function createWorkItem(overrides: Partial<WorkItem> = {}): WorkItem {
     workerId: null,
     iteration: 0,
     maxIterations: 10,
+    retryCount: 0,
+    nextRetryAt: null,
     createdAt: new Date("2024-01-01"),
     updatedAt: new Date("2024-01-01"),
     completedAt: null,
@@ -247,11 +249,11 @@ describe("Server", () => {
 
       const res = await request(app)
         .post("/api/worker/worker-123/lock")
-        .send({ files: ["file1.ts", "file2.ts"] });
+        .send({ repo: "owner/repo", files: ["file1.ts", "file2.ts"] });
 
       expect(res.status).toBe(200);
       expect(res.body.acquired).toBe(true);
-      expect(deps.conflicts.acquireLocks).toHaveBeenCalledWith("worker-123", ["file1.ts", "file2.ts"]);
+      expect(deps.conflicts.acquireLocks).toHaveBeenCalledWith("worker-123", "owner/repo", ["file1.ts", "file2.ts"]);
     });
 
     it("POST /api/worker/:id/lock returns blocked files", async () => {
@@ -263,7 +265,7 @@ describe("Server", () => {
 
       const res = await request(app)
         .post("/api/worker/worker-123/lock")
-        .send({ files: ["file1.ts"] });
+        .send({ repo: "owner/repo", files: ["file1.ts"] });
 
       expect(res.status).toBe(200);
       expect(res.body.acquired).toBe(false);
@@ -276,11 +278,11 @@ describe("Server", () => {
 
       const res = await request(app)
         .post("/api/worker/worker-123/unlock")
-        .send({ files: ["file1.ts"] });
+        .send({ repo: "owner/repo", files: ["file1.ts"] });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(deps.conflicts.releaseLocks).toHaveBeenCalledWith("worker-123", ["file1.ts"]);
+      expect(deps.conflicts.releaseLocks).toHaveBeenCalledWith("worker-123", "owner/repo", ["file1.ts"]);
     });
 
     it("POST /api/worker/:id/complete marks worker complete", async () => {

@@ -1,4 +1,4 @@
-# Factory Orchestrator Dockerfile
+# Whim Orchestrator Dockerfile
 # Multi-stage build using Bun for consistency with monorepo
 
 # =============================================================================
@@ -52,7 +52,7 @@ WORKDIR /app/packages/orchestrator
 # Environment variables with defaults
 ENV PORT=3000
 ENV LOOP_INTERVAL_MS=5000
-ENV DATABASE_URL=postgres://factory:factory@postgres:5432/factory
+ENV DATABASE_URL=postgres://whim:whim@postgres:5432/whim
 ENV REDIS_URL=redis://redis:6379
 
 # Expose the API port

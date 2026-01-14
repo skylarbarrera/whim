@@ -26,7 +26,7 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
 fi
 
 # Default database URL
-DATABASE_URL="${DATABASE_URL:-postgres://factory:factory@localhost:5432/factory}"
+DATABASE_URL="${DATABASE_URL:-postgres://whim:whim@localhost:5433/whim}"
 
 # Parse DATABASE_URL to get connection parameters
 # Format: postgres://user:password@host:port/database

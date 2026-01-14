@@ -1,4 +1,4 @@
-# Factory Intake Service Dockerfile
+# Whim Intake Service Dockerfile
 # Multi-stage build using Bun for consistency with monorepo
 
 # =============================================================================
@@ -44,8 +44,8 @@ RUN bun install --production
 WORKDIR /app/packages/intake
 
 # Environment variables (no defaults for secrets)
-ENV ORCHESTRATOR_URL=http://orchestrator:3000
-ENV INTAKE_LABEL=ai-factory
+ENV ORCHESTRATOR_URL=http://whim-orchestrator:3000
+ENV INTAKE_LABEL=ai-whim
 ENV POLL_INTERVAL=60000
 
 # Run the intake service

@@ -60,13 +60,22 @@ if [ ! -f ".env" ]; then
 GITHUB_TOKEN=           # GitHub PAT with repo permissions
 REPOS=                  # Comma-separated: owner/repo1,owner/repo2
 
+# Port mappings (single source of truth)
+POSTGRES_PORT=5433
+REDIS_PORT=6380
+ORCHESTRATOR_PORT=3002
+DASHBOARD_PORT=3003
+
+# Service URLs (derived from ports above)
+DATABASE_URL=postgres://whim:whim@localhost:5433/whim
+REDIS_URL=redis://localhost:6380
+ORCHESTRATOR_URL=http://localhost:3002
+
 # Optional (with defaults)
-DATABASE_URL=postgres://factory:factory@localhost:5432/factory
-REDIS_URL=redis://localhost:6379
 MAX_WORKERS=2           # Max concurrent workers
 DAILY_BUDGET=200        # Max iterations per day
 COOLDOWN_SECONDS=60     # Seconds between worker spawns
-INTAKE_LABEL=whim # GitHub label to watch
+INTAKE_LABEL=whim       # GitHub label to watch
 POLL_INTERVAL=60000     # GitHub poll interval (ms)
 EOF
         warn "Created .env - please edit with your values"
@@ -114,7 +123,7 @@ sleep 5
 
 # Check postgres health
 for i in {1..30}; do
-    if docker exec whim-postgres pg_isready -U factory -d factory &> /dev/null; then
+    if docker exec whim-postgres pg_isready -U whim -d whim &> /dev/null; then
         success "PostgreSQL is ready"
         break
     fi

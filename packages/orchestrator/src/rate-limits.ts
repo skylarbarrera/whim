@@ -6,12 +6,19 @@
 import type { RedisClient } from "./redis.js";
 
 /**
+ * Function to get active worker count from database (source of truth)
+ */
+export type GetActiveWorkerCountFn = () => Promise<number>;
+
+/**
  * Rate limit configuration
  */
 export interface RateLimitConfig {
   maxWorkers: number;
   dailyBudget: number;
   cooldownSeconds: number;
+  /** Optional function to get active worker count from DB (prevents counter drift) */
+  getActiveWorkerCount?: GetActiveWorkerCountFn;
 }
 
 /**
@@ -29,9 +36,10 @@ export interface RateLimitStatus {
 
 /**
  * Redis key names for rate limiting
+ * Note: activeWorkers is deprecated - prefer DB-based count via getActiveWorkerCount callback
  */
 const KEYS = {
-  activeWorkers: "rate:active_workers",
+  activeWorkers: "rate:active_workers", // Deprecated: kept for backward compatibility
   lastSpawn: "rate:last_spawn",
   dailyIterations: "rate:daily_iterations",
   dailyResetDate: "rate:daily_reset_date",
@@ -49,7 +57,8 @@ function getTodayString(): string {
  * Rate Limiter for controlling worker spawns and iteration budgets
  */
 export class RateLimiter {
-  private config: RateLimitConfig;
+  private config: Omit<RateLimitConfig, 'getActiveWorkerCount'>;
+  private getActiveWorkerCountFn?: GetActiveWorkerCountFn;
 
   constructor(
     private redis: RedisClient,
@@ -60,6 +69,8 @@ export class RateLimiter {
       dailyBudget: config?.dailyBudget ?? parseInt(process.env.DAILY_BUDGET ?? "200", 10),
       cooldownSeconds: config?.cooldownSeconds ?? parseInt(process.env.COOLDOWN_SECONDS ?? "60", 10),
     };
+    // Store the DB-based worker count function if provided (prevents counter drift)
+    this.getActiveWorkerCountFn = config?.getActiveWorkerCount;
   }
 
   /**
@@ -170,8 +181,14 @@ export class RateLimiter {
 
   /**
    * Get the current active worker count
+   * Prefers DB-based count (accurate) over Redis counter (can drift)
    */
   private async getActiveWorkerCount(): Promise<number> {
+    // Use DB-based count if available (source of truth, no drift)
+    if (this.getActiveWorkerCountFn) {
+      return this.getActiveWorkerCountFn();
+    }
+    // Fallback to Redis counter (may drift if workers crash)
     const value = await this.redis.get(KEYS.activeWorkers);
     return value ? parseInt(value, 10) : 0;
   }

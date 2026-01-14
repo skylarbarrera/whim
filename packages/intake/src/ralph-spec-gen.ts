@@ -225,12 +225,14 @@ export class RalphSpecGenerator {
    * Generate a branch name from issue metadata
    */
   private generateBranchName(issue: GitHubIssue): string {
+    const prefix = `ai/issue-${issue.number}-`;
+    const maxSlugLen = 60 - prefix.length;
     const slug = issue.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
-      .slice(0, 50);
+      .slice(0, maxSlugLen);
 
-    return `ai/issue-${issue.number}-${slug}`;
+    return `${prefix}${slug}`;
   }
 }

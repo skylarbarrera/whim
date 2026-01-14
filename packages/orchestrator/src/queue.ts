@@ -37,7 +37,7 @@ export class QueueManager {
     const id = uuid();
     const branch = input.branch ?? `whim/${id.slice(0, 8)}`;
     const priority = input.priority ?? "medium";
-    const maxIterations = input.maxIterations ?? 20;
+    const maxIterations = input.maxIterations ?? 50;
     const metadata = input.metadata ?? {};
 
     const result = await this.db.queryOne<WorkItem>(
@@ -80,9 +80,11 @@ export class QueueManager {
       // Select the highest priority queued item and lock it
       // Priority enum values are ordered naturally by PostgreSQL (critical > high > medium > low)
       // But we use CASE to be explicit about ordering
+      // Also respect retry backoff: skip items whose next_retry_at is in the future
       const selectResult = await client.query(
         `SELECT * FROM work_items
          WHERE status = 'queued'
+           AND (next_retry_at IS NULL OR next_retry_at <= NOW())
          ORDER BY
            CASE priority
              WHEN 'critical' THEN 4
@@ -211,6 +213,8 @@ export class QueueManager {
       workerId: (row.worker_id as string) ?? null,
       iteration: row.iteration as number,
       maxIterations: row.max_iterations as number,
+      retryCount: (row.retry_count as number) ?? 0,
+      nextRetryAt: (row.next_retry_at as Date) ?? null,
       createdAt: row.created_at as Date,
       updatedAt: row.updated_at as Date,
       completedAt: (row.completed_at as Date) ?? null,

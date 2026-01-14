@@ -20,6 +20,8 @@ export interface WorkItem {
   workerId: string | null;
   iteration: number;
   maxIterations: number;
+  retryCount: number;
+  nextRetryAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -147,6 +149,7 @@ export interface WorkerHeartbeatRequest {
 }
 
 export interface WorkerLockRequest {
+  repo: string;
   files: string[];
 }
 

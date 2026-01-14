@@ -99,7 +99,7 @@ ${YELLOW}Example:${NC}
 
 ${YELLOW}After creating your spec:${NC}
   1. Review and edit SPEC.md as needed
-  2. Submit to the factory:
+  2. Submit to Whim:
      See README.md for submission examples
 
 EOF
@@ -176,7 +176,7 @@ main() {
       log_info "Next steps:"
       echo "  1. Review your spec: cat $OUTPUT_PATH"
       echo "  2. Edit if needed: \$EDITOR $OUTPUT_PATH"
-      echo "  3. Submit to factory (see --help for example)"
+      echo "  3. Submit to Whim (see --help for example)"
       echo ""
     else
       log_error "SPEC.md was not created"

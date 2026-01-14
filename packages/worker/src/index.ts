@@ -74,6 +74,7 @@ async function main(): Promise<void> {
   const client = new OrchestratorClient({
     baseUrl: config.orchestratorUrl,
     workerId: config.workerId,
+    repo: config.workItem.repo,
   });
 
   console.log("Setting up workspace...");

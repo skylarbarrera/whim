@@ -9,6 +9,7 @@ describe("OrchestratorClient", () => {
     client = new OrchestratorClient({
       baseUrl: "http://localhost:3000",
       workerId: "worker-123",
+      repo: "owner/repo",
     });
 
     mockFetch = spyOn(global, "fetch");
@@ -23,12 +24,17 @@ describe("OrchestratorClient", () => {
       const c = new OrchestratorClient({
         baseUrl: "http://localhost:3000/",
         workerId: "test",
+        repo: "owner/repo",
       });
       expect(c.baseUrl).toBe("http://localhost:3000");
     });
 
     it("should store workerId", () => {
       expect(client.workerId).toBe("worker-123");
+    });
+
+    it("should store repo", () => {
+      expect(client.repo).toBe("owner/repo");
     });
   });
 
@@ -76,7 +82,7 @@ describe("OrchestratorClient", () => {
   });
 
   describe("lockFile", () => {
-    it("should POST files to lock endpoint", async () => {
+    it("should POST files to lock endpoint with repo", async () => {
       mockFetch.mockResolvedValue(
         new Response(JSON.stringify({ acquired: true }), { status: 200 })
       );
@@ -87,7 +93,7 @@ describe("OrchestratorClient", () => {
         "http://localhost:3000/api/worker/worker-123/lock",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ files: ["src/index.ts", "src/utils.ts"] }),
+          body: JSON.stringify({ repo: "owner/repo", files: ["src/index.ts", "src/utils.ts"] }),
         })
       );
       expect(result.acquired).toBe(true);
