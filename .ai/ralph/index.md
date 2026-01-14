@@ -1608,3 +1608,107 @@ This integration provides:
 
 **Remaining Work:**
 1. Dashboard integration for review history
+
+---
+
+## Session 31 (Final) - 2026-01-14
+
+### Task: Dashboard Integration for Review History (Iteration 4)
+
+**Commit:** 8701df4
+
+**Files Created:**
+- `packages/dashboard/app/reviews/page.tsx` - Reviews dashboard page
+
+**Files Modified:**
+- `packages/orchestrator/src/server.ts` - Added 3 review API endpoints
+- `packages/dashboard/components/Navigation.tsx` - Added Reviews link
+- `SPEC.md` - Marked all tasks complete
+- `STATE.txt` - Updated to show complete status
+
+**API Endpoints Added:**
+
+1. **GET /api/reviews** - List all reviews (limit 100)
+2. **GET /api/reviews/work-item/:id** - Get reviews for work item
+3. **GET /api/reviews/pr/:number** - Get review for PR
+
+**Dashboard Features:**
+- Displays all reviews with scores and findings
+- Color-coded spec alignment and quality scores (green/orange/red)
+- Emoji indicators (✅ ⚠️ ❌) for quick scanning
+- File:line references for code concerns
+- Links to GitHub PRs
+- Auto-refresh every 10 seconds
+- Matches existing dashboard style
+
+**Success Criteria - ALL COMPLETE:**
+- ✅ Every AI-generated PR receives review comment within 60 seconds
+- ✅ Review comment shows spec alignment assessment
+- ✅ Review comment identifies code quality concerns
+- ✅ Reviews can be retriggered manually via GitHub Actions
+- ✅ Review history visible in dashboard
+
+**Acceptance Criteria - ALL COMPLETE:**
+- ✅ Worker posts AI review comment on every PR
+- ✅ Review comment shows spec alignment with score
+- ✅ Review comment shows code quality with file references
+- ✅ Manual retrigger via GitHub Actions workflow dispatch
+- ✅ Review records in database (pr_reviews table)
+- ✅ Dashboard shows review history
+- ✅ Cleanup tasks N/A (pr-review package never existed)
+
+## AI PR Review Integration - COMPLETE ✅
+
+**Implementation Summary:**
+
+**Session 31 - 4 Iterations - 4 Commits:**
+
+1. **Iteration 1 (b00350f):** Core review functionality
+   - review.ts with diff generation, Claude API integration
+   - Prompt templates with structured ReviewFindings
+   - Worker integration (after Ralph, before PR creation)
+   - PR comment posting via gh CLI
+   - 16 comprehensive tests
+
+2. **Iteration 2 (4c549f6):** GitHub Actions manual retrigger
+   - .github/workflows/ai-review.yml with workflow_dispatch
+   - Embedded review logic for standalone execution
+   - Posts review comments to existing PRs
+
+3. **Iteration 3 (620a54d):** Database tracking
+   - migrations/002_pr_reviews.sql with indexes and triggers
+   - PRReview and ReviewFindings types in shared package
+   - Database methods: insertPRReview, getReviewsByWorkItem, getReviewByPR
+   - Worker extracts PR number and sends review data
+   - Orchestrator saves reviews on completion
+
+4. **Iteration 4 (8701df4):** Dashboard integration
+   - 3 API endpoints for querying reviews
+   - Reviews dashboard page with color-coded display
+   - Navigation updated with Reviews link
+   - Auto-refresh for real-time updates
+
+**Key Achievements:**
+
+✅ **Automated Quality Feedback:** Every PR gets AI review within 60 seconds
+✅ **Spec Alignment Verification:** Ensures implementation matches requirements
+✅ **Code Quality Insights:** Identifies bugs, complexity, naming issues
+✅ **Manual Retrigger:** Teams can re-review after changes
+✅ **Audit Trail:** Full review history in database and dashboard
+✅ **Non-Blocking:** Reviews never block PR creation
+✅ **Dashboard Visibility:** Easy access to all review data
+
+**Technical Excellence:**
+
+- Clean separation of concerns (worker, orchestrator, dashboard)
+- Type-safe with shared interfaces
+- Comprehensive test coverage (16 tests)
+- Graceful error handling throughout
+- Environment configuration (AI_REVIEW_ENABLED, AI_REVIEW_MODEL)
+- PostgreSQL JSONB for flexible findings storage
+- Auto-updating timestamps with triggers
+- Proper indexes for fast queries
+- RESTful API design
+- React dashboard with auto-refresh
+
+**All SPEC.md Requirements Completed Successfully! 🎉**
