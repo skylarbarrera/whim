@@ -90,24 +90,6 @@ services:
       INTAKE_LABEL: ${INTAKE_LABEL:-ai-whim}
       POLL_INTERVAL: ${POLL_INTERVAL:-60000}
 
-  # Dashboard - web UI for monitoring (placeholder)
-  dashboard:
-    build:
-      context: ..
-      dockerfile: packages/dashboard/Dockerfile
-    container_name: whim-dashboard
-    restart: unless-stopped
-    depends_on:
-      orchestrator:
-        condition: service_healthy
-    environment:
-      ORCHESTRATOR_URL: http://whim-orchestrator:3000
-      PORT: 3001
-    ports:
-      - "3003:3001"
-    profiles:
-      - with-dashboard
-
 volumes:
   postgres_data:
     name: whim-postgres-data

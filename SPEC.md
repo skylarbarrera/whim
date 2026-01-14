@@ -78,6 +78,6 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 
 ## Cleanup
 
-- [ ] Delete `packages/dashboard` after CLI is working
-- [ ] Update docker-compose to remove dashboard service
-- [ ] Update README to document CLI usage
+- [x] Delete `packages/dashboard` after CLI is working
+- [x] Update docker-compose to remove dashboard service
+- [x] Update README to document CLI usage

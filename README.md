@@ -10,7 +10,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 - **Learnings System** - Workers share discoveries across tasks via vector embeddings
 - **Rate Limiting** - Respects Claude Max limits with daily budgets and cooldowns
 - **File Locking** - Prevents conflicts when workers touch the same files
-- **Real-time Dashboard** - Monitor queue, workers, and metrics
+- **Real-time CLI Dashboard** - Terminal UI for monitoring queue, workers, and metrics
 
 ## Core Philosophy
 
@@ -189,7 +189,7 @@ factory/
 │   ├── worker/           # Docker container - runs Ralph + Claude Code
 │   ├── intake/           # GitHub adapter - polls issues, generates specs
 │   ├── shared/           # Shared types and utilities
-│   └── dashboard/        # Web UI for monitoring
+│   └── cli/              # Terminal dashboard (Ink) for monitoring
 ├── docker/
 │   └── docker-compose.yml
 ├── migrations/
@@ -232,16 +232,13 @@ cd <repo>
 cp .env.example .env
 # Add your GITHUB_TOKEN, ANTHROPIC_API_KEY, and REPOS
 
-# Start services (without dashboard)
+# Start services
 ./scripts/dev.sh
-
-# Or with dashboard
-./scripts/dev.sh --dashboard
 ```
 
 After startup:
 - Orchestrator API: http://localhost:3002
-- Dashboard (if enabled): http://localhost:3003
+- Monitor with: `whim dashboard` or `whim status`
 
 ### Manual Work Item
 
@@ -388,25 +385,40 @@ bun run lint
 
 ## Monitoring
 
-Start with dashboard enabled:
+Use the Whim CLI to monitor the orchestrator:
 
 ```bash
-./scripts/dev.sh --dashboard
+# Interactive dashboard with live updates (polls every 2s)
+whim dashboard
+
+# Quick status check (one-line summary)
+whim status
+
+# Connect to remote orchestrator
+whim dashboard --api-url http://remote-host:3000
+whim status --api-url http://remote-host:3000
 ```
 
-Dashboard at `http://localhost:3003`:
+### CLI Dashboard Features
 
-- **Overview** (`/`): Queue depth, active workers, daily usage
-- **Workers** (`/workers`): Live status, iterations, kill button
-- **Queue** (`/queue`): Pending items, priorities, cancel button
-- **Learnings** (`/learnings`): Browse and search past discoveries
-- **Metrics** (`/metrics`): Charts for throughput, success rate, duration
+The interactive dashboard shows:
+
+- **STATUS**: Running state, active worker count, queue depth
+- **WORKERS**: Live worker cards with repo, branch, iteration, progress bar
+- **QUEUE**: Pending items with priority and status
+- **TODAY**: Completed/failed counts, iterations, success rate
+
+### Keyboard Controls
+
+- `q` - Quit dashboard
+- `r` - Force refresh
+- `?` - Show help overlay
+- Navigation keys (coming soon)
 
 Service ports:
 | Service | Port |
 |---------|------|
 | Orchestrator API | 3002 |
-| Dashboard | 3003 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |
 

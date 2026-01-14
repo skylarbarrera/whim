@@ -1965,3 +1965,30 @@ This integration provides:
 - Remaining tasks: logs viewer, config file support
 
 ---
+
+### Task: Whim CLI Dashboard - Cleanup Phase
+
+**Files Deleted:**
+- `packages/dashboard/` - Removed old Next.js dashboard
+
+**Files Modified:**
+- `docker/docker-compose.yml` - Removed dashboard service
+- `README.md` - Updated documentation for CLI usage
+
+**Implementation:**
+- Deleted entire packages/dashboard directory
+- Removed dashboard service, ports, and profile from docker-compose.yml
+- Updated README with comprehensive CLI documentation:
+  - Usage examples for whim dashboard and whim status
+  - Documented --api-url flag
+  - Keyboard controls section
+  - Removed all web dashboard references
+- Updated package listing to show cli instead of dashboard
+- Removed dashboard port from service ports table
+
+**Notes:**
+- Cleanup phase complete: All 3 tasks finished
+- CLI is now the sole monitoring interface
+- Migration from web to terminal UI complete
+
+---

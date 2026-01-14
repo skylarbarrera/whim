@@ -324,3 +324,17 @@ All references to "factory" have been replaced with "whim" across the codebase:
     - Good for scripts and quick checks
     - Handles errors gracefully with exit codes
   - Error handling already existed in dashboard (shows error in UI, doesn't crash)
+
+## Cleanup Phase (COMPLETE)
+- [x] Task: Delete old dashboard and update documentation
+  - Deleted packages/dashboard directory (old Next.js dashboard)
+  - Removed dashboard service from docker-compose.yml
+  - Updated README.md to document CLI usage:
+    - Added CLI dashboard usage examples
+    - Added whim status command examples
+    - Documented --api-url flag
+    - Updated keyboard controls section
+    - Removed web dashboard references
+  - Updated package listing in README (cli instead of dashboard)
+  - Removed dashboard port from service ports table
+  - All 3 Cleanup tasks complete
