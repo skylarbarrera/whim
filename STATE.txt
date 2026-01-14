@@ -227,3 +227,9 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Sets jsx to "react" for Ink components
   - Includes reference to shared package
   - Follows orchestrator package pattern
+- [x] Task 1.3: Create entry point src/index.tsx with commander routing
+  - Added shebang for node execution
+  - Set up commander with program name, description, version
+  - Created default dashboard command
+  - Shows "Hello World" placeholder using Ink
+  - Ready for full dashboard implementation

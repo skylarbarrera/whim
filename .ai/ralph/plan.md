@@ -1,32 +1,35 @@
-# Iteration 2 Plan: Add tsconfig.json matching other packages
+# Iteration 3 Plan: Create entry point src/index.tsx with commander routing
 
 ## Goal
-Create a TypeScript configuration file for the CLI package that matches the patterns used in other packages in the monorepo.
+Create the main entry point for the CLI with commander for command routing. This will be the executable that runs when users type `whim`.
 
 ## Files to Create/Modify
-- `packages/cli/tsconfig.json` - TypeScript configuration extending root config
+- `packages/cli/src/index.tsx` - Main entry point with commander routing
 
 ## Implementation Steps
-1. Read tsconfig.json from other packages (orchestrator, dashboard) to understand the pattern
-2. Create tsconfig.json for CLI package that:
-   - Extends the root tsconfig.json
-   - Configures proper output directory (dist/)
-   - Sets up proper module resolution
-   - Includes src directory
-   - Excludes node_modules and dist
+1. Create src directory
+2. Create index.tsx with:
+   - Shebang line for node execution
+   - Import commander for CLI routing
+   - Set up basic command structure
+   - Add placeholder commands (dashboard will be added later)
+   - Handle version and help automatically via commander
+   - Add error handling
 
 ## Tests
-- Validate tsconfig.json is valid JSON
-- Check that it follows the same structure as other packages
-- Ensure it extends the root config properly
+- Verify the file compiles
+- Check that the structure is correct for a CLI entry point
+- Ensure it follows Ink/React patterns
 
 ## Exit Criteria
-- [ ] `packages/cli/tsconfig.json` exists
-- [ ] Configuration extends root tsconfig.json
-- [ ] Follows the same pattern as other packages
-- [ ] Ready for TypeScript compilation
+- [ ] `packages/cli/src/index.tsx` exists
+- [ ] Has proper shebang for executable
+- [ ] Uses commander for routing
+- [ ] Ready to add dashboard command later
+- [ ] File is valid TypeScript/React
 
 ## Notes
-- This is Phase 1, Task 2 from SPEC.md
-- Need to match existing patterns in other packages
-- Should work with the build scripts defined in package.json
+- This is Phase 1, Task 3 from SPEC.md
+- Will need to be executable after build
+- Dashboard command will be added in later tasks
+- Should follow Ink conventions for CLI apps
