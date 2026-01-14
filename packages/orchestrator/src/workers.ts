@@ -446,6 +446,17 @@ export class WorkerManager {
     if (worker.containerId) {
       try {
         const container = this.docker.getContainer(worker.containerId);
+        // Capture last logs for debugging before killing
+        try {
+          const logs = await container.logs({
+            stdout: true,
+            stderr: true,
+            tail: 50,  // Last 50 lines
+          });
+          console.log(`[Worker ${workerId}] Last logs before kill:\n${logs.toString()}`);
+        } catch {
+          // Log capture is best-effort
+        }
         await container.stop({ t: 10 }); // 10 second grace period
       } catch (err) {
         // Container might already be stopped or removed
