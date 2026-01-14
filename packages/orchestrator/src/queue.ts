@@ -37,7 +37,7 @@ export class QueueManager {
     const id = uuid();
     const branch = input.branch ?? `whim/${id.slice(0, 8)}`;
     const priority = input.priority ?? "medium";
-    const maxIterations = input.maxIterations ?? 20;
+    const maxIterations = input.maxIterations ?? 50;
     const metadata = input.metadata ?? {};
 
     const result = await this.db.queryOne<WorkItem>(
