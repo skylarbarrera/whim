@@ -149,6 +149,7 @@ export interface WorkerHeartbeatRequest {
 }
 
 export interface WorkerLockRequest {
+  repo: string;
   files: string[];
 }
 

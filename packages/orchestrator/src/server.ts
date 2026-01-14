@@ -89,7 +89,12 @@ function isValidWorkerHeartbeatRequest(body: unknown): body is WorkerHeartbeatRe
 function isValidWorkerLockRequest(body: unknown): body is WorkerLockRequest {
   if (typeof body !== "object" || body === null) return false;
   const obj = body as Record<string, unknown>;
-  return Array.isArray(obj.files) && obj.files.every((f) => typeof f === "string");
+  return (
+    typeof obj.repo === "string" &&
+    obj.repo.length > 0 &&
+    Array.isArray(obj.files) &&
+    obj.files.every((f) => typeof f === "string")
+  );
 }
 
 /**
@@ -281,7 +286,7 @@ export function createServer(deps: ServerDependencies): express.Application {
         return;
       }
 
-      const result = await deps.conflicts.acquireLocks(req.params.id, req.body.files);
+      const result = await deps.conflicts.acquireLocks(req.params.id, req.body.repo, req.body.files);
       const acquired = result.blocked.length === 0;
       res.json({
         acquired,
@@ -301,7 +306,7 @@ export function createServer(deps: ServerDependencies): express.Application {
         return;
       }
 
-      await deps.conflicts.releaseLocks(req.params.id, req.body.files);
+      await deps.conflicts.releaseLocks(req.params.id, req.body.repo, req.body.files);
       res.json({ success: true });
     })
   );

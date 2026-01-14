@@ -11,15 +11,18 @@ import type {
 export interface OrchestratorClientConfig {
   baseUrl: string;
   workerId: string;
+  repo: string;
 }
 
 export class OrchestratorClient {
   readonly baseUrl: string;
   readonly workerId: string;
+  readonly repo: string;
 
   constructor(config: OrchestratorClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, "");
     this.workerId = config.workerId;
+    this.repo = config.repo;
   }
 
   private async request<T>(
@@ -87,7 +90,7 @@ export class OrchestratorClient {
   }
 
   async lockFile(files: string[]): Promise<WorkerLockResponse> {
-    const body: WorkerLockRequest = { files };
+    const body: WorkerLockRequest = { repo: this.repo, files };
     return this.request<WorkerLockResponse>(
       "POST",
       `/api/worker/${this.workerId}/lock`,
@@ -96,7 +99,7 @@ export class OrchestratorClient {
   }
 
   async unlockFile(files: string[]): Promise<void> {
-    const body: WorkerLockRequest = { files };
+    const body: WorkerLockRequest = { repo: this.repo, files };
     await this.request<void>(
       "POST",
       `/api/worker/${this.workerId}/unlock`,

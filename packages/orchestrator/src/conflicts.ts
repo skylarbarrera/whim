@@ -15,6 +15,7 @@ export interface LockResult {
 export interface FileLock {
   id: string;
   workerId: string;
+  repo: string;
   filePath: string;
   acquiredAt: Date;
 }
@@ -37,10 +38,11 @@ export class ConflictDetector {
    * - If a lock exists for another worker, marks as blocked
    *
    * @param workerId - The worker requesting locks
+   * @param repo - The repository these files belong to (for multi-repo isolation)
    * @param files - Array of file paths to lock
    * @returns Object with arrays of acquired and blocked file paths
    */
-  async acquireLocks(workerId: string, files: string[]): Promise<LockResult> {
+  async acquireLocks(workerId: string, repo: string, files: string[]): Promise<LockResult> {
     if (files.length === 0) {
       return { acquired: [], blocked: [] };
     }
@@ -50,7 +52,7 @@ export class ConflictDetector {
 
     // Process each file individually to handle partial success
     for (const filePath of files) {
-      const result = await this.tryAcquireLock(workerId, filePath);
+      const result = await this.tryAcquireLock(workerId, repo, filePath);
       if (result.success) {
         acquired.push(filePath);
       } else {
@@ -68,15 +70,16 @@ export class ConflictDetector {
    */
   private async tryAcquireLock(
     workerId: string,
+    repo: string,
     filePath: string
   ): Promise<{ success: boolean }> {
-    // Atomic insert - if file_path already exists, does nothing and returns empty
+    // Atomic insert - if (repo, file_path) already exists, does nothing and returns empty
     const inserted = await this.db.queryOne<{ workerId: string }>(
-      `INSERT INTO file_locks (worker_id, file_path)
-       VALUES ($1, $2)
-       ON CONFLICT (file_path) DO NOTHING
+      `INSERT INTO file_locks (worker_id, repo, file_path)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (repo, file_path) DO NOTHING
        RETURNING worker_id`,
-      [workerId, filePath]
+      [workerId, repo, filePath]
     );
 
     if (inserted) {
@@ -86,8 +89,8 @@ export class ConflictDetector {
 
     // Lock already exists - check if it's ours (idempotent re-acquire)
     const existing = await this.db.queryOne<{ workerId: string }>(
-      "SELECT worker_id FROM file_locks WHERE file_path = $1",
-      [filePath]
+      "SELECT worker_id FROM file_locks WHERE repo = $1 AND file_path = $2",
+      [repo, filePath]
     );
 
     // Success if we already own this lock
@@ -101,19 +104,20 @@ export class ConflictDetector {
    * Silently ignores files that aren't locked by this worker.
    *
    * @param workerId - The worker releasing locks
+   * @param repo - The repository these files belong to
    * @param files - Array of file paths to unlock
    */
-  async releaseLocks(workerId: string, files: string[]): Promise<void> {
+  async releaseLocks(workerId: string, repo: string, files: string[]): Promise<void> {
     if (files.length === 0) {
       return;
     }
 
     // Generate placeholders for the IN clause
-    const placeholders = files.map((_, i) => `$${i + 2}`).join(", ");
+    const placeholders = files.map((_, i) => `$${i + 3}`).join(", ");
 
     await this.db.execute(
-      `DELETE FROM file_locks WHERE worker_id = $1 AND file_path IN (${placeholders})`,
-      [workerId, ...files]
+      `DELETE FROM file_locks WHERE worker_id = $1 AND repo = $2 AND file_path IN (${placeholders})`,
+      [workerId, repo, ...files]
     );
   }
 
@@ -138,7 +142,7 @@ export class ConflictDetector {
    */
   async getLocksForWorker(workerId: string): Promise<FileLock[]> {
     return this.db.query<FileLock>(
-      "SELECT id, worker_id, file_path, acquired_at FROM file_locks WHERE worker_id = $1",
+      "SELECT id, worker_id, repo, file_path, acquired_at FROM file_locks WHERE worker_id = $1",
       [workerId]
     );
   }
@@ -146,13 +150,14 @@ export class ConflictDetector {
   /**
    * Get the worker holding a lock on a specific file.
    *
+   * @param repo - The repository to check
    * @param filePath - The file to check
    * @returns The lock info if locked, null otherwise
    */
-  async getLockHolder(filePath: string): Promise<FileLock | null> {
+  async getLockHolder(repo: string, filePath: string): Promise<FileLock | null> {
     return this.db.queryOne<FileLock>(
-      "SELECT id, worker_id, file_path, acquired_at FROM file_locks WHERE file_path = $1",
-      [filePath]
+      "SELECT id, worker_id, repo, file_path, acquired_at FROM file_locks WHERE repo = $1 AND file_path = $2",
+      [repo, filePath]
     );
   }
 }
