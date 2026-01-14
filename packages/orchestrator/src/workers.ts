@@ -514,4 +514,54 @@ export class WorkerManager {
 
     return { total, byStatus, avgIterations, avgDuration };
   }
+
+  /**
+   * Get container logs for a worker
+   *
+   * Fetches the logs from the Docker container associated with a worker.
+   * Returns the most recent N lines (default 1000).
+   *
+   * @param workerId - The worker ID
+   * @param lines - Number of lines to fetch (default 1000)
+   * @returns Array of log lines
+   */
+  async getLogs(workerId: string, lines: number = 1000): Promise<string[]> {
+    // Get worker to find container ID
+    const worker = await this.db.getWorker(workerId);
+    if (!worker) {
+      throw new Error(`Worker not found: ${workerId}`);
+    }
+
+    if (!worker.containerId) {
+      throw new Error(`Worker ${workerId} has no container ID`);
+    }
+
+    try {
+      // Get container
+      const container = this.docker.getContainer(worker.containerId);
+
+      // Check if container exists
+      const containerInfo = await container.inspect();
+
+      // Get logs
+      const logStream = await container.logs({
+        stdout: true,
+        stderr: true,
+        tail: lines,
+        timestamps: false,
+      });
+
+      // Convert buffer to string and split into lines
+      const logString = logStream.toString('utf-8');
+      const logLines = logString.split('\n').filter(line => line.trim().length > 0);
+
+      return logLines;
+    } catch (error) {
+      // If container doesn't exist or error accessing logs, return empty array
+      if ((error as any).statusCode === 404) {
+        throw new Error(`Container not found for worker ${workerId}`);
+      }
+      throw error;
+    }
+  }
 }

@@ -45,9 +45,9 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 
 ## Phase 4: Logs & Polish
 
-- [ ] Create `src/commands/logs.tsx` - log viewer
-- [ ] `l` key opens logs for selected worker
-- [ ] Poll worker logs from API (or add new endpoint)
+- [x] Create `src/commands/logs.tsx` - log viewer
+- [x] `l` key opens logs for selected worker
+- [x] Poll worker logs from API (or add new endpoint)
 - [x] Add `--api-url` flag for remote orchestrators
 - [x] Add `~/.whimrc` config file support
 - [x] Add error handling for API failures (show error in UI, don't crash)

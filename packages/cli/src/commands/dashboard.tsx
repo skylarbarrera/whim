@@ -4,6 +4,7 @@ import { Section } from '../components/Section.js';
 import { Spinner } from '../components/Spinner.js';
 import { ProgressBar } from '../components/ProgressBar.js';
 import { useApi } from '../hooks/useApi.js';
+import { Logs } from './logs.js';
 import type { WhimMetrics, Worker, WorkItem } from '@whim/shared';
 
 interface StatusResponse {
@@ -17,9 +18,16 @@ interface DashboardProps {
   apiUrl?: string;
 }
 
+type FocusedSection = 'workers' | 'queue' | null;
+type ViewMode = 'dashboard' | 'logs';
+
 export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost:3000' }) => {
   const { data, loading, error, refetch } = useApi<StatusResponse>('/api/status', { apiUrl });
   const [showHelp, setShowHelp] = useState(false);
+  const [focusedSection, setFocusedSection] = useState<FocusedSection>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
+  const [selectedWorker, setSelectedWorker] = useState<{ worker: Worker; workItem?: WorkItem } | null>(null);
   const { exit } = useApp();
 
   // Keyboard handler
@@ -31,15 +39,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
     } else if (input === '?') {
       setShowHelp(!showHelp);
     } else if (input === 'w') {
-      // TODO: Focus workers section
+      setFocusedSection('workers');
+      setSelectedIndex(0);
     } else if (input === 'u') {
-      // TODO: Focus queue section
+      setFocusedSection('queue');
+      setSelectedIndex(0);
+    } else if (input === 'l' && focusedSection === 'workers' && data) {
+      // Open logs for selected worker
+      const workers = data.workers;
+      if (workers.length > 0 && selectedIndex < workers.length) {
+        const worker = workers[selectedIndex];
+        const workItem = data.queue.find(item => item.id === worker.workItemId);
+        setSelectedWorker({ worker, workItem });
+        setViewMode('logs');
+      }
     } else if (input === 'k') {
       // TODO: Kill selected worker
     } else if (input === 'c') {
       // TODO: Cancel selected queue item
-    } else if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
-      // TODO: Navigate items
+    } else if (key.upArrow && focusedSection && data) {
+      const maxIndex = focusedSection === 'workers' ? data.workers.length - 1 : data.queue.length - 1;
+      setSelectedIndex(prev => Math.max(0, prev - 1));
+    } else if (key.downArrow && focusedSection && data) {
+      const maxIndex = focusedSection === 'workers' ? data.workers.length - 1 : data.queue.length - 1;
+      setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
     }
   });
 
@@ -66,6 +89,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
 
   if (!data) {
     return <Text>No data available</Text>;
+  }
+
+  // Show logs view if in logs mode
+  if (viewMode === 'logs' && selectedWorker) {
+    return (
+      <Logs
+        workerId={selectedWorker.worker.id}
+        worker={selectedWorker.worker}
+        workItem={selectedWorker.workItem}
+        apiUrl={apiUrl}
+        onBack={() => setViewMode('dashboard')}
+      />
+    );
   }
 
   const { workers, queue, metrics } = data;
@@ -107,14 +143,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
           </Text>
         ) : (
           <Box flexDirection="column">
-            {workers.map((worker) => {
+            {workers.map((worker, index) => {
               // Find the work item for this worker to get repo/branch
               const workItem = queue.find((item) => item.id === worker.workItemId);
               const progress = (worker.iteration / (workItem?.maxIterations || 10)) * 100;
+              const isSelected = focusedSection === 'workers' && selectedIndex === index;
 
               return (
                 <Box key={worker.id} flexDirection="column" marginBottom={1}>
                   <Box>
+                    {isSelected && <Text color="cyan">→ </Text>}
                     <Spinner />
                     <Text> </Text>
                     <Text color="blue">{worker.id.substring(0, 8)}</Text>
@@ -123,7 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
                     <Text color="gray"> @ </Text>
                     <Text color="magenta">{workItem?.branch || 'unknown'}</Text>
                   </Box>
-                  <Box marginLeft={2}>
+                  <Box marginLeft={isSelected ? 4 : 2}>
                     <Text color="gray">Iteration {worker.iteration} </Text>
                     <ProgressBar percent={progress} width={15} />
                   </Box>
@@ -194,7 +232,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
       {/* Footer */}
       <Box marginTop={1}>
         <Text color="cyan" dimColor>
-          Press 'q' to quit | 'r' to refresh | '?' for help
+          Press 'q' to quit | 'w' workers | 'l' logs | 'r' refresh | '?' help
         </Text>
       </Box>
 
@@ -223,20 +261,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
             <Text>
               <Text color="yellow">?</Text> - Toggle this help
             </Text>
-            <Text color="gray" dimColor>
-              <Text color="yellow">w</Text> - Focus workers section (coming soon)
+            <Text>
+              <Text color="yellow">w</Text> - Focus workers section
             </Text>
-            <Text color="gray" dimColor>
-              <Text color="yellow">u</Text> - Focus queue section (coming soon)
+            <Text>
+              <Text color="yellow">u</Text> - Focus queue section
+            </Text>
+            <Text>
+              <Text color="yellow">l</Text> - View logs for selected worker
+            </Text>
+            <Text>
+              <Text color="yellow">↑↓</Text> - Navigate items
             </Text>
             <Text color="gray" dimColor>
               <Text color="yellow">k</Text> - Kill selected worker (coming soon)
             </Text>
             <Text color="gray" dimColor>
               <Text color="yellow">c</Text> - Cancel selected item (coming soon)
-            </Text>
-            <Text color="gray" dimColor>
-              <Text color="yellow">↑↓</Text> - Navigate items (coming soon)
             </Text>
           </Box>
         </Box>

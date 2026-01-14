@@ -381,6 +381,18 @@ export function createServer(deps: ServerDependencies): express.Application {
   );
 
   /**
+   * GET /api/workers/:id/logs - Get worker container logs
+   */
+  app.get(
+    "/api/workers/:id/logs",
+    asyncHandler<IdParams>(async (req, res) => {
+      const lines = req.query.lines ? parseInt(req.query.lines as string, 10) : 1000;
+      const logs = await deps.workers.getLogs(req.params.id, lines);
+      res.json({ workerId: req.params.id, logs });
+    })
+  );
+
+  /**
    * GET /api/queue - Queue contents and stats
    */
   app.get(

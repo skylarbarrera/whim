@@ -339,18 +339,28 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Removed dashboard port from service ports table
   - All 3 Cleanup tasks complete
 
-### Phase 4: Logs & Polish (Updated - 4 of 7 tasks)
+### Phase 4: Logs & Polish (COMPLETE - 7 of 7 tasks)
+- [x] Task 4.1: Add --api-url flag and whim status command
 - [x] Task 4.2: Add ~/.whimrc config file support
-  - Created src/config.ts module:
-    - Reads ~/.whimrc from home directory
-    - Parses key=value format
-    - Supports comments (lines starting with #)
-    - Gracefully handles missing file
-  - Updated index.tsx to load config at startup
-  - Config apiUrl becomes default for --api-url option
-  - CLI flags override config file values
-  - Documented config file in README with examples
-  - 4 of 7 Phase 4 tasks complete
+- [x] Task 4.3-4.5: Logs viewer implementation
+  - Created packages/cli/src/commands/logs.tsx - full log viewer component
+  - Added GET /api/workers/:id/logs endpoint to orchestrator
+  - Added getLogs() method to WorkerManager using Docker SDK
+  - Added WorkerLogsResponse type to shared package
+  - Updated dashboard.tsx with:
+    - Worker selection state (focusedSection, selectedIndex)
+    - 'w' key to focus workers section
+    - 'l' key to open logs for selected worker
+    - Arrow keys for navigation within sections
+    - Visual indicator (→) for selected worker
+  - Logs viewer features:
+    - Shows worker info (ID, status, repo, branch, iteration)
+    - Displays last 30 lines of logs
+    - Polls every 2 seconds for updates
+    - 'q' or ESC to return to dashboard
+    - Error handling for missing/stopped containers
+  - Updated help overlay and footer with new keyboard shortcuts
+  - All 7 Phase 4 tasks complete
 
 ## Whim CLI Dashboard Implementation - SUMMARY
 

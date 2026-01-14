@@ -231,6 +231,11 @@ export interface WorkerStatsResponse {
   avgDuration: number;
 }
 
+export interface WorkerLogsResponse {
+  workerId: string;
+  logs: string[];
+}
+
 // Error Response
 
 export interface ErrorResponse {
