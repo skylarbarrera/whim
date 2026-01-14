@@ -138,3 +138,25 @@ All acceptance criteria met:
 - Tests execute with real output parsing (Jest, Vitest, Bun)
 - Failed steps produce actionable error messages
 - Work item status properly updated with prUrl and metrics
+
+## AI PR Review Integration - In Progress
+
+- Phase 1: Core Review Functionality (COMPLETE)
+  - Created review.ts with diff generation, spec reading, Claude API integration
+  - Created review-prompt.ts with prompt templates and ReviewFindings interface
+  - Integrated review into worker flow (after Ralph, before PR creation)
+  - Modified setup.ts to post review comments to PRs
+  - Added comprehensive test suite (16 tests, all passing)
+  - Environment variables: AI_REVIEW_MODEL, AI_REVIEW_ENABLED
+
+Completed Success Criteria:
+- ✅ Every AI-generated PR receives an AI review comment within 60 seconds
+- ✅ Review comment shows spec alignment assessment with score
+- ✅ Review comment shows code quality concerns with file references
+
+Remaining Tasks:
+- GitHub Action for manual retrigger
+- Database tracking of reviews
+- Dashboard integration for review history
+- Cleanup unused pr-review code
+- Fix detector.ts (Opus not Sonnet)
