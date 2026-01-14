@@ -13,8 +13,12 @@ interface StatusResponse {
   metrics: WhimMetrics;
 }
 
-export const Dashboard: React.FC = () => {
-  const { data, loading, error, refetch } = useApi<StatusResponse>('/api/status');
+interface DashboardProps {
+  apiUrl?: string;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost:3000' }) => {
+  const { data, loading, error, refetch } = useApi<StatusResponse>('/api/status', { apiUrl });
   const [showHelp, setShowHelp] = useState(false);
   const { exit } = useApp();
 

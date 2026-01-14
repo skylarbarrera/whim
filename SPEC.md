@@ -48,10 +48,10 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 - [ ] Create `src/commands/logs.tsx` - log viewer
 - [ ] `l` key opens logs for selected worker
 - [ ] Poll worker logs from API (or add new endpoint)
-- [ ] Add `--api-url` flag for remote orchestrators
+- [x] Add `--api-url` flag for remote orchestrators
 - [ ] Add `~/.whimrc` config file support
-- [ ] Add error handling for API failures (show error in UI, don't crash)
-- [ ] Add `whim status` one-liner command
+- [x] Add error handling for API failures (show error in UI, don't crash)
+- [x] Add `whim status` one-liner command
 
 ## Color Scheme
 

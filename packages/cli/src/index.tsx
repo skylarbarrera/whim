@@ -16,7 +16,28 @@ program
   .description('Show the main dashboard (default)')
   .option('--api-url <url>', 'Orchestrator API URL', 'http://localhost:3000')
   .action((options) => {
-    render(<Dashboard />);
+    render(<Dashboard apiUrl={options.apiUrl} />);
+  });
+
+program
+  .command('status')
+  .description('Show quick status summary')
+  .option('--api-url <url>', 'Orchestrator API URL', 'http://localhost:3000')
+  .action(async (options) => {
+    try {
+      const response = await fetch(`${options.apiUrl}/api/status`);
+      if (!response.ok) {
+        console.error(`Error: HTTP ${response.status}`);
+        process.exit(1);
+      }
+      const data = await response.json();
+      console.log(
+        `Whim: ${data.status} | Workers: ${data.metrics.activeWorkers} | Queue: ${data.metrics.queuedItems} | Today: ${data.metrics.completedToday} completed, ${data.metrics.failedToday} failed`
+      );
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
   });
 
 program.parse(process.argv);

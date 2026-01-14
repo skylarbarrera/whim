@@ -1,39 +1,37 @@
-# Iteration 11 Plan: Add keyboard navigation (Phase 3)
+# Iteration 12 Plan: Add --api-url flag and whim status command (Phase 4)
 
 ## Goal
-Implement keyboard controls for the dashboard to allow user interaction. This completes Phase 3 functionality.
+Add support for configuring the API URL and create a simple status command for quick checks. These are high-value, low-complexity items from Phase 4.
 
 ## Files to Create/Modify
-- `packages/cli/src/commands/dashboard.tsx` - Add keyboard handler using useInput hook from Ink
+- `packages/cli/src/index.tsx` - Add --api-url flag support and status command
+- `packages/cli/src/commands/dashboard.tsx` - Accept apiUrl prop
+- `packages/cli/src/hooks/useApi.ts` - Already supports apiUrl parameter
 
 ## Implementation Steps
-1. Import useInput hook from Ink
-2. Implement keyboard handler with the following keys:
-   - 'q' - quit dashboard (exit app)
-   - 'r' - force refresh (call refetch)
-   - '?' - show help overlay (can be placeholder for now)
-   - 'w' - focus workers section (placeholder for future)
-   - 'u' - focus queue section (placeholder for future)
-   - 'k' - kill selected worker (placeholder - needs API call)
-   - 'c' - cancel selected queue item (placeholder - needs API call)
-   - Arrow keys - navigate items (placeholder for future)
-3. Add state for showing help overlay if needed
-4. Connect refetch function from useApi to 'r' key
+1. Update index.tsx to:
+   - Pass --api-url option value to Dashboard component
+   - Create new 'status' command that shows one-line summary
+2. Update Dashboard to:
+   - Accept optional apiUrl prop
+   - Pass it to useApi hook
+3. Create simple status command that:
+   - Fetches /api/status once
+   - Shows brief summary line
+   - Good for scripts and quick checks
 
 ## Tests
-- Verify keyboard handler is connected
-- Check that 'q' and 'r' work properly
-- Ensure other keys have placeholder handlers
+- Verify --api-url flag works
+- Check that status command outputs simple format
 
 ## Exit Criteria
-- [ ] useInput hook integrated
-- [ ] 'q' key quits the app
-- [ ] 'r' key refreshes data
-- [ ] Other keys have placeholder handlers
-- [ ] Phase 3 tasks marked complete
+- [ ] --api-url flag functional
+- [ ] Dashboard accepts and uses custom API URL
+- [ ] whim status command exists and works
+- [ ] Tasks marked complete
 
 ## Notes
-- This covers Phase 3 from SPEC.md
-- Some functionality (navigation, kill, cancel) are placeholders for now
-- Help overlay can be simple or placeholder
-- Focus on core quit and refresh functionality
+- These are Phase 4, Tasks 4 and 7 from SPEC.md
+- Skipping logs viewer and config file for now (more complex)
+- Error handling already exists in dashboard
+- Focus on highest value, simplest items

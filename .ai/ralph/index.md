@@ -1942,3 +1942,26 @@ This integration provides:
 - Ready to start Phase 4: Logs & Polish
 
 ---
+
+### Task: Whim CLI Dashboard - Phase 4.1
+
+**Files Modified:**
+- `packages/cli/src/commands/dashboard.tsx` - Added apiUrl prop support
+- `packages/cli/src/index.tsx` - Added --api-url flag and status command
+
+**Implementation:**
+- Added DashboardProps interface with optional apiUrl
+- Dashboard accepts and uses custom API URL via useApi hook
+- Added --api-url flag to both dashboard and status commands
+- Created 'whim status' command:
+  - Fetches /api/status once (no polling)
+  - Shows one-line summary: status | workers | queue | today stats
+  - Good for scripts and quick checks
+  - Handles errors gracefully with exit codes
+
+**Notes:**
+- 3 of 7 Phase 4 tasks complete
+- Error handling already existed in dashboard
+- Remaining tasks: logs viewer, config file support
+
+---

@@ -311,3 +311,16 @@ All references to "factory" have been replaced with "whim" across the codebase:
     - Visual indicators for implemented vs coming soon
     - Cyan/yellow color scheme
   - Phase 3 complete: All 9 tasks finished
+
+### Phase 4: Logs & Polish (Partial - 3 of 7 tasks)
+- [x] Task 4.1: Add --api-url flag and whim status command
+  - Added DashboardProps interface with optional apiUrl
+  - Dashboard now accepts and uses custom API URL
+  - Pass apiUrl prop from index.tsx to Dashboard
+  - Added --api-url flag to both dashboard and status commands
+  - Created 'whim status' command that:
+    - Fetches /api/status once (no polling)
+    - Shows one-line summary with key metrics
+    - Good for scripts and quick checks
+    - Handles errors gracefully with exit codes
+  - Error handling already existed in dashboard (shows error in UI, doesn't crash)
