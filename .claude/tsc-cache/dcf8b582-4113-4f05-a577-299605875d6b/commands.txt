@@ -1,2 +1,0 @@
-packages/intake:build:cd /Users/skillet/dev/ai/whim/packages/intake && npm run build
-packages/intake:tsc:cd /Users/skillet/dev/ai/whim/packages/intake && npx tsc --noEmit

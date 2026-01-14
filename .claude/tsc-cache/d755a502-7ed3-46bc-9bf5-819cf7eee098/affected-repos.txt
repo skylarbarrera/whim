@@ -1,6 +1,0 @@
-packages/orchestrator
-migrations
-packages/shared
-root
-packages/worker
-packages/intake

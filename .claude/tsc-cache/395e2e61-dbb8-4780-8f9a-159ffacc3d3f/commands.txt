@@ -1,2 +1,0 @@
-packages/orchestrator:build:cd /Users/skillet/dev/ai/whim/packages/orchestrator && npm run build
-packages/orchestrator:tsc:cd /Users/skillet/dev/ai/whim/packages/orchestrator && npx tsc --noEmit

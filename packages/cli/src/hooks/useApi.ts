@@ -14,7 +14,7 @@ interface UseApiResult<T> {
 
 export function useApi<T>(
   endpoint: string,
-  { pollInterval = 2000, apiUrl = 'http://localhost:3000' }: UseApiOptions = {}
+  { pollInterval = 2000, apiUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3002' }: UseApiOptions = {}
 ): UseApiResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);

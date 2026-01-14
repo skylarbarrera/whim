@@ -1,8 +1,0 @@
-packages/intake:build:cd /Users/skillet/dev/ai/whim/packages/intake && npm run build
-packages/intake:tsc:cd /Users/skillet/dev/ai/whim/packages/intake && npx tsc --noEmit
-packages/orchestrator:build:cd /Users/skillet/dev/ai/whim/packages/orchestrator && npm run build
-packages/orchestrator:tsc:cd /Users/skillet/dev/ai/whim/packages/orchestrator && npx tsc --noEmit
-packages/shared:build:cd /Users/skillet/dev/ai/whim/packages/shared && npm run build
-packages/shared:tsc:cd /Users/skillet/dev/ai/whim/packages/shared && npx tsc --noEmit
-packages/worker:build:cd /Users/skillet/dev/ai/whim/packages/worker && npm run build
-packages/worker:tsc:cd /Users/skillet/dev/ai/whim/packages/worker && npx tsc --noEmit

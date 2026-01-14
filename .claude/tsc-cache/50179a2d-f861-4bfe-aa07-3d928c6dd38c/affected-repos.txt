@@ -1,4 +1,0 @@
-packages/worker
-root
-packages/orchestrator
-packages/intake

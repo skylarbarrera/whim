@@ -1,6 +1,6 @@
 import type { WorkItem } from "@whim/shared";
 import { OrchestratorClient } from "./client.js";
-import { setupWorkspace, createPullRequest, PRStep, verifyGitAuth } from "./setup.js";
+import { setupWorkspace, createPullRequest, verifyGitAuth } from "./setup.js";
 import {
   loadLearnings,
   saveLearnings,
@@ -10,7 +10,7 @@ import {
 import { runRalph } from "./ralph.js";
 import { runMockRalph } from "./mock-ralph.js";
 import { runTests } from "./testing.js";
-import { reviewPullRequest, type ReviewFindings } from "./review.js";
+import { reviewPullRequest } from "./review.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;

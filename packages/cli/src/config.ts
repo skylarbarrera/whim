@@ -27,7 +27,7 @@ export function loadConfig(): WhimConfig {
         config.apiUrl = value;
       }
     }
-  } catch (error) {
+  } catch {
     // Config file doesn't exist or can't be read - that's OK
     // User can rely on defaults or CLI flags
   }

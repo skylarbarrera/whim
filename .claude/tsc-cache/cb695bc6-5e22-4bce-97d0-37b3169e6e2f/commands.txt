@@ -1,2 +1,0 @@
-packages/shared:build:cd /Users/skillet/dev/ai/whim/packages/shared && npm run build
-packages/shared:tsc:cd /Users/skillet/dev/ai/whim/packages/shared && npx tsc --noEmit

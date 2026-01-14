@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { RalphSpecGenerator } from "./ralph-spec-gen.js";
 import type { GitHubIssue } from "./github.js";
 

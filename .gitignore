@@ -40,4 +40,19 @@ build/
 
 # Bun
 bun.lockb
+
+# Claude Code internal
 .claude/tsc-cache/
+.claude/cache/
+.claude/skills/
+.claude/ralph.md
+.claude/settings.local.json
+
+# Internal development files
+STATE.txt
+plan.txt
+.ai/
+thoughts/
+SPEC.md
+SPEC-*.md
+RALPH.md

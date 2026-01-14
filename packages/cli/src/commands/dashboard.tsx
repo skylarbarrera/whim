@@ -80,7 +80,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
     } else if (input === 'c') {
       // TODO: Cancel selected queue item
     } else if (key.upArrow && focusedSection) {
-      const maxIndex = focusedSection === 'workers' ? (workersData?.length ?? 1) - 1 : (queueData?.items.length ?? 1) - 1;
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow && focusedSection) {
       const maxIndex = focusedSection === 'workers' ? (workersData?.length ?? 1) - 1 : (queueData?.items.length ?? 1) - 1;

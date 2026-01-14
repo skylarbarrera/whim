@@ -1,2 +1,0 @@
-packages/dashboard:build:cd /Users/skillet/dev/ai/whim/packages/dashboard && npm run build
-packages/dashboard:tsc:cd /Users/skillet/dev/ai/whim/packages/dashboard && npx tsc --noEmit
