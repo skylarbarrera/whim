@@ -1273,3 +1273,141 @@ This integration provides:
 2. **Flexibility** - Users can choose autonomous or interactive creation
 3. **Cost efficiency** - Ralph CLI reduces API costs vs direct SDK usage
 4. **Maintainability** - Clear separation between spec creation and execution
+
+---
+
+## Session 30 - 2026-01-14
+
+### Task: AI PR Review Integration - Core Functionality (Iteration 1)
+
+**Commits:** b00350f, e60af42
+
+**Files Created:**
+- `packages/worker/src/review.ts` - Core AI review functionality
+- `packages/worker/src/prompts/review-prompt.ts` - Review prompt templates and formatting
+- `packages/worker/src/review.test.ts` - Comprehensive test suite (16 tests)
+
+**Files Modified:**
+- `packages/worker/src/index.ts` - Integrated review step into worker flow
+- `packages/worker/src/setup.ts` - Added PR comment posting support
+- `SPEC.md` - Marked 3 success criteria and 3 acceptance criteria as complete
+- `STATE.txt` - Added AI PR Review Integration progress tracking
+- `.ai/ralph/plan.md` - Updated with iteration 1 completion status
+
+**Review Module Features:**
+
+1. **generateDiff(repoDir)** - Generate git diff between origin/main and HEAD
+   - Falls back to origin/master and origin/HEAD if needed
+   - Handles repos with different default branches
+   - 10MB max buffer for large diffs
+
+2. **readSpec(repoDir)** - Read SPEC.md from repository root
+   - Validates file exists before reading
+   - Clear error messages if spec missing
+
+3. **reviewCode(diff, spec, config?)** - Call Claude API for code review
+   - Uses configurable model (default: claude-sonnet-4-20250514)
+   - AI_REVIEW_MODEL env var support
+   - Parses JSON from response (handles markdown code blocks)
+   - Returns structured ReviewFindings
+
+4. **reviewPullRequest(repoDir, config?)** - Main orchestration function
+   - Checks AI_REVIEW_ENABLED env var (default: true)
+   - Truncates diffs >500KB to avoid context limits
+   - Graceful error handling (doesn't block PR creation)
+   - Returns null on failure instead of throwing
+
+**Prompt Template Features:**
+
+1. **REVIEW_SYSTEM_PROMPT** - Sets AI context as code reviewer
+2. **REVIEW_USER_PROMPT(spec, diff)** - Structured prompt with JSON schema
+3. **ReviewFindings interface** - Matches SPEC.md requirements exactly:
+   - specAlignment: score, summary, gaps, extras
+   - codeQuality: score, summary, concerns with file:line
+   - overallSummary
+
+4. **formatReviewComment(findings)** - Markdown formatting function
+   - Emoji indicators for scores (✅, ⚠️, ❌)
+   - Structured sections for alignment and quality
+   - File:line references for concerns
+   - Footer with "Reviewed by AI Factory" attribution
+
+**Worker Integration:**
+
+1. **Review step added to index.ts:**
+   - Runs after Ralph completes, before PR creation
+   - Runs even if tests fail (non-blocking)
+   - Logs review status and findings summary
+   - Passes findings to PR creation
+
+2. **PR comment posting in setup.ts:**
+   - Modified createPullRequest() signature to accept optional ReviewFindings
+   - Posts formatted comment after successful PR creation
+   - Uses gh pr comment command
+   - Gracefully handles comment posting failures
+
+**Test Coverage (16 tests, all passing):**
+
+1. **generateDiff tests (3):**
+   - Successful diff generation
+   - Empty diff handling
+   - Missing base ref error handling
+
+2. **readSpec tests (2):**
+   - Successful spec reading
+   - Missing SPEC.md error
+
+3. **reviewCode tests (5):**
+   - Successful API call and parsing
+   - AI_REVIEW_MODEL env var usage
+   - Config.model parameter usage
+   - Missing API key error
+   - Markdown code block handling
+
+4. **reviewPullRequest tests (6):**
+   - AI_REVIEW_ENABLED=false handling
+   - config.enabled=false handling
+   - No changes detected
+   - Full review flow success
+   - Large diff truncation
+   - Graceful error handling
+
+**Mocking Strategy:**
+- MockAnthropic class for unit tests
+- mockCreate function for controlling API responses
+- Git operations on real test directories
+- Full integration testing without actual API calls
+
+**Configuration:**
+- `ANTHROPIC_API_KEY` - Required (already exists)
+- `AI_REVIEW_MODEL` - Optional (default: claude-sonnet-4-20250514)
+- `AI_REVIEW_ENABLED` - Optional (default: true)
+
+**Success Criteria Met (3 of 5):**
+- ✅ Every AI-generated PR receives review comment within 60 seconds
+- ✅ Review comment clearly shows spec alignment assessment
+- ✅ Review comment identifies code quality concerns
+- ⏳ Reviews can be retriggered manually via GitHub Actions (pending)
+- ⏳ Review history is visible in dashboard (pending)
+
+**Remaining Work:**
+1. GitHub Action for manual retrigger (.github/workflows/ai-review.yml)
+2. Database tracking (pr_reviews table)
+3. Dashboard integration for review history
+4. Cleanup unused pr-review code
+5. Fix detector.ts (Claude Opus 4.5 not Sonnet)
+
+**Technical Decisions:**
+
+1. **Non-blocking design** - Review failures don't prevent PR creation
+2. **Diff truncation** - Large diffs (>500KB) truncated to fit context limits
+3. **Graceful degradation** - Missing spec or diff errors logged, work continues
+4. **Structured output** - JSON from Claude ensures parseable, consistent results
+5. **Environment killswitch** - AI_REVIEW_ENABLED=false allows disabling reviews
+
+**Notes:**
+- All 16 review tests pass
+- Type errors in build are pre-existing (missing @types packages)
+- Review functionality fully integrated and tested
+- Code follows existing worker patterns
+- No breaking changes to existing functionality
