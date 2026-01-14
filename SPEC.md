@@ -2,6 +2,32 @@
 
 Bugs and issues to fix before open-sourcing the repository.
 
+## Architecture Review Findings
+
+### Critical (Must Fix)
+- [x] No API authentication - added API_KEY env var with middleware
+- [x] `stuck()` doesn't release file locks - added releaseAllLocks call
+- [x] Docker containers have no resource limits - added 4GB mem, 2 CPU, 256 PIDs
+
+### High Priority (Should Fix)
+- [ ] TOCTOU race in rate limiter with multiple orchestrator instances
+- [ ] Heartbeat/kill race - no grace buffer before killing
+- [ ] Daily budget reset race at midnight
+- [x] Spawn rollback can fail and swallow original error - wrapped in try/catch
+- [ ] No PostgreSQL reconnection strategy
+
+### Medium Priority (Nice to Have)
+- [x] No input length validation - added MAX_REPO/SPEC/BRANCH_LENGTH + REPO_PATTERN
+- [x] Request body size limit - added 1MB limit
+- [ ] Stuck workers never picked up by healthCheck
+- [ ] Queue unbounded growth potential
+- [ ] File lock TTL missing (orphaned locks persist forever)
+- [ ] Orphan container risk when stop fails
+
+---
+
+## Completed Fixes
+
 ## Must Fix (Blocking)
 
 ### 1. Main Loop Capacity Bug

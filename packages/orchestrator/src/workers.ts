@@ -123,17 +123,28 @@ export class WorkerManager {
         HostConfig: {
           AutoRemove: false,  // Keep for debugging
           NetworkMode: "whim-network",
+          // Resource limits to prevent runaway containers
+          Memory: 4 * 1024 * 1024 * 1024,  // 4GB memory limit
+          MemorySwap: 4 * 1024 * 1024 * 1024,  // No swap (same as memory)
+          NanoCpus: 2 * 1e9,  // 2 CPU cores
+          PidsLimit: 256,  // Max 256 processes
         },
       });
 
       await container.start();
     } catch (error) {
       // Rollback: delete worker record and reset work item status
-      await this.db.execute(`DELETE FROM workers WHERE id = $1`, [workerId]);
-      await this.db.execute(
-        `UPDATE work_items SET worker_id = NULL, status = 'queued' WHERE id = $1`,
-        [workItem.id]
-      );
+      // Wrap in try/catch to ensure original error is always thrown
+      try {
+        await this.db.execute(`DELETE FROM workers WHERE id = $1`, [workerId]);
+        await this.db.execute(
+          `UPDATE work_items SET worker_id = NULL, status = 'queued' WHERE id = $1`,
+          [workItem.id]
+        );
+      } catch (rollbackError) {
+        console.error(`Rollback failed for worker ${workerId}:`, rollbackError);
+        // Continue to throw original error
+      }
       throw error;
     }
 
@@ -393,6 +404,9 @@ export class WorkerManager {
       `UPDATE work_items SET error = $2 WHERE id = $1`,
       [worker.workItemId, `Worker stuck: ${reason}`]
     );
+
+    // Release file locks so other workers aren't blocked
+    await this.conflictDetector.releaseAllLocks(workerId);
   }
 
   /**
