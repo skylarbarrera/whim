@@ -354,23 +354,22 @@ export class Database {
       "SELECT * FROM pr_reviews WHERE pr_number = $1 ORDER BY review_timestamp DESC LIMIT 1",
       [prNumber]
     );
-    return row ? this.rowToPRReview(row as unknown as PRReviewRow) : null;
+    return row ? this.rowToPRReview(row) : null;
   }
 
   /**
-   * Convert a PRReviewRow to PRReview
+   * Convert a PRReviewRow (snake_case from DB) to PRReview (camelCase)
    */
   private rowToPRReview(row: PRReviewRow): PRReview {
-    const camelRow = row as unknown as Record<string, unknown>;
     return {
-      id: String(camelRow.id),
-      workItemId: String(camelRow.workItemId),
-      prNumber: Number(camelRow.prNumber),
-      reviewTimestamp: new Date(camelRow.reviewTimestamp as string | Date),
-      modelUsed: String(camelRow.modelUsed),
-      findings: camelRow.findings as ReviewFindings,
-      createdAt: new Date(camelRow.createdAt as string | Date),
-      updatedAt: new Date(camelRow.updatedAt as string | Date),
+      id: String(row.id),
+      workItemId: String(row.work_item_id),
+      prNumber: Number(row.pr_number),
+      reviewTimestamp: new Date(row.review_timestamp),
+      modelUsed: String(row.model_used),
+      findings: row.findings,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
     };
   }
 }

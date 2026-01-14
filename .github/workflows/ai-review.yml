@@ -86,7 +86,7 @@ jobs:
           # Create a simple Node.js script to call the review function
           cat > /tmp/review-runner.js << 'EOF'
           import Anthropic from '@anthropic-ai/sdk';
-          import { readFileSync } from 'fs';
+          import { readFileSync, writeFileSync } from 'fs';
 
           const REVIEW_SYSTEM_PROMPT = \`You are a code reviewer for AI-generated pull requests.
           Analyze the diff against the specification and provide structured feedback.
@@ -250,7 +250,7 @@ jobs:
           EOF
 
           # Install Anthropic SDK in worker package if not already installed
-          cd /workspace/repo/packages/worker
+          cd $GITHUB_WORKSPACE/packages/worker
           bun add @anthropic-ai/sdk
 
           # Run the review script
