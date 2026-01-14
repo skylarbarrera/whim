@@ -1891,3 +1891,31 @@ This integration provides:
 - Already polls API and displays real-time data
 
 ---
+
+### Task: Whim CLI Dashboard - Phase 2.6-2.7
+
+**Files Modified:**
+- `packages/cli/src/commands/dashboard.tsx` - Enhanced with detailed worker and queue views
+
+**Implementation:**
+- Added detailed worker cards showing:
+  - Spinner for active status
+  - Worker ID (blue, first 8 chars)
+  - Repo name (white bold)
+  - Branch name (magenta)
+  - Current iteration
+  - Progress bar showing completion percentage
+- Added detailed queue items showing:
+  - Repo name (white bold)
+  - Branch name (magenta)
+  - Status with color coding (yellow=queued, green=assigned)
+  - Priority level
+- Limited queue display to first 5 items
+- Applied full color scheme from spec
+
+**Notes:**
+- Phase 2 complete: All 9 tasks finished
+- Dashboard now shows real-time detailed information
+- Ready to start Phase 3: Keyboard Navigation & Actions
+
+---

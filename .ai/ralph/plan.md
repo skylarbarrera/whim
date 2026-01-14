@@ -1,40 +1,43 @@
-# Iteration 9 Plan: Create src/commands/dashboard.tsx - main dashboard view
+# Iteration 10 Plan: Add detailed WORKERS and QUEUE sections
 
 ## Goal
-Create the main dashboard view that will display the orchestrator status, workers, queue, and metrics. This is the first task of Phase 2.
+Enhance the dashboard to display detailed worker cards and queue items with all required information from the spec.
 
 ## Files to Create/Modify
-- `packages/cli/src/commands/dashboard.tsx` - Main dashboard view component
+- `packages/cli/src/commands/dashboard.tsx` - Update to show detailed worker and queue information
 
 ## Implementation Steps
-1. Create commands directory
-2. Review SPEC.md for dashboard layout requirements:
-   - STATUS section (running state, worker count, queue depth)
-   - WORKERS section with live worker cards
-   - QUEUE section with pending items
-   - TODAY section (completed, failed, iterations, cost)
-   - Footer with keyboard hints
-   - Poll API every 2s with refresh spinner
-3. Create dashboard.tsx that:
-   - Uses useApi hook to fetch data
-   - Uses Section component for layout
-   - Uses Spinner for active workers and refresh indicator
-   - Displays placeholder sections for now (detailed content in next tasks)
-   - Proper TypeScript types from @whim/shared
+1. Read the current dashboard.tsx
+2. Add detailed worker card rendering:
+   - id (in blue per spec)
+   - repo (white bold per spec)
+   - branch (magenta per spec)
+   - iteration
+   - progress bar using ProgressBar component
+   - tokens (in/out)
+   - cost (yellow per spec)
+   - Spinner for active workers
+3. Add detailed queue item rendering:
+   - repo (white bold)
+   - branch (magenta)
+   - priority
+   - status (with appropriate colors: yellow for queued, green for active, etc.)
+4. Apply color scheme from spec
 
 ## Tests
-- Verify component structure
-- Check that it uses the hooks and components created in Phase 1
-- Ensure proper imports
+- Verify all required fields are displayed
+- Check that colors match specification
+- Ensure ProgressBar is used for worker progress
 
 ## Exit Criteria
-- [ ] `packages/cli/src/commands/dashboard.tsx` exists
-- [ ] Uses useApi hook for data fetching
-- [ ] Basic layout with Section components
-- [ ] Ready for detailed section implementation
-- [ ] TypeScript types properly defined
+- [ ] Worker cards show all required fields
+- [ ] Worker cards use correct colors from spec
+- [ ] Worker progress bar displays correctly
+- [ ] Queue items show all required fields
+- [ ] Queue items use correct status colors
+- [ ] Phase 2 fully complete
 
 ## Notes
-- This is Phase 2, Task 1 from SPEC.md
-- Will be enhanced in subsequent tasks with detailed sections
-- Should poll API every 2 seconds as specified
+- This is Phase 2, Tasks 6-7 from SPEC.md
+- Completes Phase 2 implementation
+- Color scheme: Worker ID=Blue, Repo=White bold, Branch=Magenta, Costs=Yellow, Status colors vary

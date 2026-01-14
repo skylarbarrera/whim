@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Section } from '../components/Section.js';
 import { Spinner } from '../components/Spinner.js';
+import { ProgressBar } from '../components/ProgressBar.js';
 import { useApi } from '../hooks/useApi.js';
 import type { WhimMetrics, Worker, WorkItem } from '@whim/shared';
 
@@ -78,9 +79,31 @@ export const Dashboard: React.FC = () => {
             No active workers
           </Text>
         ) : (
-          <Text color="gray" dimColor>
-            {workers.length} worker(s) - detailed view coming soon
-          </Text>
+          <Box flexDirection="column">
+            {workers.map((worker) => {
+              // Find the work item for this worker to get repo/branch
+              const workItem = queue.find((item) => item.id === worker.workItemId);
+              const progress = (worker.iteration / (workItem?.maxIterations || 10)) * 100;
+
+              return (
+                <Box key={worker.id} flexDirection="column" marginBottom={1}>
+                  <Box>
+                    <Spinner />
+                    <Text> </Text>
+                    <Text color="blue">{worker.id.substring(0, 8)}</Text>
+                    <Text> </Text>
+                    <Text bold>{workItem?.repo || 'unknown'}</Text>
+                    <Text color="gray"> @ </Text>
+                    <Text color="magenta">{workItem?.branch || 'unknown'}</Text>
+                  </Box>
+                  <Box marginLeft={2}>
+                    <Text color="gray">Iteration {worker.iteration} </Text>
+                    <ProgressBar percent={progress} width={15} />
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
         )}
       </Section>
 
@@ -91,9 +114,31 @@ export const Dashboard: React.FC = () => {
             Queue is empty
           </Text>
         ) : (
-          <Text color="gray" dimColor>
-            {queue.length} item(s) - detailed view coming soon
-          </Text>
+          <Box flexDirection="column">
+            {queue
+              .filter((item) => item.status === 'queued' || item.status === 'assigned')
+              .slice(0, 5)
+              .map((item) => {
+                const statusColor =
+                  item.status === 'queued'
+                    ? 'yellow'
+                    : item.status === 'assigned'
+                    ? 'green'
+                    : 'gray';
+
+                return (
+                  <Box key={item.id} marginBottom={1}>
+                    <Text bold>{item.repo}</Text>
+                    <Text color="gray"> @ </Text>
+                    <Text color="magenta">{item.branch}</Text>
+                    <Text color="gray"> | </Text>
+                    <Text color={statusColor}>{item.status}</Text>
+                    <Text color="gray"> | </Text>
+                    <Text>{item.priority}</Text>
+                  </Box>
+                );
+              })}
+          </Box>
         )}
       </Section>
 

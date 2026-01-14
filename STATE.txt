@@ -266,7 +266,7 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Code ready for deployment with proper dependencies
   - Phase 1 complete: All 8 tasks finished
 
-### Phase 2: Main Dashboard
+### Phase 2: Main Dashboard (COMPLETE)
 - [x] Task 2.1-2.5: Create main dashboard view with sections
   - Created src/commands/dashboard.tsx with full layout
   - Updated index.tsx to use Dashboard component
@@ -279,3 +279,19 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Shows refresh Spinner in header
   - Handles loading and error states
   - Uses Section components for consistent layout
+- [x] Task 2.6-2.7: Add detailed WORKERS and QUEUE sections
+  - Worker cards now show:
+    - Spinner for active status
+    - Worker ID (blue, first 8 chars)
+    - Repo name (white bold)
+    - Branch name (magenta)
+    - Current iteration
+    - Progress bar showing completion percentage
+  - Queue items now show:
+    - Repo name (white bold)
+    - Branch name (magenta)
+    - Status with color coding (yellow=queued, green=assigned)
+    - Priority level
+  - Limited queue display to first 5 items
+  - Applied full color scheme from spec
+  - Phase 2 complete: All 9 tasks finished
