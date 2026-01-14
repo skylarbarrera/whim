@@ -40,6 +40,11 @@ function loadConfig(): IntakeConfig {
   };
 }
 
+const ORCHESTRATOR_TIMEOUT_MS = parseInt(
+  process.env.ORCHESTRATOR_TIMEOUT_MS ?? "30000",
+  10
+);
+
 async function submitToOrchestrator(
   orchestratorUrl: string,
   issue: GitHubIssue,
@@ -58,18 +63,31 @@ async function submitToOrchestrator(
     },
   };
 
-  const response = await fetch(`${orchestratorUrl}/api/work`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ORCHESTRATOR_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to submit work item: ${response.status} ${error}`);
+  try {
+    const response = await fetch(`${orchestratorUrl}/api/work`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to submit work item: ${response.status} ${error}`);
+    }
+
+    return response.json() as Promise<AddWorkItemResponse>;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Orchestrator request timed out after ${ORCHESTRATOR_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return response.json() as Promise<AddWorkItemResponse>;
 }
 
 async function processIssue(
@@ -150,12 +168,20 @@ async function main(): Promise<void> {
   // Initial poll
   await poll(github, specGen, config.orchestratorUrl);
 
-  // Set up recurring poll
+  // Set up recurring poll with overlap guard
+  let polling = false;
   setInterval(async () => {
+    if (polling) {
+      console.log("Previous poll still running, skipping this interval");
+      return;
+    }
+    polling = true;
     try {
       await poll(github, specGen, config.orchestratorUrl);
     } catch (error) {
       console.error("Poll failed:", error);
+    } finally {
+      polling = false;
     }
   }, config.pollInterval);
 

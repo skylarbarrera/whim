@@ -1,5 +1,36 @@
 import { Octokit } from "@octokit/rest";
 
+/**
+ * Retry wrapper with exponential backoff for GitHub API calls
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  baseDelayMs = 1000
+): Promise<T> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Don't retry on 4xx client errors (except 429 rate limit)
+      if ("status" in (error as object)) {
+        const status = (error as { status: number }).status;
+        if (status >= 400 && status < 500 && status !== 429) {
+          throw lastError;
+        }
+      }
+      if (attempt < retries - 1) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.log(`GitHub API retry ${attempt + 1}/${retries} after ${delay}ms`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError ?? new Error("GitHub API call failed after retries");
+}
+
 export interface GitHubIssue {
   id: number;
   number: number;
@@ -48,14 +79,16 @@ export class GitHubAdapter {
       }
 
       try {
-        const response = await this.octokit.issues.listForRepo({
-          owner,
-          repo,
-          labels: this.config.intakeLabel,
-          state: "open",
-          sort: "created",
-          direction: "asc",
-        });
+        const response = await withRetry(() =>
+          this.octokit.issues.listForRepo({
+            owner,
+            repo,
+            labels: this.config.intakeLabel,
+            state: "open",
+            sort: "created",
+            direction: "asc",
+          })
+        );
 
         for (const issue of response.data) {
           // Skip pull requests (they also appear as issues)
@@ -98,12 +131,14 @@ export class GitHubAdapter {
     issueNumber: number,
     label: string
   ): Promise<void> {
-    await this.octokit.issues.addLabels({
-      owner,
-      repo,
-      issue_number: issueNumber,
-      labels: [label],
-    });
+    await withRetry(() =>
+      this.octokit.issues.addLabels({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        labels: [label],
+      })
+    );
   }
 
   /**
@@ -116,12 +151,14 @@ export class GitHubAdapter {
     label: string
   ): Promise<void> {
     try {
-      await this.octokit.issues.removeLabel({
-        owner,
-        repo,
-        issue_number: issueNumber,
-        name: label,
-      });
+      await withRetry(() =>
+        this.octokit.issues.removeLabel({
+          owner,
+          repo,
+          issue_number: issueNumber,
+          name: label,
+        })
+      );
     } catch (error: unknown) {
       // Ignore 404 - label might not exist
       if (
