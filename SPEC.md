@@ -13,7 +13,7 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 - [x] Create `packages/cli` with package.json (ink, react, chalk, commander)
 - [x] Add tsconfig.json matching other packages
 - [x] Create entry point `src/index.tsx` with commander routing
-- [ ] Create `src/components/Section.tsx` - boxed section with header
+- [x] Create `src/components/Section.tsx` - boxed section with header
 - [ ] Create `src/components/Spinner.tsx` - animated spinner (◐◓◑◒)
 - [ ] Create `src/components/ProgressBar.tsx` - animated progress bar
 - [ ] Create `src/hooks/useApi.ts` - orchestrator API client with polling
