@@ -1,5 +1,35 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { spawn as spawnSync } from "node:child_process";
 import type { OrchestratorClient } from "./client.js";
+
+/**
+ * Push current branch to origin (for incremental push after commits)
+ */
+async function pushBranch(repoDir: string, branch: string): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const proc = spawnSync("git", ["push", "-u", "origin", branch], {
+      cwd: repoDir,
+      shell: false,
+    });
+
+    let stderr = "";
+    proc.stderr?.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve({ success: true });
+      } else {
+        resolve({ success: false, error: stderr || `Exit code ${code}` });
+      }
+    });
+
+    proc.on("error", (err) => {
+      resolve({ success: false, error: err.message });
+    });
+  });
+}
 
 /**
  * Ralph headless event types (JSON from stdout)
@@ -64,6 +94,7 @@ export async function runRalph(
     stuckThreshold?: number;
     onEvent?: (event: RalphEvent) => void;
     onOutput?: (line: string) => void;
+    incrementalPush?: { enabled: boolean; branch: string };
   } = {}
 ): Promise<RalphResult> {
   const metrics: RalphMetrics = {
@@ -138,6 +169,25 @@ export async function runRalph(
         if (event.type === "write" && event.path) {
           metrics.filesModified++;
           await client.lockFile([event.path as string]);
+        }
+        break;
+      }
+
+      case "commit": {
+        // Push after each commit if incremental push is enabled
+        if (options.incrementalPush?.enabled) {
+          const hash = (event.hash as string) ?? "unknown";
+          const message = (event.message as string) ?? "";
+          console.log(`[PUSH] Pushing commit ${hash}: ${message.slice(0, 50)}`);
+
+          const pushResult = await pushBranch(repoDir, options.incrementalPush.branch);
+          if (pushResult.success) {
+            console.log(`[PUSH] Commit ${hash} pushed successfully`);
+          } else {
+            console.error(`[PUSH] Failed to push commit ${hash}: ${pushResult.error}`);
+            // Don't fail the whole run - log the error and continue
+            // The final PR creation will retry pushing
+          }
         }
         break;
       }

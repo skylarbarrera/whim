@@ -49,4 +49,4 @@ ENV INTAKE_LABEL=ai-factory
 ENV POLL_INTERVAL=60000
 
 # Run the intake service
-CMD ["bun", "run", "dist/index.js"]
+CMD ["bun", "dist/index.js"]

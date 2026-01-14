@@ -1,6 +1,6 @@
 import type { WorkItem } from "@factory/shared";
 import { OrchestratorClient } from "./client.js";
-import { setupWorkspace, createPullRequest, PRStep } from "./setup.js";
+import { setupWorkspace, createPullRequest, PRStep, verifyGitAuth } from "./setup.js";
 import {
   loadLearnings,
   saveLearnings,
@@ -83,6 +83,17 @@ async function main(): Promise<void> {
   });
   console.log(`Workspace ready at: ${repoDir}`);
 
+  // Verify git push access BEFORE doing any work
+  console.log("Verifying git push access...");
+  const authResult = await verifyGitAuth(repoDir, config.githubToken);
+  if (!authResult.success) {
+    console.error("Git auth verification failed:", authResult.error);
+    await client.fail(`Git auth failed: ${authResult.error}`, 0);
+    console.log("Failure reported to orchestrator");
+    return;
+  }
+  console.log("Git push access verified");
+
   console.log("Loading learnings...");
   const learningsPath = getLearningsPath(repoDir);
   await loadLearnings(client, config.workItem.repo, learningsPath);
@@ -113,6 +124,11 @@ async function main(): Promise<void> {
     : await runRalph(repoDir, client, {
         maxIterations: config.workItem.maxIterations,
         onOutput,
+        // Push after each commit so work is never lost
+        incrementalPush: {
+          enabled: true,
+          branch: config.workItem.branch,
+        },
       });
 
   console.log("Ralph completed:", result.success ? "SUCCESS" : "FAILED");

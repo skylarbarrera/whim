@@ -83,6 +83,79 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Result of git authentication verification
+ */
+export interface GitAuthResult {
+  success: boolean;
+  error?: string;
+  scopes?: string[];
+}
+
+/**
+ * Verify git push access BEFORE starting work.
+ * Creates a test branch, pushes it, then cleans up.
+ * This catches auth issues (like missing workflow scope) early.
+ */
+export async function verifyGitAuth(
+  repoDir: string,
+  githubToken: string
+): Promise<GitAuthResult> {
+  const testBranch = `factory-auth-test-${Date.now()}`;
+
+  console.log("[AUTH] Verifying git push access...");
+
+  // Step 1: Create test branch
+  const branchResult = await exec("git", ["checkout", "-b", testBranch], { cwd: repoDir });
+  if (branchResult.code !== 0) {
+    return { success: false, error: `Failed to create test branch: ${branchResult.stderr}` };
+  }
+
+  // Step 2: Create empty commit (no workflow files to avoid scope issues)
+  const commitResult = await exec(
+    "git",
+    ["commit", "--allow-empty", "-m", "test: verify git push access"],
+    { cwd: repoDir }
+  );
+  if (commitResult.code !== 0) {
+    // Clean up
+    await exec("git", ["checkout", "-"], { cwd: repoDir });
+    await exec("git", ["branch", "-D", testBranch], { cwd: repoDir });
+    return { success: false, error: `Failed to create test commit: ${commitResult.stderr}` };
+  }
+
+  // Step 3: Try to push
+  const pushResult = await exec("git", ["push", "-u", "origin", testBranch], { cwd: repoDir });
+
+  // Step 4: Clean up - switch back and delete branches regardless of push result
+  await exec("git", ["checkout", "-"], { cwd: repoDir });
+  await exec("git", ["branch", "-D", testBranch], { cwd: repoDir });
+
+  if (pushResult.code !== 0) {
+    // Check for specific scope errors
+    const stderr = pushResult.stderr.toLowerCase();
+    if (stderr.includes("workflow") && stderr.includes("scope")) {
+      return {
+        success: false,
+        error: "Token missing 'workflow' scope - cannot push workflow files. Re-auth with: gh auth login --scopes workflow"
+      };
+    }
+    if (stderr.includes("permission") || stderr.includes("denied") || stderr.includes("403")) {
+      return {
+        success: false,
+        error: `Push access denied. Ensure token has 'repo' scope. Error: ${pushResult.stderr}`
+      };
+    }
+    return { success: false, error: `Push failed: ${pushResult.stderr}` };
+  }
+
+  // Step 5: Delete remote test branch
+  await exec("git", ["push", "origin", "--delete", testBranch], { cwd: repoDir });
+
+  console.log("[AUTH] Git push access verified successfully");
+  return { success: true };
+}
+
 export async function setupWorkspace(
   workItem: WorkItem,
   config: WorkspaceConfig
