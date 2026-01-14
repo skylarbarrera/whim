@@ -1,4 +1,4 @@
-import type { WorkItem } from "@factory/shared";
+import type { WorkItem } from "@whim/shared";
 import { OrchestratorClient } from "./client.js";
 import { setupWorkspace, createPullRequest, PRStep, verifyGitAuth } from "./setup.js";
 import {

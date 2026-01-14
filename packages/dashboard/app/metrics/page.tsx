@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { StatusCard } from '@/components';
-import type { FactoryMetrics, WorkerMetrics } from '@factory/shared';
+import type { WhimMetrics, WorkerMetrics } from '@whim/shared';
 
 export default function MetricsPage() {
-  const [summary, setSummary] = useState<FactoryMetrics | null>(null);
+  const [summary, setSummary] = useState<WhimMetrics | null>(null);
   const [recentMetrics, setRecentMetrics] = useState<WorkerMetrics[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export default function MetricsPage() {
 
       {summary && (
         <>
-          <h2 style={{ marginBottom: '1rem' }}>Factory Summary</h2>
+          <h2 style={{ marginBottom: '1rem' }}>Whim Summary</h2>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
             <StatusCard title="Active Workers" value={summary.activeWorkers} status="success" />
             <StatusCard title="Queued Items" value={summary.queuedItems} status="warning" />

@@ -1,12 +1,12 @@
 /**
- * MetricsCollector - Collects and aggregates factory metrics
+ * MetricsCollector - Collects and aggregates whim metrics
  *
- * Provides methods to get factory summary metrics, worker metrics,
+ * Provides methods to get whim summary metrics, worker metrics,
  * and learnings with optional filtering.
  */
 
 import type { Database } from "./db.js";
-import type { FactoryMetrics, WorkerMetrics, Learning } from "@factory/shared";
+import type { WhimMetrics, WorkerMetrics, Learning } from "@whim/shared";
 
 /**
  * Options for filtering learnings
@@ -30,14 +30,14 @@ export class MetricsCollector {
   ) {}
 
   /**
-   * Get factory metrics summary
+   * Get whim metrics summary
    *
-   * Aggregates current state of the factory including active workers,
+   * Aggregates current state of whim including active workers,
    * queued items, daily statistics, and success rate.
    *
-   * @returns Factory metrics summary
+   * @returns Whim metrics summary
    */
-  async getSummary(): Promise<FactoryMetrics> {
+  async getSummary(): Promise<WhimMetrics> {
     // Get active workers count
     const activeResult = await this.db.queryOne<{ count: string }>(
       `SELECT COUNT(*) as count FROM workers WHERE status IN ('starting', 'running')`

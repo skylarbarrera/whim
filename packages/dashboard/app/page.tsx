@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { StatusCard } from '@/components';
-import type { FactoryMetrics, StatusResponse } from '@factory/shared';
+import type { WhimMetrics, StatusResponse } from '@whim/shared';
 
 export default function HomePage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null);
+  const [metrics, setMetrics] = useState<WhimMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function HomePage() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Factory Overview</h1>
+      <h1 style={{ marginBottom: '1.5rem' }}>Whim Overview</h1>
 
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
         <StatusCard

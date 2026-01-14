@@ -1,7 +1,7 @@
 /**
- * @factory/orchestrator
+ * @whim/orchestrator
  *
- * Main entry point for the Factory Orchestrator service.
+ * Main entry point for the Whim Orchestrator service.
  * Manages work queue, worker lifecycle, and API endpoints.
  */
 
@@ -139,7 +139,7 @@ function setupGracefulShutdown(
 async function main(): Promise<void> {
   const config = loadConfig();
 
-  log("Starting Factory Orchestrator...");
+  log("Starting Whim Orchestrator...");
   log(`Configuration: port=${config.port}, loopInterval=${config.loopIntervalMs}ms`);
 
   // Initialize database client

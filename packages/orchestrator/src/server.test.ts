@@ -5,14 +5,14 @@
 import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
 import request from "supertest";
 import { createServer, type ServerDependencies } from "./server.js";
-import type { WorkItem, Worker, FactoryMetrics, Learning } from "@factory/shared";
+import type { WorkItem, Worker, WhimMetrics, Learning } from "@whim/shared";
 
 // Helper to create mock work item
 function createWorkItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     id: "work-123",
     repo: "owner/repo",
-    branch: "factory/work-123",
+    branch: "whim/work-123",
     spec: "# Test Spec",
     priority: "medium",
     status: "queued",
@@ -97,7 +97,7 @@ function createMockDeps(): ServerDependencies {
     } as unknown as ServerDependencies["rateLimiter"],
 
     metrics: {
-      getSummary: mock((): Promise<FactoryMetrics> =>
+      getSummary: mock((): Promise<WhimMetrics> =>
         Promise.resolve({
           activeWorkers: 1,
           queuedItems: 5,
@@ -318,7 +318,7 @@ describe("Server", () => {
   });
 
   describe("Management Routes", () => {
-    it("GET /api/status returns factory status", async () => {
+    it("GET /api/status returns whim status", async () => {
       const deps = createMockDeps();
       const app = createServer(deps);
 
@@ -367,7 +367,7 @@ describe("Server", () => {
       expect(res.body.stats.total).toBe(1);
     });
 
-    it("GET /api/metrics returns factory metrics", async () => {
+    it("GET /api/metrics returns whim metrics", async () => {
       const deps = createMockDeps();
       const app = createServer(deps);
 

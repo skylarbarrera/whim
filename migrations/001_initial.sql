@@ -1,4 +1,4 @@
--- AI Software Factory - Initial Schema
+-- Whim - Initial Schema
 -- Enables pgvector for semantic similarity search on learnings
 
 -- Enable pgvector extension

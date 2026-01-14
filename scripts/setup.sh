@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI Software Factory - Setup Script
+# Whim - Setup Script
 # One-time setup: checks prerequisites, creates .env, installs deps, builds images, starts services, runs migrations
 
 set -euo pipefail
@@ -9,7 +9,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
 
-echo "🏭 AI Software Factory - Setup"
+echo "🏭 Whim - Setup"
 echo "==============================="
 echo ""
 
@@ -54,7 +54,7 @@ if [ ! -f ".env" ]; then
         warn "Created .env from .env.example - please edit with your values"
     else
         cat > .env << 'EOF'
-# AI Software Factory - Environment Variables
+# Whim - Environment Variables
 
 # Required
 GITHUB_TOKEN=           # GitHub PAT with repo permissions
@@ -66,7 +66,7 @@ REDIS_URL=redis://localhost:6379
 MAX_WORKERS=2           # Max concurrent workers
 DAILY_BUDGET=200        # Max iterations per day
 COOLDOWN_SECONDS=60     # Seconds between worker spawns
-INTAKE_LABEL=ai-factory # GitHub label to watch
+INTAKE_LABEL=whim # GitHub label to watch
 POLL_INTERVAL=60000     # GitHub poll interval (ms)
 EOF
         warn "Created .env - please edit with your values"
@@ -94,7 +94,7 @@ echo ""
 echo "Building worker Docker image..."
 
 if [ -f "packages/worker/Dockerfile" ]; then
-    docker build -t factory-worker -f packages/worker/Dockerfile .
+    docker build -t whim-worker -f packages/worker/Dockerfile .
     success "Worker image built"
 else
     warn "Worker Dockerfile not found - skipping worker image build"
@@ -114,7 +114,7 @@ sleep 5
 
 # Check postgres health
 for i in {1..30}; do
-    if docker exec factory-postgres pg_isready -U factory -d factory &> /dev/null; then
+    if docker exec whim-postgres pg_isready -U factory -d factory &> /dev/null; then
         success "PostgreSQL is ready"
         break
     fi
@@ -126,7 +126,7 @@ done
 
 # Check redis health
 for i in {1..10}; do
-    if docker exec factory-redis redis-cli ping &> /dev/null; then
+    if docker exec whim-redis redis-cli ping &> /dev/null; then
         success "Redis is ready"
         break
     fi

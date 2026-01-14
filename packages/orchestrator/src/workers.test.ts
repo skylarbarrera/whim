@@ -9,7 +9,7 @@ import type { Database } from "./db.js";
 import type { RateLimiter } from "./rate-limits.js";
 import type { ConflictDetector } from "./conflicts.js";
 import type Docker from "dockerode";
-import type { Worker, WorkItem, WorkerStatus } from "@factory/shared";
+import type { Worker, WorkItem, WorkerStatus } from "@whim/shared";
 
 /**
  * Mock Database for testing worker operations
@@ -355,7 +355,7 @@ class MockDocker {
 const createWorkItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({
   id: "work-item-1",
   repo: "owner/repo",
-  branch: "factory/abc123",
+  branch: "whim/abc123",
   spec: "# Test Spec",
   priority: "medium",
   status: "queued",

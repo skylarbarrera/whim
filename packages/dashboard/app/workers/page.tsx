@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { DataTable } from '@/components';
-import type { Worker } from '@factory/shared';
+import type { Worker } from '@whim/shared';
 
 export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);

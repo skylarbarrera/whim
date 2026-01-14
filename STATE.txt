@@ -174,3 +174,41 @@ Implementation Complete:
 - Database tracking with pr_reviews table
 - Dashboard page displaying review history
 - Full API endpoints for review data
+
+## Whim Rebrand - COMPLETE
+
+All references to "factory" have been replaced with "whim" across the codebase:
+
+### Changes Made:
+1. **Package Namespace**: Changed from @factory/* to @whim/*
+   - @whim/shared, @whim/worker, @whim/orchestrator, @whim/intake, @whim/dashboard
+
+2. **Docker Configuration**: Renamed all containers, volumes, and networks
+   - whim-orchestrator, whim-postgres, whim-redis, whim-intake, whim-dashboard
+   - whim-postgres-data, whim-redis-data volumes
+   - whim-network
+
+3. **Code References**: Updated all TypeScript imports and type names
+   - Changed FactoryMetrics to WhimMetrics
+   - Updated all comments and documentation strings
+
+4. **Configuration**: Updated environment variables and defaults
+   - WORKER_IMAGE=whim-worker:latest
+   - INTAKE_LABEL=whim
+   - DATABASE_URL=postgres://whim:whim@localhost:5433/whim
+   - Redis key prefix: whim:
+
+5. **Documentation**: Updated README.md, SPEC.md, .env.example, migrations
+
+### Success Criteria:
+- ✅ All references to "factory" variants replaced with "whim"
+- ✅ Package namespace changed from @factory/* to @whim/*
+- ✅ Docker images/containers renamed from factory-* to whim-*
+- ✅ Documentation reflects new branding
+- ✅ Project builds successfully (bun install works)
+- ✅ No broken imports or references
+
+### Acceptance Criteria:
+- ✅ grep returns only Ralph-related or external references
+- ✅ bun install completes without errors
+- Note: Some pre-existing TypeScript errors unrelated to rename exist

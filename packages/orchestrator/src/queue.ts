@@ -11,7 +11,7 @@ import type {
   Priority,
   AddWorkItemRequest,
   QueueStatsResponse,
-} from "@factory/shared";
+} from "@whim/shared";
 
 /**
  * Priority order for SQL sorting (higher number = higher priority)
@@ -35,7 +35,7 @@ export class QueueManager {
    */
   async add(input: AddWorkItemRequest): Promise<WorkItem> {
     const id = uuid();
-    const branch = input.branch ?? `factory/${id.slice(0, 8)}`;
+    const branch = input.branch ?? `whim/${id.slice(0, 8)}`;
     const priority = input.priority ?? "medium";
     const maxIterations = input.maxIterations ?? 20;
     const metadata = input.metadata ?? {};

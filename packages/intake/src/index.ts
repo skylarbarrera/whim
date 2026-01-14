@@ -1,4 +1,4 @@
-import type { AddWorkItemRequest, AddWorkItemResponse } from "@factory/shared";
+import type { AddWorkItemRequest, AddWorkItemResponse } from "@whim/shared";
 import { GitHubAdapter, type GitHubIssue } from "./github.js";
 import { SpecGenerator, type GeneratedSpec } from "./spec-gen.js";
 import { RalphSpecGenerator } from "./ralph-spec-gen.js";
@@ -34,7 +34,7 @@ function loadConfig(): IntakeConfig {
     repos: reposEnv.split(",").map((r) => r.trim()),
     orchestratorUrl:
       process.env.ORCHESTRATOR_URL ?? "http://orchestrator:3000",
-    intakeLabel: process.env.INTAKE_LABEL ?? "ai-factory",
+    intakeLabel: process.env.INTAKE_LABEL ?? "whim",
     pollInterval: parseInt(process.env.POLL_INTERVAL ?? "60000", 10),
     useRalphSpec,
   };

@@ -33,7 +33,7 @@ export function Navigation() {
           marginRight: '2rem',
         }}
       >
-        AI Factory
+        Whim
       </Link>
       {navItems.map((item) => (
         <Link

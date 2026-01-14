@@ -1,7 +1,7 @@
 /**
  * Express API Server
  *
- * Provides REST API endpoints for the AI Software Factory orchestrator.
+ * Provides REST API endpoints for the Whim orchestrator.
  * All endpoints return JSON and use consistent error handling.
  */
 
@@ -21,7 +21,7 @@ import type {
   WorkerStuckRequest,
   ErrorResponse,
   StatusResponse,
-} from "@factory/shared";
+} from "@whim/shared";
 
 /**
  * Dependencies required by the server
@@ -320,7 +320,7 @@ export function createServer(deps: ServerDependencies): express.Application {
   // ==========================================================================
 
   /**
-   * GET /api/status - Overall factory status
+   * GET /api/status - Overall whim status
    */
   app.get(
     "/api/status",
@@ -390,7 +390,7 @@ export function createServer(deps: ServerDependencies): express.Application {
   );
 
   /**
-   * GET /api/metrics - Factory metrics
+   * GET /api/metrics - Whim metrics
    */
   app.get(
     "/api/metrics",

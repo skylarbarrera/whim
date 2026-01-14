@@ -113,7 +113,7 @@ export interface WorkerMetrics {
   timestamp: Date;
 }
 
-export interface FactoryMetrics {
+export interface WhimMetrics {
   activeWorkers: number;
   queuedItems: number;
   completedToday: number;

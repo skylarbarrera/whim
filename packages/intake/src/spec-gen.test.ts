@@ -47,7 +47,7 @@ describe("SpecGenerator", () => {
     number: 42,
     title: "Add user authentication",
     body: "We need to add login and signup functionality.\n\n- OAuth support\n- Email/password",
-    labels: ["ai-factory", "enhancement"],
+    labels: ["whim", "enhancement"],
     owner: "owner",
     repo: "repo",
     url: "https://github.com/owner/repo/issues/42",

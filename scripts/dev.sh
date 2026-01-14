@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI Software Factory - Development Script
+# Whim - Development Script
 # Uses Docker Compose for all orchestration
 
 set -euo pipefail
@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🏭 AI Software Factory - Development Mode"
+echo "🏭 Whim - Development Mode"
 echo "=========================================="
 echo ""
 
@@ -83,7 +83,7 @@ fi
 
 # Build worker image first (needed for orchestrator to spawn workers)
 info "Building worker Docker image..."
-docker build -t factory-worker -f packages/worker/Dockerfile . -q
+docker build -t whim-worker -f packages/worker/Dockerfile . -q
 success "Worker image built"
 
 echo ""

@@ -108,7 +108,7 @@ export function formatReviewComment(
 
   // Footer
   comment += `---\n`;
-  comment += `*🏭 Reviewed by AI Factory*`;
+  comment += `*🏭 Reviewed by Whim*`;
   if (rerunUrl) {
     comment += ` • [Retrigger review](${rerunUrl})`;
   }

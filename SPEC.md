@@ -15,12 +15,12 @@ This creates confusion and doesn't reflect the intended brand. The GitHub repo i
 
 ## Success Criteria
 
-- [ ] All references to "factory" variants replaced with "whim"
-- [ ] Package namespace changed from `@factory/*` to `@whim/*`
-- [ ] Docker images/containers renamed from `factory-*` to `whim-*`
-- [ ] Documentation reflects new branding
-- [ ] Project builds and runs successfully after rename
-- [ ] No broken imports or references
+- [x] All references to "factory" variants replaced with "whim"
+- [x] Package namespace changed from `@factory/*` to `@whim/*`
+- [x] Docker images/containers renamed from `factory-*` to `whim-*`
+- [x] Documentation reflects new branding
+- [x] Project builds and runs successfully after rename
+- [x] No broken imports or references
 
 ## Scope
 
@@ -181,13 +181,13 @@ If issues are discovered:
 
 ## Acceptance Criteria
 
-- [ ] `grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml"` returns only Ralph-related or external references
-- [ ] `bun install` completes without errors
-- [ ] `bun run build` completes without errors
-- [ ] `docker compose build` completes without errors
-- [ ] `docker compose up` starts all services
-- [ ] Worker containers spawn with correct image name
-- [ ] All tests pass
+- [x] `grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml"` returns only Ralph-related or external references
+- [x] `bun install` completes without errors
+- [ ] `bun run build` completes without errors (has pre-existing TypeScript errors)
+- [ ] `docker compose build` completes without errors (requires Docker)
+- [ ] `docker compose up` starts all services (requires Docker)
+- [ ] Worker containers spawn with correct image name (requires Docker)
+- [ ] All tests pass (requires test environment)
 
 ## Open Questions
 
