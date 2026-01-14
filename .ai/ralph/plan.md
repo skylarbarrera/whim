@@ -1,33 +1,35 @@
-# Iteration 5 Plan: Create src/components/Spinner.tsx - animated spinner (◐◓◑◒)
+# Iteration 6 Plan: Create src/components/ProgressBar.tsx - animated progress bar
 
 ## Goal
-Create an animated spinner component that cycles through the characters ◐◓◑◒ to indicate loading or activity. This will be used for active workers and refresh indicators.
+Create a progress bar component that shows task completion progress. Will be used to display worker iteration progress.
 
 ## Files to Create/Modify
-- `packages/cli/src/components/Spinner.tsx` - Animated spinner component
+- `packages/cli/src/components/ProgressBar.tsx` - Animated progress bar component
 
 ## Implementation Steps
-1. Create Spinner.tsx component that:
-   - Cycles through spinner frames: ◐◓◑◒
-   - Uses React hooks (useState, useEffect) for animation
-   - Has configurable interval (default ~100ms)
-   - Can be used inline with other text
+1. Create ProgressBar.tsx component that:
+   - Takes percent (0-100) as prop
+   - Renders filled portion in green (per spec)
+   - Renders empty portion in gray dim (per spec)
+   - Has configurable width (default ~20 chars)
+   - Shows visual progress with characters like █ or ━
    - TypeScript types properly defined
 
 ## Tests
 - Verify the component follows Ink patterns
 - Check that it exports properly
-- Ensure animation timing makes sense
+- Ensure colors match spec (green filled, gray dim empty)
 
 ## Exit Criteria
-- [ ] `packages/cli/src/components/Spinner.tsx` exists
-- [ ] Component animates through ◐◓◑◒ frames
-- [ ] Uses React hooks for animation
-- [ ] Can be used inline
+- [ ] `packages/cli/src/components/ProgressBar.tsx` exists
+- [ ] Component takes percent prop
+- [ ] Filled portion is green
+- [ ] Empty portion is gray dim
+- [ ] Visual representation is clear
 - [ ] TypeScript types are properly defined
 
 ## Notes
-- This is Phase 1, Task 5 from SPEC.md
-- Will be used for active workers and refresh indicator
-- Animation should be smooth and not too fast
-- Should work well in terminal output
+- This is Phase 1, Task 6 from SPEC.md
+- Color scheme from spec: Progress filled = Green, Progress empty = Gray dim
+- Will be used in worker cards to show iteration progress
+- Should be compact and readable in terminal

@@ -245,3 +245,10 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Configurable interval (default 100ms)
   - Can be used inline with other components
   - Proper TypeScript types defined
+- [x] Task 1.6: Create src/components/ProgressBar.tsx - animated progress bar
+  - Takes percent (0-100) as prop with clamping
+  - Renders filled portion in green using █ characters
+  - Renders empty portion in gray dim using ░ characters
+  - Shows percentage text next to bar
+  - Configurable width (default 20 chars)
+  - Proper TypeScript types defined
