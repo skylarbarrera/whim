@@ -1,194 +1,83 @@
-# Whim Rebrand Specification
+# Whim CLI Dashboard
 
-## Executive Summary
+Ink-based terminal dashboard for monitoring and managing Whim.
 
-Rename the project from "AI Factory" / "factory" to "whim" across all code, configuration, documentation, and infrastructure. This establishes a consistent brand identity.
+## Overview
 
-## Problem Statement
+- **Replaces:** `packages/dashboard` (delete after CLI complete)
+- **Tech:** Ink (React for CLIs) + TypeScript
+- **Architecture:** Standalone client, connects to orchestrator API
 
-The project currently uses inconsistent naming:
-- `factory`, `ai-factory`, `Factory`, `AI Factory`, `AI Software Factory`
-- Package namespace `@factory/*`
-- Docker images/containers named `factory-*`
+## Phase 1: Setup & Components
 
-This creates confusion and doesn't reflect the intended brand. The GitHub repo is already named `whim`, creating a mismatch.
+- [ ] Create `packages/cli` with package.json (ink, react, chalk, commander)
+- [ ] Add tsconfig.json matching other packages
+- [ ] Create entry point `src/index.tsx` with commander routing
+- [ ] Create `src/components/Section.tsx` - boxed section with header
+- [ ] Create `src/components/Spinner.tsx` - animated spinner (◐◓◑◒)
+- [ ] Create `src/components/ProgressBar.tsx` - animated progress bar
+- [ ] Create `src/hooks/useApi.ts` - orchestrator API client with polling
+- [ ] Verify `whim` command runs and shows "Hello World"
 
-## Success Criteria
+## Phase 2: Main Dashboard
 
-- [x] All references to "factory" variants replaced with "whim"
-- [x] Package namespace changed from `@factory/*` to `@whim/*`
-- [x] Docker images/containers renamed from `factory-*` to `whim-*`
-- [x] Documentation reflects new branding
-- [x] Project builds and runs successfully after rename
-- [x] No broken imports or references
+- [ ] Create `src/commands/dashboard.tsx` - main dashboard view
+- [ ] Add STATUS section (running state, worker count, queue depth)
+- [ ] Add WORKERS section with live worker cards
+- [ ] Worker card shows: id, repo, branch, iteration, progress bar, tokens, cost
+- [ ] Add QUEUE section with pending items
+- [ ] Queue item shows: repo, branch, priority, status
+- [ ] Add TODAY section (completed, failed, iterations, cost)
+- [ ] Add footer with keyboard hints
+- [ ] Poll API every 2s, show refresh spinner
 
-## Scope
+## Phase 3: Keyboard Navigation & Actions
 
-### In Scope
+- [ ] Add keyboard handler with `useInput` hook
+- [ ] `q` - quit dashboard
+- [ ] `w` - focus workers section
+- [ ] `u` - focus queue section
+- [ ] `k` - kill selected worker (POST /api/workers/:id/kill)
+- [ ] `c` - cancel selected queue item (POST /api/work/:id/cancel)
+- [ ] `r` - force refresh
+- [ ] `?` - show help overlay
+- [ ] Arrow keys to select items within sections
 
-| Category | From | To |
-|----------|------|-----|
-| Package names | `@factory/shared`, `@factory/worker`, etc. | `@whim/shared`, `@whim/worker`, etc. |
-| Docker images | `factory-worker:latest` | `whim-worker:latest` |
-| Container names | `factory-orchestrator`, `factory-postgres` | `whim-orchestrator`, `whim-postgres` |
-| Volume names | `factory-postgres-data`, `factory-redis-data` | `whim-postgres-data`, `whim-redis-data` |
-| Network name | `factory-network` | `whim-network` |
-| Documentation | "AI Factory", "Factory" | "Whim", "whim" |
-| Comments/strings | "factory" references | "whim" references |
-| File paths | Any with "factory" | Corresponding "whim" |
+## Phase 4: Logs & Polish
 
-### Out of Scope (Preserve)
+- [ ] Create `src/commands/logs.tsx` - log viewer
+- [ ] `l` key opens logs for selected worker
+- [ ] Poll worker logs from API (or add new endpoint)
+- [ ] Add `--api-url` flag for remote orchestrators
+- [ ] Add `~/.whimrc` config file support
+- [ ] Add error handling for API failures (show error in UI, don't crash)
+- [ ] Add `whim status` one-liner command
 
-- **Ralph**: Keep all Ralph references unchanged (separate tool identity)
-- **External services**: GitHub, Anthropic, etc. references unchanged
-- **Git history**: No rewriting history
+## Color Scheme
 
-## Technical Requirements
+| Element | Color |
+|---------|-------|
+| Section headers | Cyan |
+| Active/running | Green |
+| Queued/waiting | Yellow |
+| Failed/error | Red |
+| Worker ID | Blue |
+| Repo name | White bold |
+| Branch name | Magenta |
+| Costs | Yellow |
+| Progress filled | Green |
+| Progress empty | Gray dim |
+| Key hints | Cyan dim |
 
-### Package Renaming
+## Animation Requirements
 
-```json
-// Before (package.json)
-{
-  "name": "@factory/shared",
-  "dependencies": {
-    "@factory/shared": "workspace:*"
-  }
-}
+- Spinner for active workers (◐◓◑◒ cycle)
+- Pulse/breathe for queued items
+- Smooth progress bar updates
+- Refresh indicator in header
 
-// After
-{
-  "name": "@whim/shared",
-  "dependencies": {
-    "@whim/shared": "workspace:*"
-  }
-}
-```
+## Cleanup
 
-**Packages to rename:**
-- `@factory/shared` → `@whim/shared`
-- `@factory/worker` → `@whim/worker`
-- `@factory/orchestrator` → `@whim/orchestrator`
-- `@factory/intake` → `@whim/intake`
-- `@factory/dashboard` → `@whim/dashboard`
-
-### Docker Configuration
-
-**docker-compose.yml changes:**
-```yaml
-# Container names
-container_name: whim-orchestrator  # was factory-orchestrator
-container_name: whim-postgres      # was factory-postgres
-container_name: whim-redis         # was factory-redis
-container_name: whim-intake        # was factory-intake
-container_name: whim-dashboard     # was factory-dashboard
-
-# Volumes
-volumes:
-  whim-postgres-data:    # was factory-postgres-data
-  whim-redis-data:       # was factory-redis-data
-
-# Network
-networks:
-  default:
-    name: whim-network   # was factory-network
-```
-
-**Dockerfile image references:**
-```dockerfile
-# Worker spawning (in orchestrator)
-workerImage: "whim-worker:latest"  # was factory-worker:latest
-```
-
-### Environment Variables
-
-Check and update any `FACTORY_*` environment variables to `WHIM_*` if they exist.
-
-### Import Statements
-
-All TypeScript imports need updating:
-```typescript
-// Before
-import { WorkItem } from "@factory/shared";
-
-// After
-import { WorkItem } from "@whim/shared";
-```
-
-### Documentation
-
-Update all markdown files:
-- README.md
-- SPEC.md
-- STATE.txt
-- Any docs in `thoughts/` directory
-- Code comments referencing "factory"
-
-## Implementation Plan
-
-### Phase 1: Package Names
-1. Update all `package.json` files with new names
-2. Update all import statements in `.ts` files
-3. Run `bun install` to update lockfile
-
-### Phase 2: Docker Configuration
-1. Update `docker-compose.yml` (container names, volumes, network)
-2. Update Dockerfiles (image names)
-3. Update `workers.ts` (worker image reference)
-4. Update any env files with container references
-
-### Phase 3: Documentation
-1. Search and replace in markdown files
-2. Update comments in source code
-3. Update error messages and log strings
-
-### Phase 4: Verification
-1. Run `bun install` - verify workspace resolution
-2. Run `bun run build` - verify compilation
-3. Run `bun test` - verify tests pass
-4. Start Docker stack - verify containers start
-5. Test end-to-end flow
-
-## Files to Modify
-
-### Definite Changes
-- `package.json` (root)
-- `packages/*/package.json` (all packages)
-- `docker/docker-compose.yml`
-- `docker/docker-compose.dev.yml` (if exists)
-- `packages/orchestrator/src/workers.ts`
-- `README.md`
-- `SPEC.md`
-- `STATE.txt`
-- `.env.example`
-
-### Search Patterns
-```bash
-# Find all "factory" references (case-insensitive)
-grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml" --include="*.md"
-
-# Exclude node_modules and dist
-grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml" --include="*.md" \
-  --exclude-dir=node_modules --exclude-dir=dist
-```
-
-## Rollback Plan
-
-If issues are discovered:
-1. `git checkout .` to revert all changes
-2. `bun install` to restore lockfile
-3. Rebuild Docker images with old names
-
-## Acceptance Criteria
-
-- [x] `grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml"` returns only Ralph-related or external references
-- [x] `bun install` completes without errors
-- [ ] `bun run build` completes without errors (has pre-existing TypeScript errors)
-- [ ] `docker compose build` completes without errors (requires Docker)
-- [ ] `docker compose up` starts all services (requires Docker)
-- [ ] Worker containers spawn with correct image name (requires Docker)
-- [ ] All tests pass (requires test environment)
-
-## Open Questions
-
-None - this is a straightforward mechanical refactoring.
+- [ ] Delete `packages/dashboard` after CLI is working
+- [ ] Update docker-compose to remove dashboard service
+- [ ] Update README to document CLI usage
