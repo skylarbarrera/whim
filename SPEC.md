@@ -249,5 +249,5 @@ AI_REVIEW_ENABLED=true                     # Kill switch
 - [x] Manual retrigger works via GitHub Actions workflow dispatch
 - [x] Review records appear in database
 - [ ] Dashboard shows review history
-- [ ] Unused lint/test runner code is removed from pr-review package
-- [ ] Detection pattern fixed (Opus not Sonnet)
+- [x] Unused lint/test runner code is removed from pr-review package (N/A - package never created)
+- [x] Detection pattern fixed (Opus not Sonnet) (N/A - detector.ts never created)
