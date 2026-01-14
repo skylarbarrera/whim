@@ -9,6 +9,19 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
 
+# Load .env for port variables
+if [[ -f ".env" ]]; then
+  set -a
+  source .env
+  set +a
+fi
+
+# Port defaults
+POSTGRES_PORT="${POSTGRES_PORT:-5433}"
+REDIS_PORT="${REDIS_PORT:-6380}"
+ORCHESTRATOR_PORT="${ORCHESTRATOR_PORT:-3002}"
+DASHBOARD_PORT="${DASHBOARD_PORT:-3003}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -88,10 +101,10 @@ success "Worker image built"
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  Orchestrator:  http://localhost:3002${NC}"
-echo -e "${GREEN}  Dashboard:     http://localhost:3003${NC}"
-echo -e "${GREEN}  PostgreSQL:    localhost:5433${NC}"
-echo -e "${GREEN}  Redis:         localhost:6380${NC}"
+echo -e "${GREEN}  Orchestrator:  http://localhost:${ORCHESTRATOR_PORT}${NC}"
+echo -e "${GREEN}  Dashboard:     http://localhost:${DASHBOARD_PORT}${NC}"
+echo -e "${GREEN}  PostgreSQL:    localhost:${POSTGRES_PORT}${NC}"
+echo -e "${GREEN}  Redis:         localhost:${REDIS_PORT}${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 

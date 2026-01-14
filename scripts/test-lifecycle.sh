@@ -3,12 +3,17 @@
 #
 # Usage:
 #   ./scripts/test-lifecycle.sh [success|fail|stuck]
-#
-# Requires: orchestrator running on localhost:3002
 
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:3002}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../.env" ]]; then
+  set -a
+  source "$SCRIPT_DIR/../.env"
+  set +a
+fi
+
+BASE_URL="${ORCHESTRATOR_URL:-http://localhost:${ORCHESTRATOR_PORT:-3002}}"
 MODE="${1:-success}"
 
 RED='\033[0;31m'
