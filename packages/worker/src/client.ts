@@ -89,10 +89,14 @@ export class OrchestratorClient {
   async complete(
     prUrl?: string,
     metrics?: WorkerCompleteRequest["metrics"],
-    learnings?: WorkerCompleteRequest["learnings"]
+    learnings?: WorkerCompleteRequest["learnings"],
+    prNumber?: number,
+    review?: WorkerCompleteRequest["review"]
   ): Promise<void> {
     const body: WorkerCompleteRequest = {
       prUrl,
+      prNumber,
+      review,
       metrics,
       learnings,
     };

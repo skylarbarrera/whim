@@ -252,6 +252,21 @@ export class WorkerManager {
       [worker.workItemId, data.prUrl ?? null]
     );
 
+    // Record PR review if provided
+    if (data.review && data.prNumber && worker.workItemId) {
+      try {
+        await this.db.insertPRReview(
+          worker.workItemId,
+          data.prNumber,
+          data.review.modelUsed,
+          data.review.findings
+        );
+      } catch (error) {
+        // Log but don't fail if review tracking fails
+        console.error(`Failed to save PR review for worker ${workerId}:`, error);
+      }
+    }
+
     // Release all file locks
     await this.conflictDetector.releaseAllLocks(workerId);
 

@@ -247,7 +247,7 @@ AI_REVIEW_ENABLED=true                     # Kill switch
 - [x] Review comment shows spec alignment assessment with score
 - [x] Review comment shows code quality concerns with file references
 - [x] Manual retrigger works via GitHub Actions workflow dispatch
-- [ ] Review records appear in database
+- [x] Review records appear in database
 - [ ] Dashboard shows review history
 - [ ] Unused lint/test runner code is removed from pr-review package
 - [ ] Detection pattern fixed (Opus not Sonnet)

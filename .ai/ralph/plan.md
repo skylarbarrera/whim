@@ -1,36 +1,53 @@
-# Iteration 2 Plan: GitHub Action for Manual Retrigger
+# Iteration 3 Plan: Database Tracking of Reviews
 
 ## Goal
-Create a GitHub Actions workflow that allows manual retriggering of AI reviews for existing PRs.
+Add database tracking for AI PR reviews to support audit trail and dashboard display.
 
 ## Task
-- [ ] Manual retrigger works via GitHub Actions workflow dispatch (SPEC.md line 249)
+- [ ] Review records appear in database (SPEC.md line 250)
 
 ## Implementation Steps
 
-1. **Create workflow file** `.github/workflows/ai-review.yml`
-   - Trigger: workflow_dispatch with branch input parameter
-   - Checkout PR branch
-   - Generate diff vs main
-   - Read SPEC.md
-   - Call review function
-   - Post comment to PR
+1. **Check existing database schema**
+   - Read migrations/002_pr_reviews.sql (if exists)
+   - Understand pr_reviews table structure
 
-2. **Test the workflow**
-   - Verify workflow file syntax
-   - Ensure all required inputs are present
-   - Check that required secrets are documented
+2. **Create or update migration**
+   - Ensure pr_reviews table exists with required columns:
+     - id, work_item_id, pr_number
+     - review_timestamp, model_used
+     - findings (JSONB)
+     - Created/updated timestamps
 
-## Files to Create
-- `.github/workflows/ai-review.yml`
+3. **Update worker to save reviews**
+   - Modify packages/worker/src/index.ts to save review to database
+   - Add database insert after review completes
+   - Store: work_item_id, pr_number, findings JSON, model, timestamp
 
-## Files to Modify
-- `SPEC.md` - Mark line 20, 249 as complete
-- `STATE.txt` - Update progress
-- `.ai/ralph/index.md` - Document session
+4. **Update orchestrator database module**
+   - Add pr_reviews table type in packages/orchestrator/src/db.ts
+   - Add methods: insertReview, getReviewsByWorkItem, getReviewByPR
+
+5. **Add tests**
+   - Test review insertion
+   - Test review retrieval
+
+## Files to Check
+- migrations/002_pr_reviews.sql (may exist from PR #9)
+- packages/pr-review/src/tracker.ts (may have existing code)
+- packages/shared/src/types.ts (add PRReview type if needed)
+
+## Files to Create/Modify
+- migrations/002_pr_reviews.sql (if missing)
+- packages/shared/src/types.ts (PRReview interface)
+- packages/worker/src/client.ts (add completeWithReview or update complete)
+- packages/orchestrator/src/db.ts (add review methods)
+- packages/orchestrator/src/server.ts (add GET /api/reviews/:workItemId endpoint)
+- Test files for new functionality
 
 ## Exit Criteria
-- Workflow file exists and is valid YAML
-- Workflow has proper inputs and steps
-- All tests still pass
+- pr_reviews table exists in schema
+- Worker saves reviews to database
+- Reviews can be retrieved by work_item_id or pr_number
+- Tests pass
 - Documentation updated

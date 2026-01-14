@@ -198,7 +198,24 @@ async function main(): Promise<void> {
       console.log("Work completed but PR creation failed - reporting partial success");
     }
 
-    await client.complete(prUrl, result.metrics, learnings);
+    // Extract PR number from URL if available
+    let prNumber: number | undefined;
+    if (prUrl) {
+      const prMatch = prUrl.match(/\/pull\/(\d+)/);
+      if (prMatch) {
+        prNumber = parseInt(prMatch[1], 10);
+      }
+    }
+
+    // Prepare review data if available
+    const reviewData = reviewFindings && prNumber
+      ? {
+          modelUsed: process.env.AI_REVIEW_MODEL || "claude-sonnet-4-20250514",
+          findings: reviewFindings,
+        }
+      : undefined;
+
+    await client.complete(prUrl, result.metrics, learnings, prNumber, reviewData);
     console.log("Completion reported to orchestrator");
   } else {
     console.error("Ralph failed:", result.error);

@@ -62,6 +62,39 @@ export interface Learning {
   workItemId: string | null;
 }
 
+// PR Review Types
+
+export interface ReviewFindings {
+  specAlignment: {
+    score: "aligned" | "partial" | "misaligned";
+    summary: string;
+    gaps: string[];
+    extras: string[];
+  };
+  codeQuality: {
+    score: "good" | "acceptable" | "needs-work";
+    summary: string;
+    concerns: Array<{
+      file: string;
+      line?: number;
+      issue: string;
+      suggestion: string;
+    }>;
+  };
+  overallSummary: string;
+}
+
+export interface PRReview {
+  id: string;
+  workItemId: string;
+  prNumber: number;
+  reviewTimestamp: Date;
+  modelUsed: string;
+  findings: ReviewFindings;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Metrics Types
 
 export interface WorkerMetrics {
@@ -119,6 +152,11 @@ export interface WorkerLockRequest {
 
 export interface WorkerCompleteRequest {
   prUrl?: string;
+  prNumber?: number;
+  review?: {
+    modelUsed: string;
+    findings: ReviewFindings;
+  };
   metrics?: {
     tokensIn: number;
     tokensOut: number;

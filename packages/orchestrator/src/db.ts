@@ -12,6 +12,8 @@ import type {
   WorkerStatus,
   Learning,
   WorkerMetrics,
+  PRReview,
+  ReviewFindings,
 } from "@factory/shared";
 
 const { Pool } = pg;
@@ -117,6 +119,17 @@ interface FileLockRow {
   worker_id: string;
   file_path: string;
   acquired_at: Date;
+}
+
+interface PRReviewRow {
+  id: string;
+  work_item_id: string;
+  pr_number: number;
+  review_timestamp: Date;
+  model_used: string;
+  findings: ReviewFindings; // JSONB is parsed as object
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
@@ -300,6 +313,66 @@ export class Database {
       ? this.rowToWorkerMetrics(row as unknown as WorkerMetricsRow)
       : null;
   }
+
+  /**
+   * Insert a new PR review record
+   */
+  async insertPRReview(
+    workItemId: string,
+    prNumber: number,
+    modelUsed: string,
+    findings: ReviewFindings
+  ): Promise<PRReview> {
+    const row = await this.queryOne<PRReviewRow>(
+      `INSERT INTO pr_reviews (work_item_id, pr_number, model_used, findings)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [workItemId, prNumber, modelUsed, JSON.stringify(findings)]
+    );
+    if (!row) {
+      throw new Error("Failed to insert PR review");
+    }
+    return this.rowToPRReview(row as unknown as PRReviewRow);
+  }
+
+  /**
+   * Get all reviews for a work item
+   */
+  async getReviewsByWorkItem(workItemId: string): Promise<PRReview[]> {
+    const rows = await this.query<PRReviewRow>(
+      "SELECT * FROM pr_reviews WHERE work_item_id = $1 ORDER BY review_timestamp DESC",
+      [workItemId]
+    );
+    return rows.map((row) => this.rowToPRReview(row as unknown as PRReviewRow));
+  }
+
+  /**
+   * Get review by PR number
+   */
+  async getReviewByPR(prNumber: number): Promise<PRReview | null> {
+    const row = await this.queryOne<PRReviewRow>(
+      "SELECT * FROM pr_reviews WHERE pr_number = $1 ORDER BY review_timestamp DESC LIMIT 1",
+      [prNumber]
+    );
+    return row ? this.rowToPRReview(row as unknown as PRReviewRow) : null;
+  }
+
+  /**
+   * Convert a PRReviewRow to PRReview
+   */
+  private rowToPRReview(row: PRReviewRow): PRReview {
+    const camelRow = row as unknown as Record<string, unknown>;
+    return {
+      id: String(camelRow.id),
+      workItemId: String(camelRow.workItemId),
+      prNumber: Number(camelRow.prNumber),
+      reviewTimestamp: new Date(camelRow.reviewTimestamp as string | Date),
+      modelUsed: String(camelRow.modelUsed),
+      findings: camelRow.findings as ReviewFindings,
+      createdAt: new Date(camelRow.createdAt as string | Date),
+      updatedAt: new Date(camelRow.updatedAt as string | Date),
+    };
+  }
 }
 
 /**
@@ -318,4 +391,4 @@ export function createDatabase(): Database {
   });
 }
 
-export type { WorkItemRow, WorkerRow, LearningRow, WorkerMetricsRow, FileLockRow };
+export type { WorkItemRow, WorkerRow, LearningRow, WorkerMetricsRow, FileLockRow, PRReviewRow };
