@@ -1,77 +1,42 @@
-# Task 2: Implement Interactive Spec Creation Flow
+# Iteration 4 Plan: Dashboard Integration for Review History
 
 ## Goal
-Implement a user interface for spec creation through guided questioning, allowing users to manually create specifications through an interactive process.
+Add dashboard page to display AI PR review history.
 
-## Current State
-- Ralph v0.3.0 already includes `/create-spec` skill for interactive spec creation
-- This skill uses LLM-powered interview and review process
-- Skill is available in Claude Code CLI
-- Documentation exists in Ralph repository
-- No integration with factory system yet
+## Task
+- [ ] Review history is visible in dashboard (SPEC.md line 21, 251)
 
-## Implementation Approach
+## Implementation Steps
 
-### Option 1: Expose Ralph's /create-spec skill via API
-- Add new API endpoint to orchestrator: POST /api/spec/interactive
-- Endpoint spawns a Claude Code session with /create-spec skill
-- Captures Q&A interaction and returns generated spec
-- Challenges: Complex to stream Q&A through HTTP API
+1. **Add API endpoint to orchestrator**
+   - GET /api/reviews - List all reviews with optional filters
+   - GET /api/reviews/work-item/:id - Get reviews for specific work item
+   - GET /api/reviews/pr/:number - Get review for specific PR
 
-### Option 2: CLI-based interactive workflow (RECOMMENDED)
-- Document how users can run `/create-spec` skill locally
-- User runs `claude` CLI with `/create-spec` in their repo
-- Generated SPEC.md can be submitted to factory via existing API
-- Simpler, leverages existing Ralph tooling
-- No factory code changes needed
+2. **Create dashboard page**
+   - app/reviews/page.tsx - Reviews list page
+   - Display review history with filters
+   - Show spec alignment and code quality scores
+   - Link to PRs and work items
+   - Format findings in readable way
 
-### Option 3: Wrapper script for local usage
-- Create `scripts/create-spec.sh` wrapper
-- Script runs Claude CLI with appropriate settings
-- Guides user through the interview process
-- Outputs SPEC.md that can be submitted to factory
-- Provides better UX than raw CLI
+3. **Update navigation**
+   - Add "Reviews" link to navigation
 
-## Recommendation: Option 3 (Wrapper Script)
+4. **Test the integration**
+   - Verify API endpoints work
+   - Verify dashboard page renders
 
-This approach:
-- Leverages Ralph's existing `/create-spec` skill
-- Provides simple UX without complex API streaming
-- Works with local repos before submission to factory
-- Maintains separation between spec creation and execution
-- Easy to document and use
-
-## Implementation Plan
-
-### 1. Create wrapper script
-- `scripts/create-spec.sh` - Bash script for interactive spec creation
-- Checks prerequisites (Claude CLI installed)
-- Validates repo context
-- Runs Claude CLI with /create-spec skill
-- Saves SPEC.md to specified location
-
-### 2. Add configuration
-- `.env.example` - Add any needed config vars
-- Document ANTHROPIC_API_KEY requirement
-
-### 3. Update documentation
-- README.md - Add section on interactive spec creation
-- Document the workflow: create spec → submit to factory
-- Add examples and screenshots if possible
-
-### 4. Test the workflow
-- Run the script manually
-- Verify SPEC.md generation
-- Ensure it works with factory submission
-
-## Files to Create/Modify
-- `scripts/create-spec.sh` (NEW) - Interactive spec creation wrapper
-- `README.md` - Document interactive workflow
-- `.env.example` - Add ANTHROPIC_API_KEY if not present
+## Files to Modify
+- `packages/orchestrator/src/server.ts` - Add review endpoints
+- `packages/dashboard/components/Navigation.tsx` - Add Reviews link
+- `packages/dashboard/app/reviews/page.tsx` - Create reviews page
+- `SPEC.md` - Mark task complete
+- `STATE.txt` - Update completion status
 
 ## Exit Criteria
-- [ ] Wrapper script created and executable
-- [ ] Script checks prerequisites and provides helpful errors
-- [ ] Documentation explains interactive workflow
-- [ ] Users can create specs interactively and submit to factory
-- [ ] Integration with existing factory submission API confirmed
+- API endpoint returns review history
+- Dashboard displays reviews with scores
+- Navigation includes Reviews page
+- All tasks in SPEC.md complete
+- Documentation updated

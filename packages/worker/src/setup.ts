@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile, access, cp } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import type { WorkItem } from "@factory/shared";
+import { formatReviewComment, type ReviewFindings } from "./prompts/review-prompt.js";
 
 export interface WorkspaceConfig {
   workDir: string;
@@ -445,7 +446,8 @@ function createPRError(
 export async function createPullRequest(
   repoDir: string,
   workItem: WorkItem,
-  githubToken: string
+  githubToken: string,
+  reviewFindings?: ReviewFindings
 ): Promise<PRResult> {
   console.log("[PR] Starting PR creation for branch:", workItem.branch);
 
@@ -694,6 +696,28 @@ export async function createPullRequest(
       } else {
         console.log(`[PR] Updated labels on issue #${issueNumber}`);
       }
+    }
+  }
+
+  // Post AI review comment if available
+  if (reviewFindings && prUrl) {
+    console.log("[PR] Posting AI review comment...");
+    const reviewComment = formatReviewComment(reviewFindings);
+    const reviewArgs = [
+      "pr",
+      "comment",
+      prUrl,
+      "--body",
+      reviewComment,
+    ];
+    const reviewResult = await exec("gh", reviewArgs, {
+      cwd: repoDir,
+      env: ghEnv,
+    });
+    if (reviewResult.code !== 0) {
+      console.warn("[PR] Failed to post AI review comment:", reviewResult.stderr);
+    } else {
+      console.log("[PR] Posted AI review comment");
     }
   }
 

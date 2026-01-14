@@ -1,0 +1,291 @@
+name: AI PR Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'PR branch name to review'
+        required: true
+        type: string
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: |
+          cd packages/worker
+          bun install
+
+      - name: Generate diff
+        id: diff
+        run: |
+          # Fetch main branch for comparison
+          git fetch origin main:refs/remotes/origin/main || \
+          git fetch origin master:refs/remotes/origin/master || \
+          git fetch origin HEAD:refs/remotes/origin/HEAD
+
+          # Generate diff
+          DIFF=$(git diff origin/main...HEAD 2>/dev/null || \
+                 git diff origin/master...HEAD 2>/dev/null || \
+                 git diff origin/HEAD...HEAD 2>/dev/null)
+
+          if [ -z "$DIFF" ]; then
+            echo "No changes detected"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Truncate if too large (>500KB)
+          DIFF_SIZE=$(echo "$DIFF" | wc -c)
+          if [ "$DIFF_SIZE" -gt 512000 ]; then
+            echo "Diff is large ($DIFF_SIZE bytes), truncating to 500KB..."
+            DIFF=$(echo "$DIFF" | head -c 512000)
+            DIFF="$DIFF\n\n... (diff truncated due to size)"
+          fi
+
+          # Save to file for next step
+          echo "$DIFF" > /tmp/pr-diff.txt
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "diff_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Read SPEC.md
+        id: spec
+        if: steps.diff.outputs.has_changes == 'true'
+        run: |
+          if [ ! -f "SPEC.md" ]; then
+            echo "SPEC.md not found in repository root"
+            exit 1
+          fi
+
+          # Save spec for next step
+          cat SPEC.md > /tmp/spec.txt
+
+      - name: Call Claude API for review
+        id: review
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Build the worker package to use its review functionality
+          cd packages/worker
+          bun run build
+
+          # Create a simple Node.js script to call the review function
+          cat > /tmp/review-runner.js << 'EOF'
+          import Anthropic from '@anthropic-ai/sdk';
+          import { readFileSync, writeFileSync } from 'fs';
+
+          const REVIEW_SYSTEM_PROMPT = \`You are a code reviewer for AI-generated pull requests.
+          Analyze the diff against the specification and provide structured feedback.
+
+          Focus on:
+          1. Spec Alignment: Are all requirements implemented? Any missing features? Any extras not in spec?
+          2. Code Quality: Complexity, naming, potential bugs, patterns, best practices
+
+          Be specific with file:line references where possible.\`;
+
+          function createReviewUserPrompt(spec, diff) {
+            return \`## Specification (SPEC.md)
+          \${spec}
+
+          ## Git Diff
+          \${diff}
+
+          ## Instructions
+          1. Assess spec alignment: Are all requirements implemented? Any extras?
+          2. Review code quality: Complexity, naming, potential bugs, patterns
+          3. Be specific with file:line references where possible
+          4. Output as JSON matching this schema:
+
+          {
+            "specAlignment": {
+              "score": "aligned" | "partial" | "misaligned",
+              "summary": "string",
+              "gaps": ["string"],
+              "extras": ["string"]
+            },
+            "codeQuality": {
+              "score": "good" | "acceptable" | "needs-work",
+              "summary": "string",
+              "concerns": [
+                {
+                  "file": "string",
+                  "line": number | undefined,
+                  "issue": "string",
+                  "suggestion": "string"
+                }
+              ]
+            },
+            "overallSummary": "string"
+          }\`;
+          }
+
+          async function reviewCode(diff, spec) {
+            const client = new Anthropic({
+              apiKey: process.env.ANTHROPIC_API_KEY,
+            });
+
+            const model = process.env.AI_REVIEW_MODEL || 'claude-sonnet-4-20250514';
+
+            const response = await client.messages.create({
+              model,
+              max_tokens: 4096,
+              system: REVIEW_SYSTEM_PROMPT,
+              messages: [
+                {
+                  role: 'user',
+                  content: createReviewUserPrompt(spec, diff),
+                },
+              ],
+            });
+
+            const content = response.content[0];
+            if (content.type !== 'text') {
+              throw new Error('Expected text response from Claude API');
+            }
+
+            let text = content.text;
+
+            // Handle markdown code blocks
+            const codeBlockMatch = text.match(/\`\`\`(?:json)?\s*(\{[\s\S]*\})\s*\`\`\`/);
+            if (codeBlockMatch) {
+              text = codeBlockMatch[1];
+            }
+
+            const findings = JSON.parse(text);
+            return findings;
+          }
+
+          function formatReviewComment(findings) {
+            const alignmentEmoji = {
+              aligned: '✅',
+              partial: '⚠️',
+              misaligned: '❌',
+            }[findings.specAlignment.score];
+
+            const qualityEmoji = {
+              good: '✅',
+              acceptable: '⚠️',
+              'needs-work': '❌',
+            }[findings.codeQuality.score];
+
+            let comment = \`## 🤖 AI Review\n\n\`;
+            comment += \`### Spec Alignment: \${alignmentEmoji} \${findings.specAlignment.score}\n\`;
+            comment += \`\${findings.specAlignment.summary}\n\n\`;
+
+            if (findings.specAlignment.gaps.length > 0) {
+              comment += \`**Gaps:**\n\`;
+              findings.specAlignment.gaps.forEach((gap) => {
+                comment += \`- \${gap}\n\`;
+              });
+              comment += \`\n\`;
+            } else {
+              comment += \`**Gaps:** None\n\n\`;
+            }
+
+            if (findings.specAlignment.extras.length > 0) {
+              comment += \`**Unexpected additions:**\n\`;
+              findings.specAlignment.extras.forEach((extra) => {
+                comment += \`- \${extra}\n\`;
+              });
+              comment += \`\n\`;
+            } else {
+              comment += \`**Unexpected additions:** None\n\n\`;
+            }
+
+            comment += \`### Code Quality: \${qualityEmoji} \${findings.codeQuality.score}\n\`;
+            comment += \`\${findings.codeQuality.summary}\n\n\`;
+
+            if (findings.codeQuality.concerns.length > 0) {
+              findings.codeQuality.concerns.forEach((concern) => {
+                const location = concern.line
+                  ? \`\${concern.file}:\${concern.line}\`
+                  : concern.file;
+                comment += \`- **\${location}**: \${concern.issue}\n\`;
+                comment += \`  - Suggestion: \${concern.suggestion}\n\`;
+              });
+              comment += \`\n\`;
+            }
+
+            comment += \`---\n\`;
+            comment += \`*Reviewed by AI Factory • [Retrigger review](https://github.com/\${process.env.GITHUB_REPOSITORY}/actions/workflows/ai-review.yml)*\`;
+
+            return comment;
+          }
+
+          async function main() {
+            try {
+              const diff = readFileSync('/tmp/pr-diff.txt', 'utf-8');
+              const spec = readFileSync('/tmp/spec.txt', 'utf-8');
+
+              console.log('Calling Claude API for review...');
+              const findings = await reviewCode(diff, spec);
+
+              console.log('Review complete. Formatting comment...');
+              const comment = formatReviewComment(findings);
+
+              // Write comment to file for next step
+              writeFileSync('/tmp/review-comment.txt', comment);
+              console.log('Comment saved to /tmp/review-comment.txt');
+            } catch (error) {
+              console.error('Review failed:', error);
+              process.exit(1);
+            }
+          }
+
+          main();
+          EOF
+
+          # Install Anthropic SDK in worker package if not already installed
+          cd $GITHUB_WORKSPACE/packages/worker
+          bun add @anthropic-ai/sdk
+
+          # Run the review script
+          node /tmp/review-runner.js
+
+      - name: Get PR number
+        id: pr
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get PR number from branch name
+          PR_NUMBER=$(gh pr list --head "${{ inputs.branch }}" --json number --jq '.[0].number')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR found for branch ${{ inputs.branch }}"
+            exit 1
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Found PR #$PR_NUMBER"
+
+      - name: Post review comment
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+
+          if [ ! -f /tmp/review-comment.txt ]; then
+            echo "Review comment file not found"
+            exit 1
+          fi
+
+          # Post comment to PR
+          gh pr comment "$PR_NUMBER" --body-file /tmp/review-comment.txt
+
+          echo "Review comment posted to PR #$PR_NUMBER"
