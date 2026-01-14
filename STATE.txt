@@ -221,3 +221,9 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Set up proper bin entry for `whim` command
   - Configured TypeScript build scripts matching other packages
   - Package follows workspace:* pattern for @whim/shared dependency
+- [x] Task 1.2: Add tsconfig.json matching other packages
+  - Extends root tsconfig.json
+  - Configures outDir (./dist) and rootDir (./src)
+  - Sets jsx to "react" for Ink components
+  - Includes reference to shared package
+  - Follows orchestrator package pattern
