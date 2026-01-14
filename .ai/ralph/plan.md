@@ -1,34 +1,33 @@
-# Iteration 4 Plan: Create src/components/Section.tsx - boxed section with header
+# Iteration 5 Plan: Create src/components/Spinner.tsx - animated spinner (◐◓◑◒)
 
 ## Goal
-Create a reusable Section component that displays a boxed section with a header. This will be used throughout the dashboard to organize content.
+Create an animated spinner component that cycles through the characters ◐◓◑◒ to indicate loading or activity. This will be used for active workers and refresh indicators.
 
 ## Files to Create/Modify
-- `packages/cli/src/components/Section.tsx` - Boxed section component with header
+- `packages/cli/src/components/Spinner.tsx` - Animated spinner component
 
 ## Implementation Steps
-1. Create components directory
-2. Create Section.tsx component that:
-   - Takes header (string) and children (React nodes) as props
-   - Uses Ink's Box component for borders
-   - Applies cyan color to section headers (per spec)
-   - Has proper padding and layout
-   - Is flexible to contain various child components
+1. Create Spinner.tsx component that:
+   - Cycles through spinner frames: ◐◓◑◒
+   - Uses React hooks (useState, useEffect) for animation
+   - Has configurable interval (default ~100ms)
+   - Can be used inline with other text
+   - TypeScript types properly defined
 
 ## Tests
 - Verify the component follows Ink patterns
 - Check that it exports properly
-- Ensure TypeScript types are correct
+- Ensure animation timing makes sense
 
 ## Exit Criteria
-- [ ] `packages/cli/src/components/Section.tsx` exists
-- [ ] Component renders a box with header
-- [ ] Uses cyan color for headers per spec
-- [ ] Accepts children prop for content
+- [ ] `packages/cli/src/components/Spinner.tsx` exists
+- [ ] Component animates through ◐◓◑◒ frames
+- [ ] Uses React hooks for animation
+- [ ] Can be used inline
 - [ ] TypeScript types are properly defined
 
 ## Notes
-- This is Phase 1, Task 4 from SPEC.md
-- Color scheme from spec: Section headers should be Cyan
-- Will be reused throughout the dashboard
-- Should use Ink's Box component for borders
+- This is Phase 1, Task 5 from SPEC.md
+- Will be used for active workers and refresh indicator
+- Animation should be smooth and not too fast
+- Should work well in terminal output

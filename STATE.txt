@@ -239,3 +239,9 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Rounded borders with gray color
   - Accepts children prop for flexible content
   - Proper TypeScript types defined
+- [x] Task 1.5: Create src/components/Spinner.tsx - animated spinner (◐◓◑◒)
+  - Cycles through spinner frames: ◐◓◑◒
+  - Uses React hooks (useState, useEffect) for animation
+  - Configurable interval (default 100ms)
+  - Can be used inline with other components
+  - Proper TypeScript types defined
