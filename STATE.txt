@@ -252,3 +252,10 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Shows percentage text next to bar
   - Configurable width (default 20 chars)
   - Proper TypeScript types defined
+- [x] Task 1.7: Create src/hooks/useApi.ts - orchestrator API client with polling
+  - Custom React hook with generic type parameter
+  - Fetches data from configurable API endpoint
+  - Polls every 2 seconds by default (configurable)
+  - Returns data, loading, error, refetch states
+  - Properly cleans up interval on unmount
+  - Handles fetch errors gracefully

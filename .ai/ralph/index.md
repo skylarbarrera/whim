@@ -1824,3 +1824,22 @@ This integration provides:
 - Colors match spec (green filled, gray dim empty)
 
 ---
+
+### Task: Whim CLI Dashboard - Phase 1.7
+
+**Files Created:**
+- `packages/cli/src/hooks/useApi.ts` - API client hook with polling
+
+**Implementation:**
+- Custom React hook with generic type parameter
+- Fetches data from configurable API endpoint
+- Polls every 2 seconds by default (configurable)
+- Returns data, loading, error, refetch states
+- Properly cleans up interval on unmount
+- Handles fetch errors gracefully
+
+**Notes:**
+- Will be used by dashboard to fetch worker and queue data
+- Supports configurable API URL and poll interval
+
+---

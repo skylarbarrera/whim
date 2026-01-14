@@ -16,7 +16,7 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 - [x] Create `src/components/Section.tsx` - boxed section with header
 - [x] Create `src/components/Spinner.tsx` - animated spinner (◐◓◑◒)
 - [x] Create `src/components/ProgressBar.tsx` - animated progress bar
-- [ ] Create `src/hooks/useApi.ts` - orchestrator API client with polling
+- [x] Create `src/hooks/useApi.ts` - orchestrator API client with polling
 - [ ] Verify `whim` command runs and shows "Hello World"
 
 ## Phase 2: Main Dashboard
