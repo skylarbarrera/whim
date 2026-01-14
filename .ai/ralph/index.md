@@ -2018,3 +2018,81 @@ This integration provides:
 - Core CLI functionality fully complete
 
 ---
+
+---
+
+## Session 15 - 2025-01-14
+
+### Task: Phase 4 - Complete Logs Viewer Implementation
+
+**Commit:** 88c5e0e
+
+**Files Created/Modified:**
+- `packages/cli/src/commands/logs.tsx` - NEW: Full log viewer component
+- `packages/cli/src/commands/dashboard.tsx` - Added worker selection and navigation
+- `packages/orchestrator/src/workers.ts` - Added getLogs() method
+- `packages/orchestrator/src/server.ts` - Added GET /api/workers/:id/logs endpoint
+- `packages/shared/src/types.ts` - Added WorkerLogsResponse type
+- `SPEC.md` - Marked final 3 tasks complete
+- `STATE.txt` - Updated Phase 4 completion status
+
+**Implementation Details:**
+
+Orchestrator API:
+- Added `getLogs(workerId, lines)` method to WorkerManager
+- Uses Docker SDK (already available) to fetch container logs
+- Returns array of log lines from container stdout/stderr
+- Handles missing/stopped containers gracefully
+- New endpoint: GET /api/workers/:id/logs?lines=N
+
+CLI Logs Viewer:
+- Displays worker info (ID, status, repo, branch, iteration)
+- Shows last 30 lines of logs (fetches 1000, displays last 30)
+- Polls every 2 seconds for real-time updates
+- Keyboard: 'q' or ESC to return to dashboard
+- Error handling with user-friendly messages
+
+CLI Dashboard Enhancements:
+- Added worker selection state (focusedSection, selectedIndex)
+- 'w' key focuses workers section
+- 'l' key opens logs for selected worker
+- Arrow keys (↑↓) navigate within focused section
+- Visual indicator (→) shows selected worker
+- View mode switching between dashboard and logs
+- Updated help overlay with new shortcuts
+
+**Iteration Notes:**
+- All 36 tasks in SPEC.md now complete (100%)
+- Phase 4 fully complete (7/7 tasks)
+- Implementation follows existing patterns (Ink components, useApi hook)
+- Docker logs integration reuses existing dockerode dependency
+- No new external dependencies required
+
+**Success Criteria Met:**
+✅ Can press 'l' on a selected worker to view its logs
+✅ Logs update every 2 seconds
+✅ Can navigate back to dashboard with 'q'
+✅ Works with active and stopped workers
+✅ All three checkboxes in SPEC.md marked complete
+
+---
+
+## Project Status: ALL TASKS COMPLETE
+
+The Whim CLI Dashboard implementation is now 100% complete:
+- Phase 1: Setup & Components (8/8 tasks) ✅
+- Phase 2: Main Dashboard (9/9 tasks) ✅
+- Phase 3: Keyboard Navigation (9/9 tasks) ✅
+- Phase 4: Logs & Polish (7/7 tasks) ✅
+- Cleanup Phase (3/3 tasks) ✅
+
+Total: 36/36 tasks complete
+
+The CLI provides full monitoring capabilities:
+- Real-time status dashboard
+- Worker progress tracking
+- Queue management view
+- Live log streaming
+- Keyboard navigation
+- Configuration file support
+- Remote orchestrator support
