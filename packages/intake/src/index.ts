@@ -1,42 +1,29 @@
 import type { AddWorkItemRequest, AddWorkItemResponse } from "@whim/shared";
 import { GitHubAdapter, type GitHubIssue } from "./github.js";
-import { SpecGenerator, type GeneratedSpec } from "./spec-gen.js";
-import { RalphSpecGenerator } from "./ralph-spec-gen.js";
+import { RalphSpecGenerator, type GeneratedSpec } from "./ralph-spec-gen.js";
 
 interface IntakeConfig {
   githubToken: string;
-  anthropicApiKey: string;
   repos: string[];
   orchestratorUrl: string;
   intakeLabel: string;
   pollInterval: number;
-  useRalphSpec: boolean;
 }
 
 function loadConfig(): IntakeConfig {
   const githubToken = process.env.GITHUB_TOKEN;
   if (!githubToken) throw new Error("GITHUB_TOKEN required");
 
-  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-  const useRalphSpec = process.env.USE_RALPH_SPEC === "true";
-
-  // ANTHROPIC_API_KEY only required if not using Ralph
-  if (!useRalphSpec && !anthropicApiKey) {
-    throw new Error("ANTHROPIC_API_KEY required when USE_RALPH_SPEC is not enabled");
-  }
-
   const reposEnv = process.env.REPOS;
   if (!reposEnv) throw new Error("REPOS required (comma-separated owner/repo)");
 
   return {
     githubToken,
-    anthropicApiKey: anthropicApiKey ?? "",
     repos: reposEnv.split(",").map((r) => r.trim()),
     orchestratorUrl:
       process.env.ORCHESTRATOR_URL ?? "http://orchestrator:3000",
     intakeLabel: process.env.INTAKE_LABEL ?? "whim",
     pollInterval: parseInt(process.env.POLL_INTERVAL ?? "60000", 10),
-    useRalphSpec,
   };
 }
 
@@ -92,7 +79,7 @@ async function submitToOrchestrator(
 
 async function processIssue(
   github: GitHubAdapter,
-  specGen: SpecGenerator | RalphSpecGenerator,
+  specGen: RalphSpecGenerator,
   orchestratorUrl: string,
   issue: GitHubIssue
 ): Promise<void> {
@@ -104,7 +91,7 @@ async function processIssue(
     // Mark as processing to prevent duplicate pickup
     await github.markProcessing(issue);
 
-    // Generate spec from issue
+    // Generate spec from issue using Ralph
     console.log(`Generating spec for issue #${issue.number}...`);
     const spec = await specGen.generate(issue);
     console.log(`Generated spec for branch: ${spec.branch}`);
@@ -123,7 +110,7 @@ async function processIssue(
 
 async function poll(
   github: GitHubAdapter,
-  specGen: SpecGenerator | RalphSpecGenerator,
+  specGen: RalphSpecGenerator,
   orchestratorUrl: string
 ): Promise<number> {
   console.log("Polling for issues...");
@@ -150,7 +137,6 @@ async function main(): Promise<void> {
   console.log(`Watching repos: ${config.repos.join(", ")}`);
   console.log(`Intake label: ${config.intakeLabel}`);
   console.log(`Poll interval: ${config.pollInterval}ms`);
-  console.log(`Spec generation: ${config.useRalphSpec ? "Ralph CLI" : "Anthropic SDK"}`);
 
   const github = new GitHubAdapter({
     token: config.githubToken,
@@ -158,12 +144,7 @@ async function main(): Promise<void> {
     intakeLabel: config.intakeLabel,
   });
 
-  // Use Ralph spec generation or fallback to Anthropic SDK
-  const specGen: SpecGenerator | RalphSpecGenerator = config.useRalphSpec
-    ? new RalphSpecGenerator()
-    : new SpecGenerator({
-        apiKey: config.anthropicApiKey,
-      });
+  const specGen = new RalphSpecGenerator();
 
   // Initial poll
   await poll(github, specGen, config.orchestratorUrl);
@@ -193,5 +174,5 @@ main().catch((error) => {
   process.exit(1);
 });
 
-export { GitHubAdapter, SpecGenerator, RalphSpecGenerator };
+export { GitHubAdapter, RalphSpecGenerator };
 export type { IntakeConfig, GitHubIssue, GeneratedSpec };

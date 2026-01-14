@@ -1,6 +1,16 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { GitHubIssue } from "./github.js";
-import type { GeneratedSpec } from "./spec-gen.js";
+
+export interface GeneratedSpec {
+  title: string;
+  spec: string;
+  branch: string;
+  metadata: {
+    issueNumber: number;
+    issueUrl: string;
+    generatedAt: string;
+  };
+}
 
 export interface RalphSpecGeneratorConfig {
   timeoutMs?: number;
