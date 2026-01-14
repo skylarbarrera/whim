@@ -398,7 +398,7 @@ export class RedisClient {
  * Create a RedisClient instance from environment variables
  */
 export function createRedisClient(): RedisClient {
-  const url = process.env.REDIS_URL || "redis://localhost:6379";
+  const url = process.env.REDIS_URL || "redis://localhost:6380";
 
   return new RedisClient({
     url,

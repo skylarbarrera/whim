@@ -86,7 +86,7 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       REPOS: ${REPOS}
-      ORCHESTRATOR_URL: http://orchestrator:3000
+      ORCHESTRATOR_URL: http://factory-orchestrator:3000
       INTAKE_LABEL: ${INTAKE_LABEL:-ai-factory}
       POLL_INTERVAL: ${POLL_INTERVAL:-60000}
 
@@ -101,7 +101,7 @@ services:
       orchestrator:
         condition: service_healthy
     environment:
-      ORCHESTRATOR_URL: http://orchestrator:3000
+      ORCHESTRATOR_URL: http://factory-orchestrator:3000
       PORT: 3001
     ports:
       - "3003:3001"

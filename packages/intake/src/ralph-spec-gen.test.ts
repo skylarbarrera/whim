@@ -4,6 +4,7 @@ import type { GitHubIssue } from "./github.js";
 
 describe("RalphSpecGenerator", () => {
   const mockIssue: GitHubIssue = {
+    id: 456789,
     number: 123,
     title: "Add user authentication",
     body: "We need to add JWT-based authentication to the API",
@@ -12,6 +13,7 @@ describe("RalphSpecGenerator", () => {
     url: "https://github.com/testorg/testrepo/issues/123",
     labels: ["enhancement", "security"],
     createdAt: "2024-01-15T10:00:00Z",
+    updatedAt: "2024-01-15T10:00:00Z",
   };
 
   describe("formatIssueDescription", () => {

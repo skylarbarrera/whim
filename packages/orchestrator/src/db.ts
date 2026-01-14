@@ -380,7 +380,7 @@ export class Database {
 export function createDatabase(): Database {
   const connectionString =
     process.env.DATABASE_URL ||
-    "postgres://factory:factory@localhost:5432/factory";
+    "postgres://factory:factory@localhost:5433/factory";
 
   return new Database({
     connectionString,

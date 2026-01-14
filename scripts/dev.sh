@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AI Software Factory - Development Script
-# Hot-reload development with auto-rebuilding worker image
+# Uses Docker Compose for all orchestration
 
 set -euo pipefail
 
@@ -9,7 +9,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -22,22 +22,33 @@ error() { echo -e "${RED}✗${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}ℹ${NC} $1"; }
 
 # Parse arguments
-MODE="local"  # local or docker
+MODE="watch"  # watch (hot-reload) or up (static)
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --docker)
-            MODE="docker"
+        --no-watch)
+            MODE="up"
             shift
+            ;;
+        --down|down)
+            info "Stopping all services..."
+            docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down
+            success "All services stopped"
+            exit 0
+            ;;
+        --logs|logs)
+            docker compose -f docker/docker-compose.yml logs -f
+            exit 0
             ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --docker    Run everything in Docker (no hot reload)"
-            echo "  -h, --help  Show this help"
-            echo ""
-            echo "Default: Run services locally with hot reload"
+            echo "  (default)     Start with hot-reload (docker compose watch)"
+            echo "  --no-watch    Start without hot-reload"
+            echo "  --down        Stop all services"
+            echo "  --logs        Follow logs"
+            echo "  -h, --help    Show this help"
             exit 0
             ;;
         *)
@@ -51,124 +62,49 @@ echo "=========================================="
 echo ""
 
 # Check prerequisites
-if ! command -v docker &> /dev/null; then
-    error "Docker is required but not installed"
-fi
+command -v docker &> /dev/null || error "Docker is required but not installed"
+docker info &> /dev/null 2>&1 || error "Docker is not running"
 
-if ! docker info &> /dev/null 2>&1; then
-    error "Docker is not running"
+# Check Docker Compose version supports watch
+COMPOSE_VERSION=$(docker compose version --short 2>/dev/null || echo "0")
+if [[ "$MODE" == "watch" ]] && ! printf '%s\n' "2.22.0" "$COMPOSE_VERSION" | sort -V | head -1 | grep -q "2.22.0"; then
+    warn "Docker Compose $COMPOSE_VERSION doesn't support watch mode (needs 2.22+)"
+    warn "Falling back to standard mode. Upgrade Docker Desktop for hot-reload."
+    MODE="up"
 fi
 
 # Check .env exists
 if [ ! -f "docker/.env" ]; then
-    warn "No docker/.env file found. Run ./scripts/setup.sh first."
+    warn "No docker/.env file found. Creating from template..."
+    cp .env.example docker/.env
+    warn "Edit docker/.env with your GITHUB_TOKEN and ANTHROPIC_API_KEY"
     exit 1
 fi
 
-# Load env
-set -a
-source docker/.env
-set +a
-
-if [ "$MODE" = "docker" ]; then
-    # Docker mode - just run everything in containers
-    info "Starting all services in Docker..."
-    cd docker
-    docker compose up --build -d
-    docker compose logs -f
-    exit 0
-fi
-
-# Local hot-reload mode
-info "Starting local development with hot reload..."
-
-# Cleanup on exit
-PIDS=()
-cleanup() {
-    echo ""
-    info "Shutting down..."
-    for pid in "${PIDS[@]}"; do
-        kill "$pid" 2>/dev/null || true
-    done
-    exit 0
-}
-trap cleanup SIGINT SIGTERM EXIT
-
-# Start infra in Docker
-info "Starting infrastructure (postgres, redis)..."
-docker compose -f docker/docker-compose.yml up -d postgres redis
-
-# Wait for postgres
-info "Waiting for postgres..."
-until docker exec factory-postgres pg_isready -U factory -d factory > /dev/null 2>&1; do
-    sleep 1
-done
-success "Postgres ready"
-
-# Build shared first
-info "Building shared package..."
-(cd packages/shared && bun run build)
-success "Shared package built"
-
-# Build worker image
+# Build worker image first (needed for orchestrator to spawn workers)
 info "Building worker Docker image..."
 docker build -t factory-worker -f packages/worker/Dockerfile . -q
 success "Worker image built"
 
-# Start worker watcher in background
-info "Starting worker code watcher..."
-(
-    LAST_HASH=""
-    while true; do
-        # Compute hash of worker and shared source files
-        HASH=$(find packages/worker/src packages/shared/src -type f -name "*.ts" -exec cat {} \; 2>/dev/null | md5 || echo "")
-        if [ "$HASH" != "$LAST_HASH" ] && [ -n "$LAST_HASH" ]; then
-            echo -e "${YELLOW}[worker]${NC} Code changed, rebuilding image..."
-            (cd packages/shared && bun run build) 2>/dev/null
-            docker build -t factory-worker -f packages/worker/Dockerfile . -q 2>/dev/null && \
-            echo -e "${GREEN}[worker]${NC} Image rebuilt"
-        fi
-        LAST_HASH="$HASH"
-        sleep 2
-    done
-) &
-PIDS+=($!)
-
-# Env vars already loaded from docker/.env via set -a
-# Just set additional vars for local dev
-export ORCHESTRATOR_URL="http://localhost:3000"
-export PORT=3000
-
-info "Using DATABASE_URL: ${DATABASE_URL}"
-
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  Orchestrator:  http://localhost:3000${NC}"
-echo -e "${GREEN}  Dashboard:     http://localhost:3001${NC}"
-echo -e "${GREEN}  Worker image:  auto-rebuilds on code changes${NC}"
+echo -e "${GREEN}  Orchestrator:  http://localhost:3002${NC}"
+echo -e "${GREEN}  Dashboard:     http://localhost:3003${NC}"
+echo -e "${GREEN}  PostgreSQL:    localhost:5433${NC}"
+echo -e "${GREEN}  Redis:         localhost:6380${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Run services with hot reload
-info "Starting orchestrator..."
-(cd packages/orchestrator && bun --watch src/index.ts 2>&1 | sed 's/^/[orchestrator] /') &
-PIDS+=($!)
+cd docker
 
-sleep 1
+if [ "$MODE" == "watch" ]; then
+    info "Starting with hot-reload (docker compose watch)..."
+    info "Code changes will auto-sync. Ctrl+C to stop."
+    echo ""
 
-info "Starting intake..."
-(cd packages/intake && bun --watch src/index.ts 2>&1 | sed 's/^/[intake] /') &
-PIDS+=($!)
-
-sleep 1
-
-info "Starting dashboard..."
-(cd packages/dashboard && PORT=3001 bun run dev 2>&1 | sed 's/^/[dashboard] /') &
-PIDS+=($!)
-
-echo ""
-success "All services running. Press Ctrl+C to stop."
-echo ""
-
-# Wait for any process to exit
-wait
+    # Start with watch mode for hot-reload
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml watch
+else
+    info "Starting services..."
+    docker compose -f docker-compose.yml up --build
+fi

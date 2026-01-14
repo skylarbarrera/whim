@@ -54,8 +54,8 @@ export class WorkerManager {
   ) {
     this.config = {
       workerImage: config?.workerImage ?? process.env.WORKER_IMAGE ?? "factory-worker:latest",
-      orchestratorUrl: config?.orchestratorUrl ?? process.env.ORCHESTRATOR_URL ?? "http://orchestrator:3000",
-      staleThresholdSeconds: config?.staleThresholdSeconds ?? parseInt(process.env.STALE_THRESHOLD ?? "60", 10),
+      orchestratorUrl: config?.orchestratorUrl ?? process.env.ORCHESTRATOR_URL ?? "http://factory-orchestrator:3000",
+      staleThresholdSeconds: config?.staleThresholdSeconds ?? parseInt(process.env.STALE_THRESHOLD ?? "300", 10),
     };
   }
 
@@ -93,12 +93,22 @@ export class WorkerManager {
     );
 
     // Spawn Docker container
+    // Convert localhost to Docker-accessible address for container networking
+    // - Mac/Windows: host.docker.internal (Docker Desktop feature)
+    // - Linux: Docker bridge gateway IP (172.17.0.1)
+    const dockerHost = process.platform === "linux"
+      ? "172.17.0.1"
+      : "host.docker.internal";
+    const workerOrchestratorUrl = this.config.orchestratorUrl.replace(
+      /localhost|127\.0\.0\.1/,
+      dockerHost
+    );
     const container = await this.docker.createContainer({
       Image: this.config.workerImage,
       Env: [
         `WORKER_ID=${workerId}`,
         `WORK_ITEM=${JSON.stringify(workItem)}`,
-        `ORCHESTRATOR_URL=${this.config.orchestratorUrl}`,
+        `ORCHESTRATOR_URL=${workerOrchestratorUrl}`,
         `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
         `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
         // Pass through mock mode for testing lifecycle without Claude

@@ -69,15 +69,19 @@ async function runMainLoop(
 
   while (true) {
     try {
+      log("Loop iteration starting...");
       // 1. Health check: find and kill stale workers
       const staleWorkers = await workers.healthCheck();
+      log(`Health check done, ${staleWorkers.length} stale workers`);
       for (const staleWorker of staleWorkers) {
         log(`Killing stale worker: ${staleWorker.id}`);
         await workers.kill(staleWorker.id, "heartbeat timeout");
       }
 
       // 2. Spawn workers for queued items when capacity is available
-      while (await workers.hasCapacity()) {
+      const hasCapacity = await workers.hasCapacity();
+      log(`Capacity check: ${hasCapacity}`);
+      while (hasCapacity) {
         const workItem = await queue.getNext();
         if (!workItem) {
           // No more queued items
