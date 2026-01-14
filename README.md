@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Whim Logo" width="200">
+  <img src="assets/logo-white.png" alt="Whim Logo" width="200">
 </p>
 
 <h1 align="center">Whim</h1>
