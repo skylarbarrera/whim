@@ -362,6 +362,8 @@ const createWorkItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({
   workerId: null,
   iteration: 0,
   maxIterations: 10,
+  retryCount: 0,
+  nextRetryAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   completedAt: null,

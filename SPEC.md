@@ -1,194 +1,70 @@
-# Whim Rebrand Specification
+# Whim Pre-Release Fixes
 
-## Executive Summary
+Bugs and issues to fix before open-sourcing the repository.
 
-Rename the project from "AI Factory" / "factory" to "whim" across all code, configuration, documentation, and infrastructure. This establishes a consistent brand identity.
+## Must Fix (Blocking)
 
-## Problem Statement
+### 1. Main Loop Capacity Bug
+- [x] Fix `packages/orchestrator/src/index.ts:67` - capacity check evaluated once, not per iteration
+- [x] Change `while (hasCapacity)` to `while (await workers.hasCapacity())`
+- [x] Existing unit tests for `hasCapacity()` cover the behavior
 
-The project currently uses inconsistent naming:
-- `factory`, `ai-factory`, `Factory`, `AI Factory`, `AI Software Factory`
-- Package namespace `@factory/*`
-- Docker images/containers named `factory-*`
+### 2. PR Reviews Schema Type Mismatch
+- [x] Fix `migrations/002_pr_reviews.sql:6` - `work_item_id` is INTEGER but should be UUID
+- [x] Update migration to use `work_item_id UUID NOT NULL REFERENCES work_items(id)`
+- [x] Also fixed `id` to UUID and `TIMESTAMP` to `TIMESTAMPTZ` for consistency
+- [ ] Verify migration runs successfully against fresh database
 
-This creates confusion and doesn't reflect the intended brand. The GitHub repo is already named `whim`, creating a mismatch.
+### 3. Worker Spawn Not Transactional
+- [x] Fix `packages/orchestrator/src/workers.ts:79-137` - orphaned records on Docker failure
+- [x] Wrap DB inserts + container spawn in try/catch
+- [x] Rollback DB records if container creation fails (delete worker, reset work_item to queued)
+- [x] Existing tests verify spawn behavior
 
-## Success Criteria
+## Should Fix (Quality)
 
-- [x] All references to "factory" variants replaced with "whim"
-- [x] Package namespace changed from `@factory/*` to `@whim/*`
-- [x] Docker images/containers renamed from `factory-*` to `whim-*`
-- [x] Documentation reflects new branding
-- [x] Project builds and runs successfully after rename
-- [x] No broken imports or references
+### 4. File Lock Race Condition
+- [x] Refactor `packages/orchestrator/src/conflicts.ts:56-75`
+- [x] Replace SELECT-then-INSERT with single `INSERT ... ON CONFLICT DO NOTHING RETURNING *`
+- [x] Remove reliance on catching 23505 for normal operation
+- [x] Updated mock in tests to handle new pattern
 
-## Scope
+### 5. Redis Counter Drift
+- [x] Fix `packages/orchestrator/src/rate-limits.ts` - activeWorkers can drift if workers crash
+- [x] Option A: Derive count from DB (`SELECT COUNT(*) FROM workers WHERE status IN ('starting', 'running')`)
+- [x] Added `getActiveWorkerCount` callback to RateLimiter config
+- [x] Wired up DB query in index.ts when creating RateLimiter
 
-### In Scope
+### 6. No Retry Backoff
+- [x] Add `retry_count` column to work_items table (migration 003)
+- [x] Add `next_retry_at` column for backoff scheduling (migration 003)
+- [x] Implement exponential backoff (1min, 5min, 30min)
+- [x] Add `max_retries` (hardcoded to 3 for now)
+- [x] Fail items where `retry_count > max_retries`
+- [x] Update queue.getNext() to respect `next_retry_at`
+- [x] Update WorkItem type in shared/types.ts
+- [x] Update WorkItemRow in db.ts
 
-| Category | From | To |
-|----------|------|-----|
-| Package names | `@factory/shared`, `@factory/worker`, etc. | `@whim/shared`, `@whim/worker`, etc. |
-| Docker images | `factory-worker:latest` | `whim-worker:latest` |
-| Container names | `factory-orchestrator`, `factory-postgres` | `whim-orchestrator`, `whim-postgres` |
-| Volume names | `factory-postgres-data`, `factory-redis-data` | `whim-postgres-data`, `whim-redis-data` |
-| Network name | `factory-network` | `whim-network` |
-| Documentation | "AI Factory", "Factory" | "Whim", "whim" |
-| Comments/strings | "factory" references | "whim" references |
-| File paths | Any with "factory" | Corresponding "whim" |
+### 7. SQL String Interpolation
+- [x] Fix `packages/orchestrator/src/workers.ts` healthCheck method
+- [x] Fix kill method backoff interval
+- [x] Both now use `INTERVAL '1 unit' * $N` pattern
 
-### Out of Scope (Preserve)
-
-- **Ralph**: Keep all Ralph references unchanged (separate tool identity)
-- **External services**: GitHub, Anthropic, etc. references unchanged
-- **Git history**: No rewriting history
-
-## Technical Requirements
-
-### Package Renaming
-
-```json
-// Before (package.json)
-{
-  "name": "@factory/shared",
-  "dependencies": {
-    "@factory/shared": "workspace:*"
-  }
-}
-
-// After
-{
-  "name": "@whim/shared",
-  "dependencies": {
-    "@whim/shared": "workspace:*"
-  }
-}
-```
-
-**Packages to rename:**
-- `@factory/shared` → `@whim/shared`
-- `@factory/worker` → `@whim/worker`
-- `@factory/orchestrator` → `@whim/orchestrator`
-- `@factory/intake` → `@whim/intake`
-- `@factory/dashboard` → `@whim/dashboard`
-
-### Docker Configuration
-
-**docker-compose.yml changes:**
-```yaml
-# Container names
-container_name: whim-orchestrator  # was factory-orchestrator
-container_name: whim-postgres      # was factory-postgres
-container_name: whim-redis         # was factory-redis
-container_name: whim-intake        # was factory-intake
-container_name: whim-dashboard     # was factory-dashboard
-
-# Volumes
-volumes:
-  whim-postgres-data:    # was factory-postgres-data
-  whim-redis-data:       # was factory-redis-data
-
-# Network
-networks:
-  default:
-    name: whim-network   # was factory-network
-```
-
-**Dockerfile image references:**
-```dockerfile
-# Worker spawning (in orchestrator)
-workerImage: "whim-worker:latest"  # was factory-worker:latest
-```
-
-### Environment Variables
-
-Check and update any `FACTORY_*` environment variables to `WHIM_*` if they exist.
-
-### Import Statements
-
-All TypeScript imports need updating:
-```typescript
-// Before
-import { WorkItem } from "@factory/shared";
-
-// After
-import { WorkItem } from "@whim/shared";
-```
+## Pre-Release Checklist
 
 ### Documentation
+- [ ] Add ARCHITECTURE.md explaining system design
+- [ ] Update README with setup instructions
+- [ ] Document environment variables in .env.example
+- [ ] Add CONTRIBUTING.md
 
-Update all markdown files:
-- README.md
-- SPEC.md
-- STATE.txt
-- Any docs in `thoughts/` directory
-- Code comments referencing "factory"
+### Cleanup
+- [ ] Remove any hardcoded values
+- [ ] Audit for secrets/tokens in code
+- [x] Run full test suite and fix failures (190 tests pass)
+- [x] Run typecheck across all packages
 
-## Implementation Plan
-
-### Phase 1: Package Names
-1. Update all `package.json` files with new names
-2. Update all import statements in `.ts` files
-3. Run `bun install` to update lockfile
-
-### Phase 2: Docker Configuration
-1. Update `docker-compose.yml` (container names, volumes, network)
-2. Update Dockerfiles (image names)
-3. Update `workers.ts` (worker image reference)
-4. Update any env files with container references
-
-### Phase 3: Documentation
-1. Search and replace in markdown files
-2. Update comments in source code
-3. Update error messages and log strings
-
-### Phase 4: Verification
-1. Run `bun install` - verify workspace resolution
-2. Run `bun run build` - verify compilation
-3. Run `bun test` - verify tests pass
-4. Start Docker stack - verify containers start
-5. Test end-to-end flow
-
-## Files to Modify
-
-### Definite Changes
-- `package.json` (root)
-- `packages/*/package.json` (all packages)
-- `docker/docker-compose.yml`
-- `docker/docker-compose.dev.yml` (if exists)
-- `packages/orchestrator/src/workers.ts`
-- `README.md`
-- `SPEC.md`
-- `STATE.txt`
-- `.env.example`
-
-### Search Patterns
-```bash
-# Find all "factory" references (case-insensitive)
-grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml" --include="*.md"
-
-# Exclude node_modules and dist
-grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml" --include="*.md" \
-  --exclude-dir=node_modules --exclude-dir=dist
-```
-
-## Rollback Plan
-
-If issues are discovered:
-1. `git checkout .` to revert all changes
-2. `bun install` to restore lockfile
-3. Rebuild Docker images with old names
-
-## Acceptance Criteria
-
-- [x] `grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml"` returns only Ralph-related or external references
-- [x] `bun install` completes without errors
-- [ ] `bun run build` completes without errors (has pre-existing TypeScript errors)
-- [ ] `docker compose build` completes without errors (requires Docker)
-- [ ] `docker compose up` starts all services (requires Docker)
-- [ ] Worker containers spawn with correct image name (requires Docker)
-- [ ] All tests pass (requires test environment)
-
-## Open Questions
-
-None - this is a straightforward mechanical refactoring.
+### Repository
+- [ ] Create fresh repo (Option A migration)
+- [ ] Single clean initial commit
+- [ ] Verify .gitignore covers all secrets

@@ -68,6 +68,8 @@ interface WorkItemRow {
   worker_id: string | null;
   iteration: number;
   max_iterations: number;
+  retry_count: number;
+  next_retry_at: Date | null;
   created_at: Date;
   updated_at: Date;
   completed_at: Date | null;

@@ -2,14 +2,14 @@
 -- Created: 2026-01-14
 
 CREATE TABLE IF NOT EXISTS pr_reviews (
-  id SERIAL PRIMARY KEY,
-  work_item_id INTEGER NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  work_item_id UUID NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
   pr_number INTEGER NOT NULL,
-  review_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+  review_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   model_used VARCHAR(100) NOT NULL,
   findings JSONB NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Index for fast lookup by work item

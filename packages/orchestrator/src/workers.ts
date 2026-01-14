@@ -71,15 +71,16 @@ export class WorkerManager {
    * Spawn a new worker container for a work item
    *
    * Creates the worker record first, then spawns the Docker container.
+   * If container creation fails, rolls back database changes.
    * Records the spawn with the rate limiter.
    *
    * @param workItem - The work item to process
    * @returns The worker ID and container ID
    */
   async spawn(workItem: WorkItem): Promise<SpawnResult> {
-    // Create worker record
     const workerId = uuid();
 
+    // Create worker record
     await this.db.execute(
       `INSERT INTO workers (id, work_item_id, status, iteration)
        VALUES ($1, $2, 'starting', 0)`,
@@ -92,37 +93,49 @@ export class WorkerManager {
       [workerId, workItem.id]
     );
 
-    // Spawn Docker container
-    // Convert localhost to Docker-accessible address for container networking
-    // - Mac/Windows: host.docker.internal (Docker Desktop feature)
-    // - Linux: Docker bridge gateway IP (172.17.0.1)
-    const dockerHost = process.platform === "linux"
-      ? "172.17.0.1"
-      : "host.docker.internal";
-    const workerOrchestratorUrl = this.config.orchestratorUrl.replace(
-      /localhost|127\.0\.0\.1/,
-      dockerHost
-    );
-    const container = await this.docker.createContainer({
-      Image: this.config.workerImage,
-      Env: [
-        `WORKER_ID=${workerId}`,
-        `WORK_ITEM=${JSON.stringify(workItem)}`,
-        `ORCHESTRATOR_URL=${workerOrchestratorUrl}`,
-        `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
-        `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
-        // Pass through mock mode for testing lifecycle without Claude
-        `MOCK_RALPH=${process.env.MOCK_RALPH ?? ""}`,
-        `MOCK_FAIL=${process.env.MOCK_FAIL ?? ""}`,
-        `MOCK_STUCK=${process.env.MOCK_STUCK ?? ""}`,
-      ],
-      HostConfig: {
-        AutoRemove: false,  // Keep for debugging
-        NetworkMode: "whim-network",
-      },
-    });
+    // Spawn Docker container - if this fails, rollback DB changes
+    let container: { id: string; start: () => Promise<void> };
+    try {
+      // Convert localhost to Docker-accessible address for container networking
+      // - Mac/Windows: host.docker.internal (Docker Desktop feature)
+      // - Linux: Docker bridge gateway IP (172.17.0.1)
+      const dockerHost = process.platform === "linux"
+        ? "172.17.0.1"
+        : "host.docker.internal";
+      const workerOrchestratorUrl = this.config.orchestratorUrl.replace(
+        /localhost|127\.0\.0\.1/,
+        dockerHost
+      );
 
-    await container.start();
+      container = await this.docker.createContainer({
+        Image: this.config.workerImage,
+        Env: [
+          `WORKER_ID=${workerId}`,
+          `WORK_ITEM=${JSON.stringify(workItem)}`,
+          `ORCHESTRATOR_URL=${workerOrchestratorUrl}`,
+          `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
+          `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
+          // Pass through mock mode for testing lifecycle without Claude
+          `MOCK_RALPH=${process.env.MOCK_RALPH ?? ""}`,
+          `MOCK_FAIL=${process.env.MOCK_FAIL ?? ""}`,
+          `MOCK_STUCK=${process.env.MOCK_STUCK ?? ""}`,
+        ],
+        HostConfig: {
+          AutoRemove: false,  // Keep for debugging
+          NetworkMode: "whim-network",
+        },
+      });
+
+      await container.start();
+    } catch (error) {
+      // Rollback: delete worker record and reset work item status
+      await this.db.execute(`DELETE FROM workers WHERE id = $1`, [workerId]);
+      await this.db.execute(
+        `UPDATE work_items SET worker_id = NULL, status = 'queued' WHERE id = $1`,
+        [workItem.id]
+      );
+      throw error;
+    }
 
     // Update worker with container ID
     const containerId = container.id;
@@ -394,7 +407,8 @@ export class WorkerManager {
     return this.db.query<Worker>(
       `SELECT * FROM workers
        WHERE status IN ('starting', 'running')
-       AND last_heartbeat < NOW() - INTERVAL '${this.config.staleThresholdSeconds} seconds'`
+       AND last_heartbeat < NOW() - INTERVAL '1 second' * $1`,
+      [this.config.staleThresholdSeconds]
     );
   }
 
@@ -433,18 +447,36 @@ export class WorkerManager {
       [workerId, `Killed: ${reason}`]
     );
 
-    // Update work item (back to queued for retry, or failed if max iterations)
+    // Update work item with retry backoff
     const workItem = await this.db.getWorkItem(worker.workItemId);
-    if (workItem && workItem.iteration < workItem.maxIterations) {
-      await this.db.execute(
-        `UPDATE work_items SET status = 'queued', worker_id = NULL, error = $2 WHERE id = $1`,
-        [worker.workItemId, `Worker killed: ${reason}`]
-      );
-    } else {
-      await this.db.execute(
-        `UPDATE work_items SET status = 'failed', error = $2 WHERE id = $1`,
-        [worker.workItemId, `Worker killed (max iterations): ${reason}`]
-      );
+    const maxRetries = 3;
+
+    if (workItem) {
+      const newRetryCount = workItem.retryCount + 1;
+
+      if (newRetryCount > maxRetries) {
+        // Max retries exceeded - mark as permanently failed
+        await this.db.execute(
+          `UPDATE work_items SET status = 'failed', error = $2, retry_count = $3 WHERE id = $1`,
+          [worker.workItemId, `Worker killed (max retries ${maxRetries}): ${reason}`, newRetryCount]
+        );
+      } else if (workItem.iteration >= workItem.maxIterations) {
+        // Max iterations exceeded - mark as failed
+        await this.db.execute(
+          `UPDATE work_items SET status = 'failed', error = $2 WHERE id = $1`,
+          [worker.workItemId, `Worker killed (max iterations): ${reason}`]
+        );
+      } else {
+        // Calculate exponential backoff: 1min, 5min, 30min
+        const backoffMinutes = [1, 5, 30][Math.min(newRetryCount - 1, 2)] ?? 30;
+        await this.db.execute(
+          `UPDATE work_items
+           SET status = 'queued', worker_id = NULL, error = $2,
+               retry_count = $3, next_retry_at = NOW() + INTERVAL '1 minute' * $4
+           WHERE id = $1`,
+          [worker.workItemId, `Worker killed: ${reason} (retry ${newRetryCount}/${maxRetries})`, newRetryCount, backoffMinutes]
+        );
+      }
     }
 
     // Release all file locks

@@ -43,6 +43,27 @@ class MockDatabase {
     text: string,
     values?: unknown[]
   ): Promise<T | null> {
+    // Handle INSERT ... ON CONFLICT DO NOTHING RETURNING
+    if (text.includes("INSERT INTO file_locks") && text.includes("ON CONFLICT") && text.includes("RETURNING") && values) {
+      const workerId = values[0] as string;
+      const filePath = values[1] as string;
+
+      // Check if already locked (DO NOTHING case)
+      if (this.locks.has(filePath)) {
+        return null;
+      }
+
+      // Insert succeeded
+      this.idCounter++;
+      this.locks.set(filePath, {
+        id: `lock-${this.idCounter}`,
+        workerId,
+        filePath,
+        acquiredAt: new Date(),
+      });
+      return { workerId } as T;
+    }
+
     // Handle SELECT by file_path
     if (text.includes("WHERE file_path = $1") && values) {
       const filePath = values[0] as string;

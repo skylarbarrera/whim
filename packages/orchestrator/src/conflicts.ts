@@ -63,49 +63,35 @@ export class ConflictDetector {
 
   /**
    * Try to acquire a single file lock.
-   * Uses INSERT ... ON CONFLICT to atomically check and acquire.
+   * Uses INSERT ... ON CONFLICT DO NOTHING for atomic lock acquisition.
+   * No race condition - single statement handles both check and acquire.
    */
   private async tryAcquireLock(
     workerId: string,
     filePath: string
   ): Promise<{ success: boolean }> {
-    // Check if lock exists
-    const existing = await this.db.queryOne<{
-      workerId: string;
-      filePath: string;
-    }>("SELECT worker_id, file_path FROM file_locks WHERE file_path = $1", [
-      filePath,
-    ]);
+    // Atomic insert - if file_path already exists, does nothing and returns empty
+    const inserted = await this.db.queryOne<{ workerId: string }>(
+      `INSERT INTO file_locks (worker_id, file_path)
+       VALUES ($1, $2)
+       ON CONFLICT (file_path) DO NOTHING
+       RETURNING worker_id`,
+      [workerId, filePath]
+    );
 
-    if (existing) {
-      // Lock exists - check if it's ours
-      if (existing.workerId === workerId) {
-        // Already have this lock (idempotent)
-        return { success: true };
-      }
-      // Locked by another worker
-      return { success: false };
-    }
-
-    // No lock exists - try to create it
-    try {
-      await this.db.execute(
-        "INSERT INTO file_locks (worker_id, file_path) VALUES ($1, $2)",
-        [workerId, filePath]
-      );
+    if (inserted) {
+      // We acquired the lock
       return { success: true };
-    } catch (error: unknown) {
-      // Race condition: another worker got the lock first
-      // Check for unique_violation (23505)
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        (error as { code: string }).code === "23505"
-      ) {
-        return { success: false };
-      }
-      throw error;
     }
+
+    // Lock already exists - check if it's ours (idempotent re-acquire)
+    const existing = await this.db.queryOne<{ workerId: string }>(
+      "SELECT worker_id FROM file_locks WHERE file_path = $1",
+      [filePath]
+    );
+
+    // Success if we already own this lock
+    return { success: existing?.workerId === workerId };
   }
 
   /**

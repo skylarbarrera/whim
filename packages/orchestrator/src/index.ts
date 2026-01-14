@@ -79,12 +79,12 @@ async function runMainLoop(
       }
 
       // 2. Spawn workers for queued items when capacity is available
-      const hasCapacity = await workers.hasCapacity();
-      log(`Capacity check: ${hasCapacity}`);
-      while (hasCapacity) {
+      // Re-check capacity before each spawn to respect rate limits
+      while (await workers.hasCapacity()) {
         const workItem = await queue.getNext();
         if (!workItem) {
           // No more queued items
+          log("No queued items, waiting...");
           break;
         }
 
@@ -159,7 +159,15 @@ async function main(): Promise<void> {
 
   // Initialize components
   const queue = new QueueManager(db);
-  const rateLimiter = new RateLimiter(redis);
+  const rateLimiter = new RateLimiter(redis, {
+    // Use DB as source of truth for active worker count (prevents counter drift)
+    getActiveWorkerCount: async () => {
+      const result = await db.queryOne<{ count: string }>(
+        `SELECT COUNT(*) as count FROM workers WHERE status IN ('starting', 'running')`
+      );
+      return parseInt(result?.count ?? "0", 10);
+    },
+  });
   const conflicts = new ConflictDetector(db);
   const workers = new WorkerManager(db, rateLimiter, conflicts, docker);
   const metrics = new MetricsCollector(db);
