@@ -110,7 +110,7 @@ export async function reviewCode(
 
     // Extract JSON from response
     const content = response.content[0];
-    if (content.type !== "text") {
+    if (!content || content.type !== "text") {
       throw new Error("Expected text response from Claude API");
     }
 

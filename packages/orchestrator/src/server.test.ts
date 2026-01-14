@@ -123,6 +123,12 @@ function createMockDeps(): ServerDependencies {
         ])
       ),
     } as unknown as ServerDependencies["metrics"],
+
+    db: {
+      getReviewsByWorkItem: mock(() => Promise.resolve([])),
+      getReviewByPR: mock(() => Promise.resolve(null)),
+      query: mock(() => Promise.resolve([])),
+    } as unknown as ServerDependencies["db"],
   };
 }
 

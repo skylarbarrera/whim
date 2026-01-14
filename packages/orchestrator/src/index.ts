@@ -171,6 +171,7 @@ async function main(): Promise<void> {
     conflicts,
     rateLimiter,
     metrics,
+    db,
   });
 
   // Start HTTP server

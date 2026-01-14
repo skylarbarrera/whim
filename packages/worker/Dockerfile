@@ -76,8 +76,13 @@ WORKDIR /app
 # Copy built worker from builder stage
 COPY --from=builder /app/packages/worker/dist ./dist
 COPY --from=builder /app/packages/worker/package.json ./
-COPY --from=builder /app/packages/shared/dist ./node_modules/@factory/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./node_modules/@factory/shared/
+
+# Copy all node_modules from builder (includes @anthropic-ai/sdk and transitive deps)
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy shared package (overwrite workspace link with actual build)
+COPY --from=builder /app/packages/shared/dist ./node_modules/@whim/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./node_modules/@whim/shared/
 
 # Copy Claude configuration to worker user's home
 COPY --chown=worker:worker packages/worker/.claude /home/worker/.claude

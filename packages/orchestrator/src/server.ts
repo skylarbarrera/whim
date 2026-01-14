@@ -11,6 +11,7 @@ import type { WorkerManager } from "./workers.js";
 import type { ConflictDetector } from "./conflicts.js";
 import type { RateLimiter } from "./rate-limits.js";
 import type { MetricsCollector } from "./metrics.js";
+import type { Database } from "./db.js";
 import type {
   AddWorkItemRequest,
   WorkerRegisterRequest,
@@ -32,6 +33,7 @@ export interface ServerDependencies {
   conflicts: ConflictDetector;
   rateLimiter: RateLimiter;
   metrics: MetricsCollector;
+  db: Database;
 }
 
 /**
@@ -433,6 +435,10 @@ export function createServer(deps: ServerDependencies): express.Application {
     "/api/reviews/work-item/:id",
     asyncHandler(async (req, res) => {
       const workItemId = req.params.id;
+      if (!workItemId) {
+        res.status(400).json(errorResponse("Work item ID required", "INVALID_INPUT"));
+        return;
+      }
       const reviews = await deps.db.getReviewsByWorkItem(workItemId);
       res.json(reviews);
     })
@@ -444,7 +450,12 @@ export function createServer(deps: ServerDependencies): express.Application {
   app.get(
     "/api/reviews/pr/:number",
     asyncHandler(async (req, res) => {
-      const prNumber = parseInt(req.params.number, 10);
+      const numberParam = req.params.number;
+      if (!numberParam) {
+        res.status(400).json(errorResponse("PR number required", "INVALID_INPUT"));
+        return;
+      }
+      const prNumber = parseInt(numberParam, 10);
       if (isNaN(prNumber)) {
         res.status(400).json(errorResponse("Invalid PR number", "INVALID_INPUT"));
         return;
