@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import React from 'react';
-import { render, Text } from 'ink';
+import { render } from 'ink';
+import { Dashboard } from './commands/dashboard.js';
 
 const program = new Command();
 
@@ -13,9 +14,9 @@ program
 program
   .command('dashboard', { isDefault: true })
   .description('Show the main dashboard (default)')
-  .action(() => {
-    // For now, just show "Hello World" - dashboard will be implemented later
-    render(<Text color="green">Hello World</Text>);
+  .option('--api-url <url>', 'Orchestrator API URL', 'http://localhost:3000')
+  .action((options) => {
+    render(<Dashboard />);
   });
 
 program.parse(process.argv);

@@ -265,3 +265,17 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - All source files structurally correct
   - Code ready for deployment with proper dependencies
   - Phase 1 complete: All 8 tasks finished
+
+### Phase 2: Main Dashboard
+- [x] Task 2.1-2.5: Create main dashboard view with sections
+  - Created src/commands/dashboard.tsx with full layout
+  - Updated index.tsx to use Dashboard component
+  - Added STATUS section showing running state, worker count, queue depth
+  - Added WORKERS section with placeholder (detailed cards next)
+  - Added QUEUE section with placeholder (detailed items next)
+  - Added TODAY section with completed, failed, iterations, success rate
+  - Added footer with keyboard hints (q/r/? keys)
+  - Integrated useApi hook polling every 2 seconds
+  - Shows refresh Spinner in header
+  - Handles loading and error states
+  - Uses Section components for consistent layout

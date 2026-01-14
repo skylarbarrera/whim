@@ -21,15 +21,15 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 
 ## Phase 2: Main Dashboard
 
-- [ ] Create `src/commands/dashboard.tsx` - main dashboard view
-- [ ] Add STATUS section (running state, worker count, queue depth)
+- [x] Create `src/commands/dashboard.tsx` - main dashboard view
+- [x] Add STATUS section (running state, worker count, queue depth)
 - [ ] Add WORKERS section with live worker cards
 - [ ] Worker card shows: id, repo, branch, iteration, progress bar, tokens, cost
-- [ ] Add QUEUE section with pending items
+- [x] Add QUEUE section with pending items
 - [ ] Queue item shows: repo, branch, priority, status
-- [ ] Add TODAY section (completed, failed, iterations, cost)
-- [ ] Add footer with keyboard hints
-- [ ] Poll API every 2s, show refresh spinner
+- [x] Add TODAY section (completed, failed, iterations, cost)
+- [x] Add footer with keyboard hints
+- [x] Poll API every 2s, show refresh spinner
 
 ## Phase 3: Keyboard Navigation & Actions
 

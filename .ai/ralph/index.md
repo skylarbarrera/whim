@@ -1866,3 +1866,28 @@ This integration provides:
 - Ready to start Phase 2: Main Dashboard implementation
 
 ---
+
+### Task: Whim CLI Dashboard - Phase 2.1-2.5
+
+**Files Created/Modified:**
+- `packages/cli/src/commands/dashboard.tsx` - Main dashboard view
+- `packages/cli/src/index.tsx` - Updated to use Dashboard component
+
+**Implementation:**
+- Created full dashboard layout with all major sections
+- STATUS section: running state, worker count, queue depth
+- WORKERS section: placeholder for detailed worker cards
+- QUEUE section: placeholder for detailed queue items  
+- TODAY section: completed, failed, iterations, success rate
+- Footer with keyboard hints (q, r, ?)
+- Integrated useApi hook polling every 2 seconds
+- Refresh Spinner in header
+- Loading and error state handling
+- Uses Section components throughout
+
+**Notes:**
+- Basic dashboard structure complete
+- Next tasks will add detailed worker cards and queue items
+- Already polls API and displays real-time data
+
+---
