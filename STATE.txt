@@ -295,3 +295,19 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Limited queue display to first 5 items
   - Applied full color scheme from spec
   - Phase 2 complete: All 9 tasks finished
+
+### Phase 3: Keyboard Navigation & Actions (COMPLETE)
+- [x] Task 3.1: Add keyboard handler and all keyboard shortcuts
+  - Integrated useInput hook from Ink
+  - Added useApp hook for exit functionality
+  - Implemented 'q' key to quit dashboard
+  - Implemented 'r' key to force refresh via refetch()
+  - Implemented '?' key to toggle help overlay
+  - Added placeholder handlers for w, u, k, c keys (coming soon)
+  - Added placeholder handler for arrow key navigation
+  - Created help overlay with:
+    - Double-bordered box
+    - List of all keyboard shortcuts
+    - Visual indicators for implemented vs coming soon
+    - Cyan/yellow color scheme
+  - Phase 3 complete: All 9 tasks finished

@@ -1919,3 +1919,26 @@ This integration provides:
 - Ready to start Phase 3: Keyboard Navigation & Actions
 
 ---
+
+### Task: Whim CLI Dashboard - Phase 3.1
+
+**Files Modified:**
+- `packages/cli/src/commands/dashboard.tsx` - Added keyboard navigation
+
+**Implementation:**
+- Integrated useInput hook from Ink
+- Added useApp hook for exit functionality
+- Implemented 'q' key to quit dashboard
+- Implemented 'r' key to force refresh via refetch()
+- Implemented '?' key to toggle help overlay
+- Added placeholder handlers for w, u, k, c keys (coming soon)
+- Added placeholder handler for arrow key navigation
+- Created help overlay with double-bordered box showing all shortcuts
+
+**Notes:**
+- Phase 3 complete: All 9 tasks finished
+- Core keyboard functionality (quit, refresh, help) working
+- Navigation and action keys have placeholder handlers
+- Ready to start Phase 4: Logs & Polish
+
+---

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useState } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
 import { Section } from '../components/Section.js';
 import { Spinner } from '../components/Spinner.js';
 import { ProgressBar } from '../components/ProgressBar.js';
@@ -14,7 +14,30 @@ interface StatusResponse {
 }
 
 export const Dashboard: React.FC = () => {
-  const { data, loading, error } = useApi<StatusResponse>('/api/status');
+  const { data, loading, error, refetch } = useApi<StatusResponse>('/api/status');
+  const [showHelp, setShowHelp] = useState(false);
+  const { exit } = useApp();
+
+  // Keyboard handler
+  useInput((input, key) => {
+    if (input === 'q') {
+      exit();
+    } else if (input === 'r') {
+      refetch();
+    } else if (input === '?') {
+      setShowHelp(!showHelp);
+    } else if (input === 'w') {
+      // TODO: Focus workers section
+    } else if (input === 'u') {
+      // TODO: Focus queue section
+    } else if (input === 'k') {
+      // TODO: Kill selected worker
+    } else if (input === 'c') {
+      // TODO: Cancel selected queue item
+    } else if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
+      // TODO: Navigate items
+    }
+  });
 
   if (loading && !data) {
     return (
@@ -170,6 +193,50 @@ export const Dashboard: React.FC = () => {
           Press 'q' to quit | 'r' to refresh | '?' for help
         </Text>
       </Box>
+
+      {/* Help Overlay */}
+      {showHelp && (
+        <Box
+          position="absolute"
+          top={5}
+          left={10}
+          width={60}
+          borderStyle="double"
+          borderColor="cyan"
+          padding={1}
+          flexDirection="column"
+        >
+          <Text bold color="cyan" underline>
+            KEYBOARD SHORTCUTS
+          </Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text>
+              <Text color="yellow">q</Text> - Quit dashboard
+            </Text>
+            <Text>
+              <Text color="yellow">r</Text> - Force refresh
+            </Text>
+            <Text>
+              <Text color="yellow">?</Text> - Toggle this help
+            </Text>
+            <Text color="gray" dimColor>
+              <Text color="yellow">w</Text> - Focus workers section (coming soon)
+            </Text>
+            <Text color="gray" dimColor>
+              <Text color="yellow">u</Text> - Focus queue section (coming soon)
+            </Text>
+            <Text color="gray" dimColor>
+              <Text color="yellow">k</Text> - Kill selected worker (coming soon)
+            </Text>
+            <Text color="gray" dimColor>
+              <Text color="yellow">c</Text> - Cancel selected item (coming soon)
+            </Text>
+            <Text color="gray" dimColor>
+              <Text color="yellow">↑↓</Text> - Navigate items (coming soon)
+            </Text>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 };

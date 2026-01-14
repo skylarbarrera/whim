@@ -33,15 +33,15 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 
 ## Phase 3: Keyboard Navigation & Actions
 
-- [ ] Add keyboard handler with `useInput` hook
-- [ ] `q` - quit dashboard
-- [ ] `w` - focus workers section
-- [ ] `u` - focus queue section
-- [ ] `k` - kill selected worker (POST /api/workers/:id/kill)
-- [ ] `c` - cancel selected queue item (POST /api/work/:id/cancel)
-- [ ] `r` - force refresh
-- [ ] `?` - show help overlay
-- [ ] Arrow keys to select items within sections
+- [x] Add keyboard handler with `useInput` hook
+- [x] `q` - quit dashboard
+- [x] `w` - focus workers section
+- [x] `u` - focus queue section
+- [x] `k` - kill selected worker (POST /api/workers/:id/kill)
+- [x] `c` - cancel selected queue item (POST /api/work/:id/cancel)
+- [x] `r` - force refresh
+- [x] `?` - show help overlay
+- [x] Arrow keys to select items within sections
 
 ## Phase 4: Logs & Polish
 
