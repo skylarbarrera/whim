@@ -1992,3 +1992,29 @@ This integration provides:
 - Migration from web to terminal UI complete
 
 ---
+
+### Task: Whim CLI Dashboard - Phase 4.2
+
+**Files Created:**
+- `packages/cli/src/config.ts` - Configuration file loader
+
+**Files Modified:**
+- `packages/cli/src/index.tsx` - Load and use config file
+- `README.md` - Documented config file usage
+
+**Implementation:**
+- Created config.ts module to read ~/.whimrc
+- Parses simple key=value format
+- Supports comments (# prefix)
+- Gracefully handles missing file
+- Config loaded at startup
+- apiUrl from config becomes default for --api-url
+- CLI flags override config values
+- Documented in README with examples
+
+**Notes:**
+- 4 of 7 Phase 4 tasks complete
+- 3 remaining tasks are all related to logs viewer
+- Core CLI functionality fully complete
+
+---

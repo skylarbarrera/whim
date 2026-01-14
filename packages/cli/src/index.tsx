@@ -3,6 +3,10 @@ import { Command } from 'commander';
 import React from 'react';
 import { render } from 'ink';
 import { Dashboard } from './commands/dashboard.js';
+import { loadConfig } from './config.js';
+
+const config = loadConfig();
+const defaultApiUrl = config.apiUrl || 'http://localhost:3000';
 
 const program = new Command();
 
@@ -14,7 +18,7 @@ program
 program
   .command('dashboard', { isDefault: true })
   .description('Show the main dashboard (default)')
-  .option('--api-url <url>', 'Orchestrator API URL', 'http://localhost:3000')
+  .option('--api-url <url>', 'Orchestrator API URL', defaultApiUrl)
   .action((options) => {
     render(<Dashboard apiUrl={options.apiUrl} />);
   });
@@ -22,7 +26,7 @@ program
 program
   .command('status')
   .description('Show quick status summary')
-  .option('--api-url <url>', 'Orchestrator API URL', 'http://localhost:3000')
+  .option('--api-url <url>', 'Orchestrator API URL', defaultApiUrl)
   .action(async (options) => {
     try {
       const response = await fetch(`${options.apiUrl}/api/status`);

@@ -397,7 +397,21 @@ whim status
 # Connect to remote orchestrator
 whim dashboard --api-url http://remote-host:3000
 whim status --api-url http://remote-host:3000
+
+# Or configure default API URL in ~/.whimrc
+echo "apiUrl=http://remote-host:3000" > ~/.whimrc
 ```
+
+### Configuration File
+
+Create `~/.whimrc` to set defaults:
+
+```bash
+# Whim CLI Configuration
+apiUrl=http://localhost:3000
+```
+
+CLI flags override config file values.
 
 ### CLI Dashboard Features
 

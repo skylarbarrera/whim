@@ -338,3 +338,16 @@ All references to "factory" have been replaced with "whim" across the codebase:
   - Updated package listing in README (cli instead of dashboard)
   - Removed dashboard port from service ports table
   - All 3 Cleanup tasks complete
+
+### Phase 4: Logs & Polish (Updated - 4 of 7 tasks)
+- [x] Task 4.2: Add ~/.whimrc config file support
+  - Created src/config.ts module:
+    - Reads ~/.whimrc from home directory
+    - Parses key=value format
+    - Supports comments (lines starting with #)
+    - Gracefully handles missing file
+  - Updated index.tsx to load config at startup
+  - Config apiUrl becomes default for --api-url option
+  - CLI flags override config file values
+  - Documented config file in README with examples
+  - 4 of 7 Phase 4 tasks complete
