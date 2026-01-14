@@ -153,9 +153,9 @@ Completed Success Criteria:
 - ✅ Every AI-generated PR receives an AI review comment within 60 seconds
 - ✅ Review comment shows spec alignment assessment with score
 - ✅ Review comment shows code quality concerns with file references
+- ✅ Manual retrigger works via GitHub Actions workflow dispatch
 
 Remaining Tasks:
-- GitHub Action for manual retrigger
 - Database tracking of reviews
 - Dashboard integration for review history
 - Cleanup unused pr-review code

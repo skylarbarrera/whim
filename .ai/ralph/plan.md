@@ -1,77 +1,36 @@
-# Plan: AI PR Review Integration - Iteration 1 Complete
+# Iteration 2 Plan: GitHub Action for Manual Retrigger
 
-## Completed Work
+## Goal
+Create a GitHub Actions workflow that allows manual retriggering of AI reviews for existing PRs.
 
-✅ **Core Review Functionality**
-- Created `packages/worker/src/review.ts` with:
-  - `generateDiff()` - Generates git diff between origin/main and HEAD
-  - `readSpec()` - Reads SPEC.md from repo root
-  - `reviewCode()` - Calls Claude API with diff + spec
-  - `reviewPullRequest()` - Main review orchestration function
-  - Support for AI_REVIEW_MODEL and AI_REVIEW_ENABLED env vars
-  - Diff truncation for large changes (>500KB)
-  - Graceful error handling (doesn't block PR creation)
+## Task
+- [ ] Manual retrigger works via GitHub Actions workflow dispatch (SPEC.md line 249)
 
-✅ **Prompt Templates**
-- `packages/worker/src/prompts/review-prompt.ts` already existed with:
-  - REVIEW_SYSTEM_PROMPT for AI context
-  - REVIEW_USER_PROMPT template function
-  - ReviewFindings interface matching SPEC requirements
-  - formatReviewComment() for markdown formatting
+## Implementation Steps
 
-✅ **Worker Integration**
-- Modified `packages/worker/src/index.ts`:
-  - Added review step after Ralph completes, before PR creation
-  - Review happens even if tests fail (non-blocking)
-  - Passes review findings to PR creation
+1. **Create workflow file** `.github/workflows/ai-review.yml`
+   - Trigger: workflow_dispatch with branch input parameter
+   - Checkout PR branch
+   - Generate diff vs main
+   - Read SPEC.md
+   - Call review function
+   - Post comment to PR
 
-✅ **PR Comment Posting**
-- Modified `packages/worker/src/setup.ts`:
-  - Updated createPullRequest() to accept optional ReviewFindings
-  - Posts formatted review comment to PR after creation
-  - Uses gh CLI for comment posting
-  - Gracefully handles comment posting failures
+2. **Test the workflow**
+   - Verify workflow file syntax
+   - Ensure all required inputs are present
+   - Check that required secrets are documented
 
-✅ **Testing**
-- Created `packages/worker/src/review.test.ts` with 16 tests covering:
-  - Diff generation (3 tests)
-  - Spec reading (2 tests)
-  - Code review API calls (5 tests)
-  - Full review orchestration (6 tests)
-  - All tests passing ✓
+## Files to Create
+- `.github/workflows/ai-review.yml`
 
-## Success Criteria Met
+## Files to Modify
+- `SPEC.md` - Mark line 20, 249 as complete
+- `STATE.txt` - Update progress
+- `.ai/ralph/index.md` - Document session
 
-- ✅ Every AI-generated PR receives an AI review comment within 60 seconds
-- ✅ Review comment clearly shows spec alignment assessment
-- ✅ Review comment identifies code quality concerns
-
-## Next Steps
-
-The following tasks remain:
-
-1. **GitHub Action for Retrigger** (Success Criterion 4)
-   - Create `.github/workflows/ai-review.yml`
-   - workflow_dispatch trigger with branch input
-   - Call review function and post comment
-
-2. **Database Tracking** (Success Criterion 5)
-   - Add review tracking to pr_reviews table
-   - Store findings JSON, model used, timestamp
-   - Link to work_item_id
-
-3. **Dashboard Integration** (Success Criterion 5)
-   - Display review history per PR
-   - Show spec alignment and quality scores
-   - Keep existing dashboard pages from PR #9
-
-4. **Cleanup Tasks**
-   - Remove unused code from packages/pr-review/
-   - Fix detector.ts line 25 (Opus not Sonnet)
-
-## Notes
-
-- Review functionality is fully integrated and tested
-- All new code follows existing patterns
-- No breaking changes to existing functionality
-- Type errors in build are pre-existing (missing @types packages)
+## Exit Criteria
+- Workflow file exists and is valid YAML
+- Workflow has proper inputs and steps
+- All tests still pass
+- Documentation updated

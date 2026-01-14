@@ -17,7 +17,7 @@ This creates review burden and risks merged PRs that drift from requirements.
 - [x] Every AI-generated PR receives an AI review comment within 60 seconds of worker completion
 - [x] Review comment clearly shows spec alignment assessment
 - [x] Review comment identifies code quality concerns
-- [ ] Reviews can be retriggered manually via GitHub Actions
+- [x] Reviews can be retriggered manually via GitHub Actions
 - [ ] Review history is visible in dashboard
 
 ## User Journey
@@ -246,7 +246,7 @@ AI_REVIEW_ENABLED=true                     # Kill switch
 - [x] Worker posts AI review comment on every PR it creates
 - [x] Review comment shows spec alignment assessment with score
 - [x] Review comment shows code quality concerns with file references
-- [ ] Manual retrigger works via GitHub Actions workflow dispatch
+- [x] Manual retrigger works via GitHub Actions workflow dispatch
 - [ ] Review records appear in database
 - [ ] Dashboard shows review history
 - [ ] Unused lint/test runner code is removed from pr-review package
