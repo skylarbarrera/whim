@@ -40,3 +40,4 @@ build/
 
 # Bun
 bun.lockb
+.claude/tsc-cache/
