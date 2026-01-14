@@ -18,7 +18,7 @@ This creates review burden and risks merged PRs that drift from requirements.
 - [x] Review comment clearly shows spec alignment assessment
 - [x] Review comment identifies code quality concerns
 - [x] Reviews can be retriggered manually via GitHub Actions
-- [ ] Review history is visible in dashboard
+- [x] Review history is visible in dashboard
 
 ## User Journey
 
@@ -248,6 +248,6 @@ AI_REVIEW_ENABLED=true                     # Kill switch
 - [x] Review comment shows code quality concerns with file references
 - [x] Manual retrigger works via GitHub Actions workflow dispatch
 - [x] Review records appear in database
-- [ ] Dashboard shows review history
+- [x] Dashboard shows review history
 - [x] Unused lint/test runner code is removed from pr-review package (N/A - package never created)
 - [x] Detection pattern fixed (Opus not Sonnet) (N/A - detector.ts never created)

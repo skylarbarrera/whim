@@ -426,6 +426,53 @@ export function createServer(deps: ServerDependencies): express.Application {
     })
   );
 
+  /**
+   * GET /api/reviews/work-item/:id - Get reviews for a work item
+   */
+  app.get(
+    "/api/reviews/work-item/:id",
+    asyncHandler(async (req, res) => {
+      const workItemId = req.params.id;
+      const reviews = await deps.db.getReviewsByWorkItem(workItemId);
+      res.json(reviews);
+    })
+  );
+
+  /**
+   * GET /api/reviews/pr/:number - Get review for a PR
+   */
+  app.get(
+    "/api/reviews/pr/:number",
+    asyncHandler(async (req, res) => {
+      const prNumber = parseInt(req.params.number, 10);
+      if (isNaN(prNumber)) {
+        res.status(400).json(errorResponse("Invalid PR number", "INVALID_INPUT"));
+        return;
+      }
+      const review = await deps.db.getReviewByPR(prNumber);
+      if (!review) {
+        res.status(404).json(errorResponse("Review not found", "NOT_FOUND"));
+        return;
+      }
+      res.json(review);
+    })
+  );
+
+  /**
+   * GET /api/reviews - List all reviews
+   */
+  app.get(
+    "/api/reviews",
+    asyncHandler(async (req, res) => {
+      // Get all reviews by querying all work items and their reviews
+      // This is a simple implementation; for large datasets, add pagination
+      const reviews = await deps.db.query(
+        "SELECT * FROM pr_reviews ORDER BY review_timestamp DESC LIMIT 100"
+      );
+      res.json(reviews);
+    })
+  );
+
   // ==========================================================================
   // Error Handling
   // ==========================================================================

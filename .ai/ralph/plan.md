@@ -1,53 +1,42 @@
-# Iteration 3 Plan: Database Tracking of Reviews
+# Iteration 4 Plan: Dashboard Integration for Review History
 
 ## Goal
-Add database tracking for AI PR reviews to support audit trail and dashboard display.
+Add dashboard page to display AI PR review history.
 
 ## Task
-- [ ] Review records appear in database (SPEC.md line 250)
+- [ ] Review history is visible in dashboard (SPEC.md line 21, 251)
 
 ## Implementation Steps
 
-1. **Check existing database schema**
-   - Read migrations/002_pr_reviews.sql (if exists)
-   - Understand pr_reviews table structure
+1. **Add API endpoint to orchestrator**
+   - GET /api/reviews - List all reviews with optional filters
+   - GET /api/reviews/work-item/:id - Get reviews for specific work item
+   - GET /api/reviews/pr/:number - Get review for specific PR
 
-2. **Create or update migration**
-   - Ensure pr_reviews table exists with required columns:
-     - id, work_item_id, pr_number
-     - review_timestamp, model_used
-     - findings (JSONB)
-     - Created/updated timestamps
+2. **Create dashboard page**
+   - app/reviews/page.tsx - Reviews list page
+   - Display review history with filters
+   - Show spec alignment and code quality scores
+   - Link to PRs and work items
+   - Format findings in readable way
 
-3. **Update worker to save reviews**
-   - Modify packages/worker/src/index.ts to save review to database
-   - Add database insert after review completes
-   - Store: work_item_id, pr_number, findings JSON, model, timestamp
+3. **Update navigation**
+   - Add "Reviews" link to navigation
 
-4. **Update orchestrator database module**
-   - Add pr_reviews table type in packages/orchestrator/src/db.ts
-   - Add methods: insertReview, getReviewsByWorkItem, getReviewByPR
+4. **Test the integration**
+   - Verify API endpoints work
+   - Verify dashboard page renders
 
-5. **Add tests**
-   - Test review insertion
-   - Test review retrieval
-
-## Files to Check
-- migrations/002_pr_reviews.sql (may exist from PR #9)
-- packages/pr-review/src/tracker.ts (may have existing code)
-- packages/shared/src/types.ts (add PRReview type if needed)
-
-## Files to Create/Modify
-- migrations/002_pr_reviews.sql (if missing)
-- packages/shared/src/types.ts (PRReview interface)
-- packages/worker/src/client.ts (add completeWithReview or update complete)
-- packages/orchestrator/src/db.ts (add review methods)
-- packages/orchestrator/src/server.ts (add GET /api/reviews/:workItemId endpoint)
-- Test files for new functionality
+## Files to Modify
+- `packages/orchestrator/src/server.ts` - Add review endpoints
+- `packages/dashboard/components/Navigation.tsx` - Add Reviews link
+- `packages/dashboard/app/reviews/page.tsx` - Create reviews page
+- `SPEC.md` - Mark task complete
+- `STATE.txt` - Update completion status
 
 ## Exit Criteria
-- pr_reviews table exists in schema
-- Worker saves reviews to database
-- Reviews can be retrieved by work_item_id or pr_number
-- Tests pass
+- API endpoint returns review history
+- Dashboard displays reviews with scores
+- Navigation includes Reviews page
+- All tasks in SPEC.md complete
 - Documentation updated
