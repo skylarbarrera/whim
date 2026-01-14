@@ -38,7 +38,7 @@ export function useApi<T>(
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const json = await response.json();
+        const json = await response.json() as T;
 
         if (isMounted) {
           setData(json);

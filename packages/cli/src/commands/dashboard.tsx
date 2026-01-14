@@ -5,13 +5,27 @@ import { Spinner } from '../components/Spinner.js';
 import { ProgressBar } from '../components/ProgressBar.js';
 import { useApi } from '../hooks/useApi.js';
 import { Logs } from './logs.js';
-import type { WhimMetrics, Worker, WorkItem } from '@whim/shared';
+import type { Worker, WorkItem } from '@whim/shared';
 
 interface StatusResponse {
   status: string;
-  workers: Worker[];
-  queue: WorkItem[];
-  metrics: WhimMetrics;
+  workers: { active: number; maxWorkers: number };
+  queue: { size: number; oldest: string | null };
+  rateLimits: {
+    iterationsToday: number;
+    dailyBudget: number;
+    lastSpawn: string;
+    cooldownSeconds: number;
+  };
+}
+
+interface QueueResponse {
+  items: WorkItem[];
+  stats: {
+    total: number;
+    byStatus: Record<string, number>;
+    byPriority: Record<string, number>;
+  };
 }
 
 interface DashboardProps {
@@ -22,7 +36,14 @@ type FocusedSection = 'workers' | 'queue' | null;
 type ViewMode = 'dashboard' | 'logs';
 
 export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost:3000' }) => {
-  const { data, loading, error, refetch } = useApi<StatusResponse>('/api/status', { apiUrl });
+  const { data: statusData, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi<StatusResponse>('/api/status', { apiUrl });
+  const { data: workersData, loading: workersLoading, error: workersError, refetch: refetchWorkers } = useApi<Worker[]>('/api/workers', { apiUrl });
+  const { data: queueData, loading: queueLoading, error: queueError, refetch: refetchQueue } = useApi<QueueResponse>('/api/queue', { apiUrl });
+
+  const loading = statusLoading || workersLoading || queueLoading;
+  const error = statusError || workersError || queueError;
+  const data = statusData;
+  const refetch = () => { refetchStatus(); refetchWorkers(); refetchQueue(); };
   const [showHelp, setShowHelp] = useState(false);
   const [focusedSection, setFocusedSection] = useState<FocusedSection>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -44,24 +65,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
     } else if (input === 'u') {
       setFocusedSection('queue');
       setSelectedIndex(0);
-    } else if (input === 'l' && focusedSection === 'workers' && data) {
+    } else if (input === 'l' && focusedSection === 'workers' && workersData) {
       // Open logs for selected worker
-      const workers = data.workers;
-      if (workers.length > 0 && selectedIndex < workers.length) {
-        const worker = workers[selectedIndex];
-        const workItem = data.queue.find(item => item.id === worker.workItemId);
-        setSelectedWorker({ worker, workItem });
-        setViewMode('logs');
+      if (workersData.length > 0 && selectedIndex < workersData.length) {
+        const worker = workersData[selectedIndex];
+        if (worker) {
+          const workItem = queueData?.items.find(item => item.id === worker.workItemId);
+          setSelectedWorker({ worker, workItem });
+          setViewMode('logs');
+        }
       }
     } else if (input === 'k') {
       // TODO: Kill selected worker
     } else if (input === 'c') {
       // TODO: Cancel selected queue item
-    } else if (key.upArrow && focusedSection && data) {
-      const maxIndex = focusedSection === 'workers' ? data.workers.length - 1 : data.queue.length - 1;
+    } else if (key.upArrow && focusedSection) {
+      const maxIndex = focusedSection === 'workers' ? (workersData?.length ?? 1) - 1 : (queueData?.items.length ?? 1) - 1;
       setSelectedIndex(prev => Math.max(0, prev - 1));
-    } else if (key.downArrow && focusedSection && data) {
-      const maxIndex = focusedSection === 'workers' ? data.workers.length - 1 : data.queue.length - 1;
+    } else if (key.downArrow && focusedSection) {
+      const maxIndex = focusedSection === 'workers' ? (workersData?.length ?? 1) - 1 : (queueData?.items.length ?? 1) - 1;
       setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
     }
   });
@@ -70,7 +92,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
     return (
       <Box flexDirection="column">
         <Text>
-          Loading dashboard... <Spinner />
+          Loading dashboard...
         </Text>
       </Box>
     );
@@ -104,7 +126,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
     );
   }
 
-  const { workers, queue, metrics } = data;
+  const workers = workersData ?? [];
+  const queue = queueData?.items ?? [];
+  const metrics = {
+    activeWorkers: data.workers.active,
+    queuedItems: data.queue.size,
+    completedToday: queueData?.stats.byStatus.completed ?? 0,
+    failedToday: queueData?.stats.byStatus.failed ?? 0,
+    iterationsToday: data.rateLimits.iterationsToday,
+    dailyBudget: data.rateLimits.dailyBudget,
+    avgCompletionTime: 0,
+    successRate: 0,
+  };
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -239,9 +272,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
       {/* Help Overlay */}
       {showHelp && (
         <Box
-          position="absolute"
-          top={5}
-          left={10}
           width={60}
           borderStyle="double"
           borderColor="cyan"
