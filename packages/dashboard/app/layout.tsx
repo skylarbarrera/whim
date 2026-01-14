@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { Navigation } from '@/components';
 
 export const metadata: Metadata = {
-  title: 'AI Factory Dashboard',
-  description: 'Monitor and manage AI software factory workers',
+  title: 'Whim Dashboard',
+  description: 'Monitor and manage Whim workers',
 };
 
 export default function RootLayout({

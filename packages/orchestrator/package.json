@@ -1,5 +1,5 @@
 {
-  "name": "@factory/orchestrator",
+  "name": "@whim/orchestrator",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@factory/shared": "workspace:*",
+    "@whim/shared": "workspace:*",
     "express": "^4.21.0",
     "pg": "^8.13.0",
     "ioredis": "^5.4.0",

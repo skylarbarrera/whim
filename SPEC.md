@@ -1,253 +1,194 @@
-# AI PR Review Integration
+# Whim Rebrand Specification
 
 ## Executive Summary
 
-Add AI-powered code review to AI Factory that analyzes pull requests for spec alignment and code quality, posting findings as advisory PR comments. This completes the feedback loop where AI-generated code gets AI review before human merge.
+Rename the project from "AI Factory" / "factory" to "whim" across all code, configuration, documentation, and infrastructure. This establishes a consistent brand identity.
 
 ## Problem Statement
 
-AI Factory creates PRs from GitHub issues but provides no quality feedback before human review. Humans must manually verify that:
-- Implementation matches the original SPEC.md requirements
-- Code follows quality patterns (complexity, naming, potential bugs)
+The project currently uses inconsistent naming:
+- `factory`, `ai-factory`, `Factory`, `AI Factory`, `AI Software Factory`
+- Package namespace `@factory/*`
+- Docker images/containers named `factory-*`
 
-This creates review burden and risks merged PRs that drift from requirements.
+This creates confusion and doesn't reflect the intended brand. The GitHub repo is already named `whim`, creating a mismatch.
 
 ## Success Criteria
 
-- [x] Every AI-generated PR receives an AI review comment within 60 seconds of worker completion
-- [x] Review comment clearly shows spec alignment assessment
-- [x] Review comment identifies code quality concerns
-- [x] Reviews can be retriggered manually via GitHub Actions
-- [x] Review history is visible in dashboard
+- [x] All references to "factory" variants replaced with "whim"
+- [x] Package namespace changed from `@factory/*` to `@whim/*`
+- [x] Docker images/containers renamed from `factory-*` to `whim-*`
+- [x] Documentation reflects new branding
+- [x] Project builds and runs successfully after rename
+- [x] No broken imports or references
 
-## User Journey
+## Scope
 
-### Primary Flow (Automatic)
-1. Worker completes implementation
-2. Worker generates diff of changes
-3. Worker calls Claude API with diff + SPEC.md
-4. Claude returns structured review findings
-5. Worker posts findings as single PR comment
-6. Worker creates PR (continues regardless of review outcome)
-7. Human sees review comment when viewing PR
+### In Scope
 
-### Retrigger Flow (Manual)
-1. Human pushes changes to PR branch
-2. Human goes to Actions tab → "AI Review" workflow
-3. Human clicks "Run workflow" → selects PR branch
-4. Action fetches diff + SPEC, calls Claude API
-5. Action posts new review comment to PR
+| Category | From | To |
+|----------|------|-----|
+| Package names | `@factory/shared`, `@factory/worker`, etc. | `@whim/shared`, `@whim/worker`, etc. |
+| Docker images | `factory-worker:latest` | `whim-worker:latest` |
+| Container names | `factory-orchestrator`, `factory-postgres` | `whim-orchestrator`, `whim-postgres` |
+| Volume names | `factory-postgres-data`, `factory-redis-data` | `whim-postgres-data`, `whim-redis-data` |
+| Network name | `factory-network` | `whim-network` |
+| Documentation | "AI Factory", "Factory" | "Whim", "whim" |
+| Comments/strings | "factory" references | "whim" references |
+| File paths | Any with "factory" | Corresponding "whim" |
 
-## Functional Requirements
+### Out of Scope (Preserve)
 
-### Must Have (P0)
+- **Ralph**: Keep all Ralph references unchanged (separate tool identity)
+- **External services**: GitHub, Anthropic, etc. references unchanged
+- **Git history**: No rewriting history
 
-#### AI Review Function
-- Accept inputs: git diff, SPEC.md content
-- Call Claude API (Anthropic SDK)
-- Model: configurable via env var, default `claude-sonnet-4-20250514`
-- Return structured findings:
-  ```typescript
-  interface ReviewFindings {
-    specAlignment: {
-      score: 'aligned' | 'partial' | 'misaligned';
-      summary: string;
-      gaps: string[];      // Requirements not implemented
-      extras: string[];    // Things implemented not in spec
-    };
-    codeQuality: {
-      score: 'good' | 'acceptable' | 'needs-work';
-      summary: string;
-      concerns: Array<{
-        file: string;
-        line?: number;
-        issue: string;
-        suggestion: string;
-      }>;
-    };
-    overallSummary: string;
+## Technical Requirements
+
+### Package Renaming
+
+```json
+// Before (package.json)
+{
+  "name": "@factory/shared",
+  "dependencies": {
+    "@factory/shared": "workspace:*"
   }
-  ```
+}
 
-#### Worker Integration
-- Location: `packages/worker/src/review.ts` (new file)
-- Called after implementation, before PR creation
-- Generates diff: `git diff origin/main...HEAD`
-- Reads SPEC.md from workspace
-- Posts comment via GitHub API (`gh pr comment` or Octokit)
-- Records review in database (pr_reviews table)
-- Continues to PR creation regardless of review success/failure
-
-#### GitHub Action for Retrigger
-- File: `.github/workflows/ai-review.yml`
-- Trigger: `workflow_dispatch` with branch input
-- Steps:
-  1. Checkout PR branch
-  2. Generate diff vs main
-  3. Read SPEC.md
-  4. Call review function
-  5. Post comment to PR
-
-#### PR Comment Format
-```markdown
-## AI Review
-
-### Spec Alignment: {score}
-{summary}
-
-**Gaps:** {list or "None"}
-**Unexpected additions:** {list or "None"}
-
-### Code Quality: {score}
-{summary}
-
-{concerns as list with file:line references}
-
----
-*Reviewed by AI Factory • [Retrigger review](link-to-action)*
+// After
+{
+  "name": "@whim/shared",
+  "dependencies": {
+    "@whim/shared": "workspace:*"
+  }
+}
 ```
 
-### Should Have (P1)
+**Packages to rename:**
+- `@factory/shared` → `@whim/shared`
+- `@factory/worker` → `@whim/worker`
+- `@factory/orchestrator` → `@whim/orchestrator`
+- `@factory/intake` → `@whim/intake`
+- `@factory/dashboard` → `@whim/dashboard`
 
-#### Database Tracking
-- Use existing `pr_reviews` table schema
-- Record: PR number, review timestamp, findings JSON, model used
-- Link to work_item via `work_item_id`
+### Docker Configuration
 
-#### Dashboard Integration
-- Keep existing dashboard pages from PR #9
-- Display review history per PR
-- Show spec alignment and quality scores
+**docker-compose.yml changes:**
+```yaml
+# Container names
+container_name: whim-orchestrator  # was factory-orchestrator
+container_name: whim-postgres      # was factory-postgres
+container_name: whim-redis         # was factory-redis
+container_name: whim-intake        # was factory-intake
+container_name: whim-dashboard     # was factory-dashboard
 
-### Nice to Have (P2)
+# Volumes
+volumes:
+  whim-postgres-data:    # was factory-postgres-data
+  whim-redis-data:       # was factory-redis-data
 
-#### Review Caching
-- Don't re-review if diff hasn't changed
-- Store diff hash, skip if matches
-
-#### Configurable Review Focus
-- ENV vars or config to adjust review prompt
-- e.g., `REVIEW_FOCUS=security` for security-heavy review
-
-## Technical Architecture
-
-### New Components
-
-```
-packages/worker/src/review.ts     # AI review function
-packages/worker/src/prompts/      # Review prompt templates
-.github/workflows/ai-review.yml   # Retrigger action
+# Network
+networks:
+  default:
+    name: whim-network   # was factory-network
 ```
 
-### Modified Components
-
-```
-packages/worker/src/index.ts      # Add review step before PR creation
-packages/worker/src/setup.ts      # Call review, post comment
-```
-
-### Data Flow
-
-```
-Worker completes implementation
-         ↓
-    git diff origin/main...HEAD
-         ↓
-    Read SPEC.md from workspace
-         ↓
-    POST /v1/messages (Claude API)
-         ↓
-    Parse response → ReviewFindings
-         ↓
-    Format as markdown comment
-         ↓
-    gh pr comment (if PR exists) OR store for after PR creation
-         ↓
-    INSERT INTO pr_reviews
-         ↓
-    Continue to PR creation
+**Dockerfile image references:**
+```dockerfile
+# Worker spawning (in orchestrator)
+workerImage: "whim-worker:latest"  # was factory-worker:latest
 ```
 
-### Claude API Prompt Structure
+### Environment Variables
 
-```
-System: You are a code reviewer for AI-generated pull requests.
-Analyze the diff against the specification and provide structured feedback.
+Check and update any `FACTORY_*` environment variables to `WHIM_*` if they exist.
 
-User:
-## Specification (SPEC.md)
-{spec_content}
+### Import Statements
 
-## Git Diff
-{diff_content}
+All TypeScript imports need updating:
+```typescript
+// Before
+import { WorkItem } from "@factory/shared";
 
-## Instructions
-1. Assess spec alignment: Are all requirements implemented? Any extras?
-2. Review code quality: Complexity, naming, potential bugs, patterns
-3. Be specific with file:line references where possible
-4. Output as JSON matching the ReviewFindings schema
+// After
+import { WorkItem } from "@whim/shared";
 ```
 
-## Cleanup Tasks
+### Documentation
 
-### Delete from `packages/pr-review/`
-- `src/checks/` directory (lint-check.ts, test-check.ts, base-check.ts)
-- `src/lint-runner.ts`
-- `src/test-runner.ts`
-- `src/merge-guardian.ts` (no merge blocking)
-- `src/branch-protection.ts` (not needed)
-- Related test files
+Update all markdown files:
+- README.md
+- SPEC.md
+- STATE.txt
+- Any docs in `thoughts/` directory
+- Code comments referencing "factory"
 
-### Keep from `packages/pr-review/`
-- `src/tracker.ts` - review tracking
-- `src/detector.ts` - AI PR detection (for retrigger filtering)
-- `src/github-status.ts` - posting comments
-- `src/config.ts` - may adapt for review config
-- Database migration (002_pr_reviews.sql)
-- Dashboard pages
+## Implementation Plan
 
-### Fix
-- `src/detector.ts` line 25: Change `Claude Sonnet 4.5` → `Claude Opus 4.5`
+### Phase 1: Package Names
+1. Update all `package.json` files with new names
+2. Update all import statements in `.ts` files
+3. Run `bun install` to update lockfile
 
-## Non-Functional Requirements
+### Phase 2: Docker Configuration
+1. Update `docker-compose.yml` (container names, volumes, network)
+2. Update Dockerfiles (image names)
+3. Update `workers.ts` (worker image reference)
+4. Update any env files with container references
 
-- **Latency**: Review should complete in <30 seconds (Sonnet typical)
-- **Reliability**: If review fails, PR creation continues (no blocking)
-- **Cost**: ~$0.01-0.05 per review (Sonnet with typical diff size)
-- **Observability**: Log review duration, model used, success/failure
+### Phase 3: Documentation
+1. Search and replace in markdown files
+2. Update comments in source code
+3. Update error messages and log strings
 
-## Out of Scope
+### Phase 4: Verification
+1. Run `bun install` - verify workspace resolution
+2. Run `bun run build` - verify compilation
+3. Run `bun test` - verify tests pass
+4. Start Docker stack - verify containers start
+5. Test end-to-end flow
 
-- Merge blocking based on review results
-- Automated lint/test/typecheck (use standard GitHub Actions)
-- AI approval or "Request Changes" status
-- Multi-round review conversations
-- Review of non-AI PRs
+## Files to Modify
 
-## Open Questions for Implementation
+### Definite Changes
+- `package.json` (root)
+- `packages/*/package.json` (all packages)
+- `docker/docker-compose.yml`
+- `docker/docker-compose.dev.yml` (if exists)
+- `packages/orchestrator/src/workers.ts`
+- `README.md`
+- `SPEC.md`
+- `STATE.txt`
+- `.env.example`
 
-1. **Comment timing**: Post comment before or after PR creation? (Before requires PR to exist, after is simpler)
-2. **Diff size limits**: What if diff exceeds Claude context? Truncate or chunk?
-3. **SPEC.md location**: Always in repo root, or check work_item.spec from DB?
-
-## Environment Variables
-
+### Search Patterns
 ```bash
-# Required
-ANTHROPIC_API_KEY=sk-ant-...        # Already exists in worker
+# Find all "factory" references (case-insensitive)
+grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml" --include="*.md"
 
-# New
-AI_REVIEW_MODEL=claude-sonnet-4-20250514  # Default model
-AI_REVIEW_ENABLED=true                     # Kill switch
+# Exclude node_modules and dist
+grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml" --include="*.md" \
+  --exclude-dir=node_modules --exclude-dir=dist
 ```
+
+## Rollback Plan
+
+If issues are discovered:
+1. `git checkout .` to revert all changes
+2. `bun install` to restore lockfile
+3. Rebuild Docker images with old names
 
 ## Acceptance Criteria
 
-- [x] Worker posts AI review comment on every PR it creates
-- [x] Review comment shows spec alignment assessment with score
-- [x] Review comment shows code quality concerns with file references
-- [x] Manual retrigger works via GitHub Actions workflow dispatch
-- [x] Review records appear in database
-- [x] Dashboard shows review history
-- [x] Unused lint/test runner code is removed from pr-review package (N/A - package never created)
-- [x] Detection pattern fixed (Opus not Sonnet) (N/A - detector.ts never created)
+- [x] `grep -ri "factory" --include="*.ts" --include="*.json" --include="*.yml"` returns only Ralph-related or external references
+- [x] `bun install` completes without errors
+- [ ] `bun run build` completes without errors (has pre-existing TypeScript errors)
+- [ ] `docker compose build` completes without errors (requires Docker)
+- [ ] `docker compose up` starts all services (requires Docker)
+- [ ] Worker containers spawn with correct image name (requires Docker)
+- [ ] All tests pass (requires test environment)
+
+## Open Questions
+
+None - this is a straightforward mechanical refactoring.

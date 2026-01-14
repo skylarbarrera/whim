@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI Software Factory - Migration Script
+# Whim - Migration Script
 # Runs SQL migrations against the database
 
 set -euo pipefail
@@ -55,7 +55,7 @@ echo "   Database: $DB_NAME"
 echo ""
 
 # Check if postgres is accessible
-if ! docker exec factory-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" &> /dev/null 2>&1; then
+if ! docker exec whim-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" &> /dev/null 2>&1; then
     # Try without docker (local postgres)
     if ! command -v psql &> /dev/null; then
         error "PostgreSQL is not accessible. Start with: docker compose -f docker/docker-compose.yml up -d postgres"
@@ -81,8 +81,8 @@ for migration in "${MIGRATION_FILES[@]}"; do
     echo "Running: $filename"
 
     # Try docker exec first, fall back to local psql
-    if docker ps --format '{{.Names}}' | grep -q factory-postgres; then
-        docker exec -i factory-postgres psql -U "$DB_USER" -d "$DB_NAME" < "$migration" 2>&1 || {
+    if docker ps --format '{{.Names}}' | grep -q whim-postgres; then
+        docker exec -i whim-postgres psql -U "$DB_USER" -d "$DB_NAME" < "$migration" 2>&1 || {
             # Some errors are OK (e.g., "relation already exists")
             warn "Migration may have already been applied: $filename"
         }

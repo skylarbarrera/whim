@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Learning } from '@factory/shared';
+import type { Learning } from '@whim/shared';
 
 export default function LearningsPage() {
   const [learnings, setLearnings] = useState<Learning[]>([]);

@@ -14,7 +14,7 @@ const mockListForRepo = mock(() =>
         number: 42,
         title: "Test Issue",
         body: "Issue description",
-        labels: [{ name: "ai-factory" }],
+        labels: [{ name: "whim" }],
         html_url: "https://github.com/owner/repo/issues/42",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-02T00:00:00Z",
@@ -24,7 +24,7 @@ const mockListForRepo = mock(() =>
         number: 43,
         title: "PR as Issue",
         body: "This is a PR",
-        labels: [{ name: "ai-factory" }],
+        labels: [{ name: "whim" }],
         pull_request: { url: "..." },
         html_url: "https://github.com/owner/repo/pull/43",
         created_at: "2024-01-01T00:00:00Z",
@@ -35,7 +35,7 @@ const mockListForRepo = mock(() =>
         number: 44,
         title: "Already Processing",
         body: "Being processed",
-        labels: [{ name: "ai-factory" }, { name: "ai-processing" }],
+        labels: [{ name: "whim" }, { name: "ai-processing" }],
         html_url: "https://github.com/owner/repo/issues/44",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-02T00:00:00Z",
@@ -69,7 +69,7 @@ describe("GitHubAdapter", () => {
     adapter = new GitHubAdapter({
       token: "test-token",
       repos: ["owner/repo"],
-      intakeLabel: "ai-factory",
+      intakeLabel: "whim",
     });
   });
 
@@ -104,7 +104,7 @@ describe("GitHubAdapter", () => {
       expect(mockListForRepo).toHaveBeenCalledWith({
         owner: "owner",
         repo: "repo",
-        labels: "ai-factory",
+        labels: "whim",
         state: "open",
         sort: "created",
         direction: "asc",
@@ -115,7 +115,7 @@ describe("GitHubAdapter", () => {
       const multiAdapter = new GitHubAdapter({
         token: "test-token",
         repos: ["owner/repo1", "owner/repo2"],
-        intakeLabel: "ai-factory",
+        intakeLabel: "whim",
       });
 
       await multiAdapter.poll();
@@ -127,7 +127,7 @@ describe("GitHubAdapter", () => {
       const invalidAdapter = new GitHubAdapter({
         token: "test-token",
         repos: ["invalid-format"],
-        intakeLabel: "ai-factory",
+        intakeLabel: "whim",
       });
 
       const issues = await invalidAdapter.poll();
@@ -178,7 +178,7 @@ describe("GitHubAdapter", () => {
         number: 42,
         title: "Test",
         body: "Body",
-        labels: ["ai-factory"],
+        labels: ["whim"],
         owner: "owner",
         repo: "repo",
         url: "https://github.com/owner/repo/issues/42",
@@ -204,7 +204,7 @@ describe("GitHubAdapter", () => {
         number: 42,
         title: "Test",
         body: "Body",
-        labels: ["ai-factory", "ai-processing"],
+        labels: ["whim", "ai-processing"],
         owner: "owner",
         repo: "repo",
         url: "https://github.com/owner/repo/issues/42",
@@ -233,7 +233,7 @@ describe("GitHubAdapter", () => {
         number: 42,
         title: "Test",
         body: "Body",
-        labels: ["ai-factory", "ai-processing"],
+        labels: ["whim", "ai-processing"],
         owner: "owner",
         repo: "repo",
         url: "https://github.com/owner/repo/issues/42",
@@ -257,7 +257,7 @@ describe("GitHubAdapter", () => {
       const labels = adapter.getLabels();
 
       expect(labels).toEqual({
-        intake: "ai-factory",
+        intake: "whim",
         processing: "ai-processing",
         completed: "ai-completed",
       });

@@ -92,6 +92,7 @@ export async function runRalph(
   options: {
     maxIterations?: number;
     stuckThreshold?: number;
+    timeoutIdle?: number; // Idle timeout in seconds (default 300)
     onEvent?: (event: RalphEvent) => void;
     onOutput?: (line: string) => void;
     incrementalPush?: { enabled: boolean; branch: string };
@@ -128,6 +129,10 @@ export async function runRalph(
   if (options.stuckThreshold) {
     args.push("--stuck-threshold", String(options.stuckThreshold));
   }
+
+  // Set idle timeout (default 5 minutes - builds can take a while)
+  const idleTimeout = options.timeoutIdle ?? 300;
+  args.push("--timeout-idle", String(idleTimeout));
 
   const proc = spawn("ralph", args, {
     cwd: repoDir,

@@ -1,10 +1,10 @@
-# AI Software Factory
+# Whim
 
 An autonomous AI development system that takes GitHub issues, converts them to specs, and produces PRs through iterative Claude Code execution.
 
 ## Features (v1)
 
-- **GitHub Issue → PR Pipeline** - Label an issue `ai-factory`, get a PR back
+- **GitHub Issue → PR Pipeline** - Label an issue `whim`, get a PR back
 - **Issue Linking** - PRs reference source issues with `Closes #N` for auto-close on merge
 - **Parallel Workers** - Run multiple Claude Code instances simultaneously
 - **Learnings System** - Workers share discoveries across tasks via vector embeddings
@@ -23,7 +23,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              FACTORY                                     │
+│                              WHIM                                     │
 │                                                                          │
 │  ┌────────────────────────────────────────────────────────────────────┐ │
 │  │                         ORCHESTRATOR                                │ │
@@ -61,7 +61,7 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 
 ## How It Works
 
-1. **Intake** - GitHub issues labeled `ai-factory` are picked up
+1. **Intake** - GitHub issues labeled `whim` are picked up
 2. **Spec Generation** - Issues are converted to SPEC.md (task checklist)
 3. **Queue** - Work items are prioritized (critical > high > medium > low)
 4. **Worker Spawn** - Orchestrator spawns Docker containers with Claude Code
@@ -198,7 +198,7 @@ factory/
 │   ├── setup.sh
 │   ├── dev.sh
 │   └── migrate.sh
-├── SPEC.md               # Factory implementation checklist
+├── SPEC.md               # Whim implementation checklist
 └── SPEC-ralph.md         # Ralph CLI implementation checklist
 ```
 
@@ -206,10 +206,10 @@ factory/
 
 | Spec | Description |
 |------|-------------|
-| **SPEC.md** | Factory infrastructure (orchestrator, workers, intake, dashboard) |
+| **SPEC.md** | Whim infrastructure (orchestrator, workers, intake, dashboard) |
 | **SPEC-ralph.md** | Ralph CLI (autonomous Claude Code loop with event contract) |
 
-Ralph and Factory are separate concerns. Factory spawns Ralph and parses its stdout events. See SPEC-ralph.md for the event contract.
+Ralph and Whim are separate concerns. Whim spawns Ralph and parses its stdout events. See SPEC-ralph.md for the event contract.
 
 ## Quick Start
 
@@ -263,7 +263,7 @@ curl -X POST http://localhost:3002/api/work \
 
 ### GitHub Integration
 
-1. Add label `ai-factory` to a GitHub issue
+1. Add label `whim` to a GitHub issue
 2. Intake service picks it up, adds `ai-processing` label
 3. Generates SPEC.md from issue description
 4. Queues work item for processing
@@ -286,7 +286,7 @@ curl -X POST http://localhost:3002/api/work \
 | `DAILY_BUDGET` | `200` | Max iterations per day (Claude Max) |
 | `COOLDOWN_SECONDS` | `60` | Seconds between worker spawns |
 | `STALE_THRESHOLD` | `300` | Seconds before worker marked stale |
-| `INTAKE_LABEL` | `ai-factory` | GitHub label to watch |
+| `INTAKE_LABEL` | `whim` | GitHub label to watch |
 | `POLL_INTERVAL` | `60000` | GitHub poll interval (ms) |
 
 ## API Endpoints
@@ -310,7 +310,7 @@ curl -X POST http://localhost:3002/api/work \
 - `POST /api/worker/:id/stuck` - Report stuck state
 
 ### Status & Metrics
-- `GET /api/status` - Factory status overview
+- `GET /api/status` - Whim status overview
 - `GET /api/queue` - Queue contents and stats
 - `GET /api/metrics` - Performance metrics
 - `GET /api/learnings` - Browse learnings

@@ -14,7 +14,7 @@ import type {
   WorkerMetrics,
   PRReview,
   ReviewFindings,
-} from "@factory/shared";
+} from "@whim/shared";
 
 const { Pool } = pg;
 
@@ -380,7 +380,7 @@ export class Database {
 export function createDatabase(): Database {
   const connectionString =
     process.env.DATABASE_URL ||
-    "postgres://factory:factory@localhost:5433/factory";
+    "postgres://whim:whim@localhost:5433/whim";
 
   return new Database({
     connectionString,

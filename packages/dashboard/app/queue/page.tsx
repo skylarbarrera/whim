@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { DataTable, StatusCard } from '@/components';
-import type { WorkItem, QueueStatsResponse } from '@factory/shared';
+import type { WorkItem, QueueStatsResponse } from '@whim/shared';
 
 interface QueueResponse {
   items: WorkItem[];

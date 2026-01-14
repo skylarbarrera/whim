@@ -6,7 +6,7 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { MetricsCollector } from "./metrics.js";
 import type { Database } from "./db.js";
-import type { WorkerMetrics, Learning } from "@factory/shared";
+import type { WorkerMetrics, Learning } from "@whim/shared";
 
 /**
  * Mock Database for testing metrics operations

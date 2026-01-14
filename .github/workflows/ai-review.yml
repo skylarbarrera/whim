@@ -221,7 +221,7 @@ jobs:
             }
 
             comment += \`---\n\`;
-            comment += \`*Reviewed by AI Factory • [Retrigger review](https://github.com/\${process.env.GITHUB_REPOSITORY}/actions/workflows/ai-review.yml)*\`;
+            comment += \`*Reviewed by Whim • [Retrigger review](https://github.com/\${process.env.GITHUB_REPOSITORY}/actions/workflows/ai-review.yml)*\`;
 
             return comment;
           }

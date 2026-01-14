@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI Software Factory - Integration Test
+# Whim - Integration Test
 # Verifies the factory API is working correctly
 
 set -euo pipefail
@@ -15,7 +15,7 @@ success() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 info() { echo -e "${YELLOW}→${NC} $1"; }
 
-echo "🧪 AI Software Factory - Integration Tests"
+echo "🧪 Whim - Integration Tests"
 echo "==========================================="
 echo "Base URL: $BASE_URL"
 echo ""

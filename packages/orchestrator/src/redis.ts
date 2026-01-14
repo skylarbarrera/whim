@@ -25,7 +25,7 @@ export class RedisClient {
   private connected = false;
 
   constructor(config: RedisConfig = {}) {
-    const { url, keyPrefix = "factory:", ...options } = config;
+    const { url, keyPrefix = "whim:", ...options } = config;
 
     this.keyPrefix = keyPrefix;
 
@@ -402,6 +402,6 @@ export function createRedisClient(): RedisClient {
 
   return new RedisClient({
     url,
-    keyPrefix: "factory:",
+    keyPrefix: "whim:",
   });
 }

@@ -14,16 +14,16 @@ class MockRedisClient {
   private store: Map<string, string> = new Map();
 
   async get(key: string): Promise<string | null> {
-    return this.store.get(`factory:${key}`) ?? null;
+    return this.store.get(`whim:${key}`) ?? null;
   }
 
   async set(key: string, value: string): Promise<"OK" | null> {
-    this.store.set(`factory:${key}`, value);
+    this.store.set(`whim:${key}`, value);
     return "OK";
   }
 
   async incr(key: string): Promise<number> {
-    const prefixedKey = `factory:${key}`;
+    const prefixedKey = `whim:${key}`;
     const current = parseInt(this.store.get(prefixedKey) ?? "0", 10);
     const newValue = current + 1;
     this.store.set(prefixedKey, newValue.toString());
@@ -31,7 +31,7 @@ class MockRedisClient {
   }
 
   async decr(key: string): Promise<number> {
-    const prefixedKey = `factory:${key}`;
+    const prefixedKey = `whim:${key}`;
     const current = parseInt(this.store.get(prefixedKey) ?? "0", 10);
     const newValue = current - 1;
     this.store.set(prefixedKey, newValue.toString());
@@ -40,7 +40,7 @@ class MockRedisClient {
 
   // Helper to set values directly for testing
   _set(key: string, value: string): void {
-    this.store.set(`factory:${key}`, value);
+    this.store.set(`whim:${key}`, value);
   }
 
   // Helper to clear store

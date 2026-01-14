@@ -1,42 +1,52 @@
-# Iteration 4 Plan: Dashboard Integration for Review History
+# Whim Rebrand Plan
 
 ## Goal
-Add dashboard page to display AI PR review history.
+Rename the project from "AI Factory" / "factory" to "whim" across all code, configuration, documentation, and infrastructure.
 
-## Task
-- [ ] Review history is visible in dashboard (SPEC.md line 21, 251)
-
-## Implementation Steps
-
-1. **Add API endpoint to orchestrator**
-   - GET /api/reviews - List all reviews with optional filters
-   - GET /api/reviews/work-item/:id - Get reviews for specific work item
-   - GET /api/reviews/pr/:number - Get review for specific PR
-
-2. **Create dashboard page**
-   - app/reviews/page.tsx - Reviews list page
-   - Display review history with filters
-   - Show spec alignment and code quality scores
-   - Link to PRs and work items
-   - Format findings in readable way
-
-3. **Update navigation**
-   - Add "Reviews" link to navigation
-
-4. **Test the integration**
-   - Verify API endpoints work
-   - Verify dashboard page renders
+## Approach
+This is a comprehensive find-and-replace operation across multiple file types. I'll work systematically through each category:
+1. Package names in package.json files
+2. Import statements in TypeScript files
+3. Docker configuration (compose files, container names, volumes, networks)
+4. Documentation (markdown files)
+5. Environment variables and comments
 
 ## Files to Modify
-- `packages/orchestrator/src/server.ts` - Add review endpoints
-- `packages/dashboard/components/Navigation.tsx` - Add Reviews link
-- `packages/dashboard/app/reviews/page.tsx` - Create reviews page
-- `SPEC.md` - Mark task complete
-- `STATE.txt` - Update completion status
+
+### Package Configuration
+- Root `package.json`
+- `packages/shared/package.json`
+- `packages/worker/package.json`
+- `packages/orchestrator/package.json`
+- `packages/intake/package.json`
+- `packages/dashboard/package.json`
+
+### TypeScript Files
+All `.ts` and `.tsx` files with imports from `@factory/*`
+
+### Docker Configuration
+- `docker/docker-compose.yml`
+- Any Dockerfiles with factory references
+- `packages/orchestrator/src/workers.ts` (worker image reference)
+
+### Documentation
+- `README.md`
+- `SPEC.md`
+- `STATE.txt`
+- Files in `thoughts/` directory
+- `.env.example`
+
+## Tests
+1. `bun install` - verify workspace resolution
+2. `bun run build` - verify compilation
+3. `bun test` - verify tests pass
+4. `grep -ri "factory"` - verify only Ralph/external references remain
 
 ## Exit Criteria
-- API endpoint returns review history
-- Dashboard displays reviews with scores
-- Navigation includes Reviews page
-- All tasks in SPEC.md complete
-- Documentation updated
+All 6 checkboxes in SPEC.md Success Criteria section are marked complete:
+- All references to "factory" variants replaced with "whim"
+- Package namespace changed from @factory/* to @whim/*
+- Docker images/containers renamed from factory-* to whim-*
+- Documentation reflects new branding
+- Project builds and runs successfully after rename
+- No broken imports or references

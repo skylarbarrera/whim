@@ -6,7 +6,7 @@ import type {
   WorkerFailRequest,
   WorkerStuckRequest,
   Learning,
-} from "@factory/shared";
+} from "@whim/shared";
 
 export interface OrchestratorClientConfig {
   baseUrl: string;

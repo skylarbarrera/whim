@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { PRReview } from '@factory/shared';
+import type { PRReview } from '@whim/shared';
 
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState<PRReview[]>([]);

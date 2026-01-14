@@ -1,4 +1,4 @@
-import type { WorkItem } from "@factory/shared";
+import type { WorkItem } from "@whim/shared";
 import { OrchestratorClient } from "./client.js";
 import { setupWorkspace, createPullRequest, PRStep, verifyGitAuth } from "./setup.js";
 import {
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
     let prNumber: number | undefined;
     if (prUrl) {
       const prMatch = prUrl.match(/\/pull\/(\d+)/);
-      if (prMatch) {
+      if (prMatch?.[1]) {
         prNumber = parseInt(prMatch[1], 10);
       }
     }

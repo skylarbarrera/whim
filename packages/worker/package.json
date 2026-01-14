@@ -1,5 +1,5 @@
 {
-  "name": "@factory/worker",
+  "name": "@whim/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,11 +20,13 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@factory/shared": "workspace:*"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@whim/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

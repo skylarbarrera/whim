@@ -2,7 +2,7 @@
  * WorkerManager - Manages worker lifecycle
  *
  * Handles spawning Docker containers, worker registration, heartbeats,
- * completion, failure, and health checks for factory workers.
+ * completion, failure, and health checks for whim workers.
  */
 
 import { v4 as uuid } from "uuid";
@@ -17,7 +17,7 @@ import type {
   WorkerStatsResponse,
   WorkerHeartbeatRequest,
   WorkerCompleteRequest,
-} from "@factory/shared";
+} from "@whim/shared";
 
 /**
  * Configuration for WorkerManager
@@ -53,8 +53,8 @@ export class WorkerManager {
     config?: Partial<WorkerManagerConfig>
   ) {
     this.config = {
-      workerImage: config?.workerImage ?? process.env.WORKER_IMAGE ?? "factory-worker:latest",
-      orchestratorUrl: config?.orchestratorUrl ?? process.env.ORCHESTRATOR_URL ?? "http://factory-orchestrator:3000",
+      workerImage: config?.workerImage ?? process.env.WORKER_IMAGE ?? "whim-worker:latest",
+      orchestratorUrl: config?.orchestratorUrl ?? process.env.ORCHESTRATOR_URL ?? "http://whim-orchestrator:3000",
       staleThresholdSeconds: config?.staleThresholdSeconds ?? parseInt(process.env.STALE_THRESHOLD ?? "300", 10),
     };
   }
@@ -118,7 +118,7 @@ export class WorkerManager {
       ],
       HostConfig: {
         AutoRemove: false,  // Keep for debugging
-        NetworkMode: "factory-network",
+        NetworkMode: "whim-network",
       },
     });
 
