@@ -212,3 +212,12 @@ All references to "factory" have been replaced with "whim" across the codebase:
 - ✅ grep returns only Ralph-related or external references
 - ✅ bun install completes without errors
 - Note: Some pre-existing TypeScript errors unrelated to rename exist
+
+## Whim CLI Dashboard - In Progress
+
+### Phase 1: Setup & Components
+- [x] Task 1.1: Create `packages/cli` with package.json
+  - Created package.json with ink, react, chalk, commander dependencies
+  - Set up proper bin entry for `whim` command
+  - Configured TypeScript build scripts matching other packages
+  - Package follows workspace:* pattern for @whim/shared dependency

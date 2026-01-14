@@ -1,52 +1,33 @@
-# Whim Rebrand Plan
+# Iteration 1 Plan: Create packages/cli with package.json
 
 ## Goal
-Rename the project from "AI Factory" / "factory" to "whim" across all code, configuration, documentation, and infrastructure.
+Create the foundation for the new Ink-based CLI dashboard by setting up the `packages/cli` package with proper dependencies and configuration.
 
-## Approach
-This is a comprehensive find-and-replace operation across multiple file types. I'll work systematically through each category:
-1. Package names in package.json files
-2. Import statements in TypeScript files
-3. Docker configuration (compose files, container names, volumes, networks)
-4. Documentation (markdown files)
-5. Environment variables and comments
+## Files to Create/Modify
+- `packages/cli/package.json` - New package manifest with Ink, React, Chalk, and Commander dependencies
+- May need to update root `package.json` or workspace configuration
 
-## Files to Modify
-
-### Package Configuration
-- Root `package.json`
-- `packages/shared/package.json`
-- `packages/worker/package.json`
-- `packages/orchestrator/package.json`
-- `packages/intake/package.json`
-- `packages/dashboard/package.json`
-
-### TypeScript Files
-All `.ts` and `.tsx` files with imports from `@factory/*`
-
-### Docker Configuration
-- `docker/docker-compose.yml`
-- Any Dockerfiles with factory references
-- `packages/orchestrator/src/workers.ts` (worker image reference)
-
-### Documentation
-- `README.md`
-- `SPEC.md`
-- `STATE.txt`
-- Files in `thoughts/` directory
-- `.env.example`
+## Implementation Steps
+1. Create `packages/cli` directory structure
+2. Create `package.json` with:
+   - Package name: `@whim/cli`
+   - Dependencies: ink, react, chalk, commander, @whim/shared
+   - Dev dependencies: TypeScript, @types/react, @types/node
+   - Build scripts matching other packages
+   - Proper bin entry for `whim` command
+3. Verify the package is recognized by the workspace
 
 ## Tests
-1. `bun install` - verify workspace resolution
-2. `bun run build` - verify compilation
-3. `bun test` - verify tests pass
-4. `grep -ri "factory"` - verify only Ralph/external references remain
+- Run `bun install` to verify dependencies resolve
+- Check that the workspace recognizes the new package
+- Verify package.json is valid JSON
 
 ## Exit Criteria
-All 6 checkboxes in SPEC.md Success Criteria section are marked complete:
-- All references to "factory" variants replaced with "whim"
-- Package namespace changed from @factory/* to @whim/*
-- Docker images/containers renamed from factory-* to whim-*
-- Documentation reflects new branding
-- Project builds and runs successfully after rename
-- No broken imports or references
+- [ ] `packages/cli/package.json` exists with all required dependencies
+- [ ] `bun install` completes successfully
+- [ ] Package follows the same structure as other packages in the workspace
+
+## Notes
+- This is Phase 1, Task 1 from SPEC.md
+- Need to ensure compatibility with existing Bun workspace setup
+- The `whim` bin command will be defined but not yet functional

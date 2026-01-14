@@ -10,7 +10,7 @@ Ink-based terminal dashboard for monitoring and managing Whim.
 
 ## Phase 1: Setup & Components
 
-- [ ] Create `packages/cli` with package.json (ink, react, chalk, commander)
+- [x] Create `packages/cli` with package.json (ink, react, chalk, commander)
 - [ ] Add tsconfig.json matching other packages
 - [ ] Create entry point `src/index.tsx` with commander routing
 - [ ] Create `src/components/Section.tsx` - boxed section with header
