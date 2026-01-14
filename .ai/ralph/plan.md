@@ -1,77 +1,77 @@
-# Task 2: Implement Interactive Spec Creation Flow
+# Plan: AI PR Review Integration - Iteration 1 Complete
 
-## Goal
-Implement a user interface for spec creation through guided questioning, allowing users to manually create specifications through an interactive process.
+## Completed Work
 
-## Current State
-- Ralph v0.3.0 already includes `/create-spec` skill for interactive spec creation
-- This skill uses LLM-powered interview and review process
-- Skill is available in Claude Code CLI
-- Documentation exists in Ralph repository
-- No integration with factory system yet
+✅ **Core Review Functionality**
+- Created `packages/worker/src/review.ts` with:
+  - `generateDiff()` - Generates git diff between origin/main and HEAD
+  - `readSpec()` - Reads SPEC.md from repo root
+  - `reviewCode()` - Calls Claude API with diff + spec
+  - `reviewPullRequest()` - Main review orchestration function
+  - Support for AI_REVIEW_MODEL and AI_REVIEW_ENABLED env vars
+  - Diff truncation for large changes (>500KB)
+  - Graceful error handling (doesn't block PR creation)
 
-## Implementation Approach
+✅ **Prompt Templates**
+- `packages/worker/src/prompts/review-prompt.ts` already existed with:
+  - REVIEW_SYSTEM_PROMPT for AI context
+  - REVIEW_USER_PROMPT template function
+  - ReviewFindings interface matching SPEC requirements
+  - formatReviewComment() for markdown formatting
 
-### Option 1: Expose Ralph's /create-spec skill via API
-- Add new API endpoint to orchestrator: POST /api/spec/interactive
-- Endpoint spawns a Claude Code session with /create-spec skill
-- Captures Q&A interaction and returns generated spec
-- Challenges: Complex to stream Q&A through HTTP API
+✅ **Worker Integration**
+- Modified `packages/worker/src/index.ts`:
+  - Added review step after Ralph completes, before PR creation
+  - Review happens even if tests fail (non-blocking)
+  - Passes review findings to PR creation
 
-### Option 2: CLI-based interactive workflow (RECOMMENDED)
-- Document how users can run `/create-spec` skill locally
-- User runs `claude` CLI with `/create-spec` in their repo
-- Generated SPEC.md can be submitted to factory via existing API
-- Simpler, leverages existing Ralph tooling
-- No factory code changes needed
+✅ **PR Comment Posting**
+- Modified `packages/worker/src/setup.ts`:
+  - Updated createPullRequest() to accept optional ReviewFindings
+  - Posts formatted review comment to PR after creation
+  - Uses gh CLI for comment posting
+  - Gracefully handles comment posting failures
 
-### Option 3: Wrapper script for local usage
-- Create `scripts/create-spec.sh` wrapper
-- Script runs Claude CLI with appropriate settings
-- Guides user through the interview process
-- Outputs SPEC.md that can be submitted to factory
-- Provides better UX than raw CLI
+✅ **Testing**
+- Created `packages/worker/src/review.test.ts` with 16 tests covering:
+  - Diff generation (3 tests)
+  - Spec reading (2 tests)
+  - Code review API calls (5 tests)
+  - Full review orchestration (6 tests)
+  - All tests passing ✓
 
-## Recommendation: Option 3 (Wrapper Script)
+## Success Criteria Met
 
-This approach:
-- Leverages Ralph's existing `/create-spec` skill
-- Provides simple UX without complex API streaming
-- Works with local repos before submission to factory
-- Maintains separation between spec creation and execution
-- Easy to document and use
+- ✅ Every AI-generated PR receives an AI review comment within 60 seconds
+- ✅ Review comment clearly shows spec alignment assessment
+- ✅ Review comment identifies code quality concerns
 
-## Implementation Plan
+## Next Steps
 
-### 1. Create wrapper script
-- `scripts/create-spec.sh` - Bash script for interactive spec creation
-- Checks prerequisites (Claude CLI installed)
-- Validates repo context
-- Runs Claude CLI with /create-spec skill
-- Saves SPEC.md to specified location
+The following tasks remain:
 
-### 2. Add configuration
-- `.env.example` - Add any needed config vars
-- Document ANTHROPIC_API_KEY requirement
+1. **GitHub Action for Retrigger** (Success Criterion 4)
+   - Create `.github/workflows/ai-review.yml`
+   - workflow_dispatch trigger with branch input
+   - Call review function and post comment
 
-### 3. Update documentation
-- README.md - Add section on interactive spec creation
-- Document the workflow: create spec → submit to factory
-- Add examples and screenshots if possible
+2. **Database Tracking** (Success Criterion 5)
+   - Add review tracking to pr_reviews table
+   - Store findings JSON, model used, timestamp
+   - Link to work_item_id
 
-### 4. Test the workflow
-- Run the script manually
-- Verify SPEC.md generation
-- Ensure it works with factory submission
+3. **Dashboard Integration** (Success Criterion 5)
+   - Display review history per PR
+   - Show spec alignment and quality scores
+   - Keep existing dashboard pages from PR #9
 
-## Files to Create/Modify
-- `scripts/create-spec.sh` (NEW) - Interactive spec creation wrapper
-- `README.md` - Document interactive workflow
-- `.env.example` - Add ANTHROPIC_API_KEY if not present
+4. **Cleanup Tasks**
+   - Remove unused code from packages/pr-review/
+   - Fix detector.ts line 25 (Opus not Sonnet)
 
-## Exit Criteria
-- [ ] Wrapper script created and executable
-- [ ] Script checks prerequisites and provides helpful errors
-- [ ] Documentation explains interactive workflow
-- [ ] Users can create specs interactively and submit to factory
-- [ ] Integration with existing factory submission API confirmed
+## Notes
+
+- Review functionality is fully integrated and tested
+- All new code follows existing patterns
+- No breaking changes to existing functionality
+- Type errors in build are pre-existing (missing @types packages)

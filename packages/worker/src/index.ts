@@ -10,6 +10,7 @@ import {
 import { runRalph } from "./ralph.js";
 import { runMockRalph } from "./mock-ralph.js";
 import { runTests } from "./testing.js";
+import { reviewPullRequest, type ReviewFindings } from "./review.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;
@@ -153,6 +154,15 @@ async function main(): Promise<void> {
     );
     console.log(`Found ${learnings.length} new learnings`);
 
+    // Run AI review before creating PR
+    console.log("Running AI code review...");
+    const reviewFindings = await reviewPullRequest(repoDir);
+    if (reviewFindings) {
+      console.log("AI review completed - will post as PR comment after creation");
+    } else {
+      console.log("AI review skipped or failed - continuing without review");
+    }
+
     // Wrap PR creation in try/catch to handle unexpected errors and report partial success
     let prUrl: string | undefined;
     try {
@@ -160,7 +170,8 @@ async function main(): Promise<void> {
       const prResult = await createPullRequest(
         repoDir,
         config.workItem,
-        config.githubToken
+        config.githubToken,
+        reviewFindings ?? undefined
       );
 
       if (prResult.status === "success") {
