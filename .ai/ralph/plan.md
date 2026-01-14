@@ -1,39 +1,33 @@
-# Iteration 7 Plan: Create src/hooks/useApi.ts - orchestrator API client with polling
+# Iteration 8 Plan: Verify whim command runs and shows "Hello World"
 
 ## Goal
-Create a custom React hook that fetches data from the orchestrator API and polls for updates. This will provide real-time dashboard data.
+Verify that the CLI package compiles correctly with TypeScript and that the basic "Hello World" functionality works. This confirms Phase 1 is complete.
 
 ## Files to Create/Modify
-- `packages/cli/src/hooks/useApi.ts` - Custom hook for API client with polling
+- None - just verification
 
 ## Implementation Steps
-1. Create hooks directory
-2. Look at @whim/shared types to understand API response structure
-3. Create useApi hook that:
-   - Takes API endpoint URL as parameter
-   - Takes poll interval (default 2s per spec)
-   - Uses useState for data, loading, error states
-   - Uses useEffect for polling with setInterval
-   - Fetches data using native fetch API
-   - Returns { data, loading, error, refetch }
-   - Cleans up interval on unmount
-   - TypeScript types properly defined with generics
+1. Try to compile the TypeScript code using tsc
+2. Check that dist/ directory is created
+3. Verify the compiled index.js has proper shebang
+4. Document any type errors or issues found
+5. If there are fixable issues, fix them
 
 ## Tests
-- Verify the hook follows React patterns
-- Check that polling works correctly
-- Ensure proper cleanup happens
+- Run `tsc` in packages/cli directory
+- Check for compilation errors
+- Verify dist output exists
+- Check that types are properly resolved
 
 ## Exit Criteria
-- [ ] `packages/cli/src/hooks/useApi.ts` exists
-- [ ] Hook fetches data from API endpoint
-- [ ] Polls every 2 seconds by default
-- [ ] Returns data, loading, error, refetch
-- [ ] Properly cleans up on unmount
-- [ ] TypeScript types with generics
+- [ ] TypeScript compiles without blocking errors
+- [ ] dist/ directory contains compiled output
+- [ ] index.js has executable shebang
+- [ ] All imports resolve correctly
+- [ ] Phase 1 is considered complete
 
 ## Notes
-- This is Phase 1, Task 7 from SPEC.md
-- Spec says "Poll API every 2s"
-- Need to check shared types for API response structure
-- Will be used by dashboard command to fetch worker/queue data
+- This is Phase 1, Task 8 (final task) from SPEC.md
+- May encounter type errors related to dependencies not being installed
+- Can document issues without blocking if they're environment-related
+- The entry point already shows "Hello World" via Ink
