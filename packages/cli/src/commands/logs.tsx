@@ -38,9 +38,11 @@ export const Logs: React.FC<LogsProps> = ({ workerId, worker, workItem, apiUrl =
       <Box flexDirection="column" padding={1}>
         <Section header="LOGS - ERROR">
           <Text color="red">Error: {error}</Text>
-          <Text color="gray" dimColor marginTop={1}>
-            Press 'q' or ESC to go back
-          </Text>
+          <Box marginTop={1}>
+            <Text color="gray" dimColor>
+              Press 'q' or ESC to go back
+            </Text>
+          </Box>
         </Section>
       </Box>
     );

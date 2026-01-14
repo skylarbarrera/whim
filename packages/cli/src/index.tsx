@@ -34,7 +34,15 @@ program
         console.error(`Error: HTTP ${response.status}`);
         process.exit(1);
       }
-      const data = await response.json();
+      const data = await response.json() as {
+        status: string;
+        metrics: {
+          activeWorkers: number;
+          queuedItems: number;
+          completedToday: number;
+          failedToday: number;
+        };
+      };
       console.log(
         `Whim: ${data.status} | Workers: ${data.metrics.activeWorkers} | Queue: ${data.metrics.queuedItems} | Today: ${data.metrics.completedToday} completed, ${data.metrics.failedToday} failed`
       );

@@ -23,7 +23,7 @@ export function loadConfig(): WhimConfig {
       const [key, ...valueParts] = trimmed.split('=');
       const value = valueParts.join('=').trim();
 
-      if (key.trim() === 'apiUrl') {
+      if (key?.trim() === 'apiUrl') {
         config.apiUrl = value;
       }
     }

@@ -69,25 +69,26 @@ An autonomous AI development system that takes GitHub issues, converts them to s
 6. **Learnings** - Workers save discoveries for future tasks
 7. **PR Creation** - Completed work becomes a pull request
 
+### Iteration Model
+
+Whim uses Ralph for autonomous coding but with a modified iteration strategy optimized for speed.
+
+**Ralph standalone**: 1 task = 1 Claude session. Claude completes one SPEC checkbox, stops, and Ralph restarts it for the next task. This provides strict checkpointing but incurs context reload overhead per task.
+
+**Whim turbo mode**: Claude runs until SPEC complete or context fills. Ralph restarts Claude only when needed (context exhaustion, idle timeout). Tasks are tracked via SPEC.md checkboxes and commits remain granular (one per task), but Claude sessions span multiple tasks.
+
+This is intentional - Whim prioritizes throughput. A 36-task spec might complete in 3 Claude sessions rather than 36, reducing context reload overhead by ~80%.
+
 ## Spec Creation Flows
 
 The factory supports two ways to create specifications:
 
 ### 1. Autonomous Spec Generation (Default)
 
-**Method A: Using Anthropic SDK (Default)**
-The intake service uses the Anthropic SDK directly to convert GitHub issues into specifications.
+The intake service uses Ralph CLI to convert GitHub issues into specifications:
 
-```env
-USE_RALPH_SPEC=false
-ANTHROPIC_API_KEY=your_key_here
-```
-
-**Method B: Using Ralph CLI (v0.3+)**
-Leverage Ralph's built-in spec generation with validation and convention checking:
-
-```env
-USE_RALPH_SPEC=true
+```bash
+ralph spec --headless "<issue description>"
 ```
 
 Ralph's spec generator includes:
@@ -95,40 +96,22 @@ Ralph's spec generator includes:
 - Automatic validation against Ralph conventions
 - Structured JSON event output
 - Built-in spec quality checks
+- Verification steps for each task
 
 ### 2. Interactive Spec Creation
 
-For manual spec creation with guided prompts, use the wrapper script or run Claude Code's `/create-spec` skill directly.
-
-**Option A: Using the wrapper script (Recommended)**
-
-```bash
-# Run from your project directory
-./scripts/create-spec.sh
-
-# Or specify output location
-./scripts/create-spec.sh --output /path/to/SPEC.md
-```
-
-The script will:
-- Check prerequisites (Claude CLI, git repo, API key)
-- Run the `/create-spec` skill interactively
-- Save the generated SPEC.md to your project
-- Show next steps for submission to the factory
-
-**Option B: Using Claude CLI directly**
+For manual spec creation with guided prompts, use Ralph's interactive mode:
 
 ```bash
 cd your-project
-claude
-> /create-spec
+ralph spec "Brief description of what you want to build"
 ```
 
-The skill will:
+Ralph will:
 1. **Interview you** about project type, stack, features, and constraints
 2. **Generate a structured SPEC.md** following Ralph conventions
-3. **Review with LLM** to catch anti-patterns and violations
-4. **Finalize** only after passing validation
+3. **Validate** against spec conventions
+4. **Save** the spec to your project
 
 **Submitting your spec to the factory:**
 
@@ -274,8 +257,7 @@ curl -X POST http://localhost:3002/api/work \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GITHUB_TOKEN` | required | GitHub PAT with repo permissions |
-| `ANTHROPIC_API_KEY` | conditional | Anthropic API key (required if `USE_RALPH_SPEC=false`) |
-| `USE_RALPH_SPEC` | `false` | Use Ralph CLI for spec generation (requires Ralph v0.3+) |
+| `ANTHROPIC_API_KEY` | required | Anthropic API key (used by Ralph for spec generation) |
 | `REPOS` | required | Comma-separated: `owner/repo1,owner/repo2` |
 | `DATABASE_URL` | `postgres://factory:factory@localhost:5432/factory` | PostgreSQL connection |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection |
