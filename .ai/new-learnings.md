@@ -367,3 +367,249 @@ The Whim CLI dashboard successfully replaces the Next.js web dashboard with a fa
 - Documentation complete
 - Clean migration accomplished
 
+
+## CLI Logs Viewer Implementation - 2025-01-14
+
+### Docker Logs Integration
+
+**Challenge:** Need to display worker container logs in CLI dashboard without adding log aggregation infrastructure.
+
+**Solution:** Use Docker SDK (dockerode) that's already available in the orchestrator.
+
+**Implementation:**
+```typescript
+// In WorkerManager class
+async getLogs(workerId: string, lines: number = 1000): Promise<string[]> {
+  const worker = await this.db.getWorker(workerId);
+  const container = this.docker.getContainer(worker.containerId);
+  const logStream = await container.logs({
+    stdout: true,
+    stderr: true,
+    tail: lines,
+    timestamps: false,
+  });
+  return logStream.toString('utf-8').split('\n').filter(line => line.trim());
+}
+```
+
+**Key Learnings:**
+1. **Reuse existing dependencies** - dockerode was already installed for worker spawning
+2. **Docker logs API** - Can fetch logs from stopped containers (useful for debugging failed workers)
+3. **Buffer handling** - Docker logs return Buffer, need to convert to string and split
+4. **Error handling** - Container might not exist (404), handle gracefully
+5. **Line count strategy** - Fetch more than displayed (e.g., fetch 1000, show last 30) for better UX
+
+### Ink State Management
+
+**Pattern for view switching in Ink apps:**
+
+```typescript
+type ViewMode = 'dashboard' | 'logs';
+const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
+const [selectedItem, setSelectedItem] = useState<ItemType | null>(null);
+
+// Early return pattern for view switching
+if (viewMode === 'logs' && selectedItem) {
+  return <LogsView item={selectedItem} onBack={() => setViewMode('dashboard')} />;
+}
+
+// Main view rendering
+return <DashboardView onOpenLogs={(item) => { setSelectedItem(item); setViewMode('logs'); }} />;
+```
+
+**Benefits:**
+- Clean separation of concerns
+- Easy to add more views (e.g., settings, help)
+- Maintains state across view switches
+- onBack callback pattern for navigation
+
+### Selection State Pattern
+
+**Implementation for keyboard navigation:**
+
+```typescript
+const [focusedSection, setFocusedSection] = useState<'workers' | 'queue' | null>(null);
+const [selectedIndex, setSelectedIndex] = useState(0);
+
+useInput((input, key) => {
+  if (input === 'w') {
+    setFocusedSection('workers');
+    setSelectedIndex(0); // Reset on section change
+  }
+  if (key.upArrow && focusedSection) {
+    setSelectedIndex(prev => Math.max(0, prev - 1));
+  }
+  if (key.downArrow && focusedSection) {
+    const maxIndex = focusedSection === 'workers' ? workers.length - 1 : queue.length - 1;
+    setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
+  }
+});
+
+// Render with selection indicator
+workers.map((worker, index) => {
+  const isSelected = focusedSection === 'workers' && selectedIndex === index;
+  return (
+    <Box key={worker.id}>
+      {isSelected && <Text color="cyan">→ </Text>}
+      {/* worker content */}
+    </Box>
+  );
+});
+```
+
+**Key Points:**
+1. **Separate focus and selection** - focusedSection determines which list is active
+2. **Reset index on section change** - Prevents out-of-bounds errors
+3. **Visual feedback** - Arrow indicator (→) shows selection clearly
+4. **Bounds checking** - Math.max/Math.min prevents invalid indices
+5. **Conditional rendering** - Only show indicator when section is focused
+
+### Ink Polling Pattern
+
+**Using the useApi hook for real-time updates:**
+
+```typescript
+// In useApi hook
+useEffect(() => {
+  const fetchData = async () => { /* ... */ };
+  fetchData(); // Initial fetch
+  const intervalId = setInterval(fetchData, pollInterval); // Poll every N ms
+  return () => clearInterval(intervalId); // Cleanup
+}, [endpoint, apiUrl, pollInterval, fetchTrigger]);
+```
+
+**Best Practices:**
+1. **Fetch on mount** - Don't wait for first interval
+2. **Cleanup intervals** - Always clear in useEffect return
+3. **Dependency array** - Include all used variables
+4. **Manual refetch** - Add fetchTrigger state for force refresh
+5. **Show spinner** - Use loading state only on initial load, not on polls
+
+### Error Message UX
+
+**Good patterns for CLI error messages:**
+
+1. **Show context:**
+   ```
+   Error: Container not found for worker abc12345
+   Worker might have stopped or been removed
+   Press 'q' to go back
+   ```
+
+2. **Suggest actions:**
+   ```
+   Error: HTTP 503: Service Unavailable
+   Make sure the orchestrator is running at http://localhost:3000
+   Press 'r' to retry
+   ```
+
+3. **Color coding:**
+   - Red for errors
+   - Gray dim for hints/suggestions
+   - Cyan for keyboard shortcuts
+
+4. **Avoid technical jargon** - "Container not found" is better than "Docker SDK error 404"
+
+### Component Composition
+
+**Reusable Section component pattern:**
+
+```typescript
+// Section.tsx - Generic wrapper
+export const Section = ({ header, children }) => (
+  <Box borderStyle="round" borderColor="gray" flexDirection="column" padding={1}>
+    <Text color="cyan" bold>{header}</Text>
+    {children}
+  </Box>
+);
+
+// Usage in multiple views
+<Section header="LOGS">
+  {logs.map(line => <Text key={...}>{line}</Text>)}
+</Section>
+
+<Section header="WORKER INFO">
+  <Text>ID: {worker.id}</Text>
+  <Text>Status: {worker.status}</Text>
+</Section>
+```
+
+**Benefits:**
+- Consistent UI across components
+- Easy to change styling globally
+- Reduces boilerplate
+- Encourages logical grouping
+
+### TypeScript Tips for Ink
+
+1. **Import types correctly:**
+   ```typescript
+   import type { Worker, WorkItem } from '@whim/shared'; // Type-only import
+   import { Box, Text } from 'ink'; // Runtime import
+   ```
+
+2. **Component props interface:**
+   ```typescript
+   interface LogsProps {
+     workerId: string;
+     worker: Worker;
+     workItem: WorkItem | undefined; // Allow undefined for missing items
+     apiUrl?: string; // Optional with default
+     onBack: () => void; // Callback pattern
+   }
+   export const Logs: React.FC<LogsProps> = ({ ... }) => { ... };
+   ```
+
+3. **useInput types:**
+   ```typescript
+   useInput((input: string, key: Key) => { // Types are inferred but good to know
+     if (key.escape) { ... }
+   });
+   ```
+
+### API Design
+
+**Logs endpoint design decisions:**
+
+1. **Query parameters over request body** - GET requests should use query params
+   ```
+   GET /api/workers/:id/logs?lines=1000
+   ```
+
+2. **Include context in response:**
+   ```json
+   {
+     "workerId": "abc123",
+     "logs": ["line 1", "line 2", ...]
+   }
+   ```
+
+3. **Default values** - Reasonable defaults (1000 lines) prevent API misuse
+
+4. **Error handling:**
+   - 404 if worker not found
+   - 404 if container not found (different error message)
+   - 500 for Docker API errors
+
+### Testing Considerations
+
+**Manual testing checklist for logs viewer:**
+- [ ] Logs update every 2 seconds while viewing
+- [ ] Can navigate back with 'q' or ESC
+- [ ] Works with running workers (shows live logs)
+- [ ] Works with stopped workers (shows last logs before stop)
+- [ ] Handles missing workers gracefully (shows error)
+- [ ] Arrow keys navigate worker list correctly
+- [ ] Selected worker has visual indicator
+- [ ] Can switch between workers without losing state
+- [ ] Long log lines are truncated/wrapped properly
+- [ ] Empty logs show helpful message
+
+**Future improvements:**
+- Add scrolling support (currently shows last 30 lines only)
+- Add search/filter in logs
+- Add log level filtering (stdout vs stderr)
+- Add timestamps to log lines
+- Add follow mode (auto-scroll to bottom)
+- Add log export functionality
+
