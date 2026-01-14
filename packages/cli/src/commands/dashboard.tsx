@@ -35,7 +35,7 @@ interface DashboardProps {
 type FocusedSection = 'workers' | 'queue' | null;
 type ViewMode = 'dashboard' | 'logs';
 
-export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost:3000' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3002' }) => {
   const { data: statusData, loading: statusLoading, error: statusError, refetch: refetchStatus } = useApi<StatusResponse>('/api/status', { apiUrl });
   const { data: workersData, loading: workersLoading, error: workersError, refetch: refetchWorkers } = useApi<Worker[]>('/api/workers', { apiUrl });
   const { data: queueData, loading: queueLoading, error: queueError, refetch: refetchQueue } = useApi<QueueResponse>('/api/queue', { apiUrl });
@@ -102,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = 'http://localhost
       <Box flexDirection="column">
         <Text color="red">Error: {error}</Text>
         <Text color="gray" dimColor>
-          Make sure the orchestrator is running at http://localhost:3000
+          Make sure the orchestrator is running at http://localhost:3002
         </Text>
       </Box>
     );

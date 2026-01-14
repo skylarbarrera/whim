@@ -1,6 +1,19 @@
-# Whim
+<p align="center">
+  <img src="assets/logo.png" alt="Whim Logo" width="200">
+</p>
 
-An autonomous AI development system that takes GitHub issues, converts them to specs, and produces PRs through iterative Claude Code execution.
+<h1 align="center">Whim</h1>
+
+<p align="center">
+  <strong>An autonomous AI development system that takes GitHub issues, converts them to specs, and produces PRs through iterative Claude Code execution.</strong>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#api-endpoints">API</a> •
+  <a href="#monitoring">Monitoring</a>
+</p>
 
 ## Features (v1)
 
@@ -166,7 +179,7 @@ See [Ralph's create-spec skill documentation](https://github.com/skylarbarrera/r
 ## Project Structure
 
 ```
-factory/
+whim/
 ├── packages/
 │   ├── orchestrator/     # Central brain - queue, workers, rate limits
 │   ├── worker/           # Docker container - runs Ralph + Claude Code
@@ -177,22 +190,11 @@ factory/
 │   └── docker-compose.yml
 ├── migrations/
 │   └── 001_initial.sql
-├── scripts/
-│   ├── setup.sh
-│   ├── dev.sh
-│   └── migrate.sh
-├── SPEC.md               # Whim implementation checklist
-└── SPEC-ralph.md         # Ralph CLI implementation checklist
+└── scripts/
+    ├── setup.sh
+    ├── dev.sh
+    └── migrate.sh
 ```
-
-## Implementation Specs
-
-| Spec | Description |
-|------|-------------|
-| **SPEC.md** | Whim infrastructure (orchestrator, workers, intake, dashboard) |
-| **SPEC-ralph.md** | Ralph CLI (autonomous Claude Code loop with event contract) |
-
-Ralph and Whim are separate concerns. Whim spawns Ralph and parses its stdout events. See SPEC-ralph.md for the event contract.
 
 ## Quick Start
 
@@ -377,11 +379,11 @@ whim dashboard
 whim status
 
 # Connect to remote orchestrator
-whim dashboard --api-url http://remote-host:3000
-whim status --api-url http://remote-host:3000
+whim dashboard --api-url http://remote-host:3002
+whim status --api-url http://remote-host:3002
 
 # Or configure default API URL in ~/.whimrc
-echo "apiUrl=http://remote-host:3000" > ~/.whimrc
+echo "apiUrl=http://remote-host:3002" > ~/.whimrc
 ```
 
 ### Configuration File
@@ -390,7 +392,7 @@ Create `~/.whimrc` to set defaults:
 
 ```bash
 # Whim CLI Configuration
-apiUrl=http://localhost:3000
+apiUrl=http://localhost:3002
 ```
 
 CLI flags override config file values.

@@ -13,7 +13,7 @@ interface LogsProps {
   onBack: () => void;
 }
 
-export const Logs: React.FC<LogsProps> = ({ workerId, worker, workItem, apiUrl = 'http://localhost:3000', onBack }) => {
+export const Logs: React.FC<LogsProps> = ({ workerId, worker, workItem, apiUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:3002', onBack }) => {
   const { data, loading, error } = useApi<WorkerLogsResponse>(`/api/workers/${workerId}/logs`, { apiUrl, pollInterval: 2000 });
 
   // Keyboard handler

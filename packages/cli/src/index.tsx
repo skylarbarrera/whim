@@ -6,7 +6,7 @@ import { Dashboard } from './commands/dashboard.js';
 import { loadConfig } from './config.js';
 
 const config = loadConfig();
-const defaultApiUrl = config.apiUrl || 'http://localhost:3000';
+const defaultApiUrl = config.apiUrl || process.env.ORCHESTRATOR_URL || 'http://localhost:3002';
 
 const program = new Command();
 
