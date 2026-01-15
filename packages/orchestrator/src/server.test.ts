@@ -177,6 +177,64 @@ describe("Server", () => {
       expect(res.body.code).toBe("VALIDATION_ERROR");
     });
 
+    it("POST /api/work accepts description instead of spec", async () => {
+      const deps = createMockDeps();
+      (deps.queue.add as ReturnType<typeof mock>).mockImplementation(() =>
+        Promise.resolve(createWorkItem({ status: "generating", spec: null, branch: null, description: "Add a feature" }))
+      );
+      const app = createServer(deps);
+
+      const res = await request(app)
+        .post("/api/work")
+        .send({ repo: "owner/repo", description: "Add a feature" });
+
+      expect(res.status).toBe(201);
+      expect(res.body.id).toBe("work-123");
+      expect(res.body.status).toBe("generating");
+      expect(deps.queue.add).toHaveBeenCalled();
+    });
+
+    it("POST /api/work rejects both spec and description", async () => {
+      const app = createServer(createMockDeps());
+
+      const res = await request(app)
+        .post("/api/work")
+        .send({ repo: "owner/repo", spec: "# Do something", description: "Add a feature" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe("Invalid request body");
+      expect(res.body.code).toBe("VALIDATION_ERROR");
+    });
+
+    it("POST /api/work rejects neither spec nor description", async () => {
+      const app = createServer(createMockDeps());
+
+      const res = await request(app)
+        .post("/api/work")
+        .send({ repo: "owner/repo" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe("Invalid request body");
+      expect(res.body.code).toBe("VALIDATION_ERROR");
+    });
+
+    it("POST /api/work accepts source and sourceRef", async () => {
+      const deps = createMockDeps();
+      const app = createServer(deps);
+
+      const res = await request(app)
+        .post("/api/work")
+        .send({
+          repo: "owner/repo",
+          spec: "# Do something",
+          source: "github",
+          sourceRef: "issue:42"
+        });
+
+      expect(res.status).toBe(201);
+      expect(deps.queue.add).toHaveBeenCalled();
+    });
+
     it("GET /api/work/:id returns work item", async () => {
       const deps = createMockDeps();
       const app = createServer(deps);

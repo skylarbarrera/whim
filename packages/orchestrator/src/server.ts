@@ -43,6 +43,9 @@ export interface ServerDependencies {
 const MAX_REPO_LENGTH = 200;
 const MAX_BRANCH_LENGTH = 250;
 const MAX_SPEC_LENGTH = 100_000;  // 100KB
+const MAX_DESCRIPTION_LENGTH = 50_000;  // 50KB
+const MAX_SOURCE_LENGTH = 50;
+const MAX_SOURCE_REF_LENGTH = 200;
 const REPO_PATTERN = /^[a-zA-Z0-9][-a-zA-Z0-9]*\/[a-zA-Z0-9._-]+$/;
 
 function isValidAddWorkItemRequest(body: unknown): body is AddWorkItemRequest {
@@ -52,16 +55,35 @@ function isValidAddWorkItemRequest(body: unknown): body is AddWorkItemRequest {
   if (typeof obj.repo !== "string" || obj.repo.length === 0) return false;
   if (obj.repo.length > MAX_REPO_LENGTH) return false;
   if (!REPO_PATTERN.test(obj.repo)) return false;
-  // Spec validation: required, length
-  if (typeof obj.spec !== "string" || obj.spec.length === 0) return false;
-  if (obj.spec.length > MAX_SPEC_LENGTH) return false;
+
+  // Spec XOR description validation: exactly one required
+  const hasSpec = typeof obj.spec === "string" && obj.spec.length > 0;
+  const hasDescription = typeof obj.description === "string" && obj.description.length > 0;
+  if (hasSpec && hasDescription) return false;  // Both provided - invalid
+  if (!hasSpec && !hasDescription) return false;  // Neither provided - invalid
+
+  // Spec validation: if provided, check length
+  if (hasSpec && (obj.spec as string).length > MAX_SPEC_LENGTH) return false;
+
+  // Description validation: if provided, check length
+  if (hasDescription && (obj.description as string).length > MAX_DESCRIPTION_LENGTH) return false;
+
   // Branch validation: optional, length
   if (obj.branch !== undefined && typeof obj.branch !== "string") return false;
   if (typeof obj.branch === "string" && obj.branch.length > MAX_BRANCH_LENGTH) return false;
+
   // Priority validation
   if (obj.priority !== undefined && !["low", "medium", "high", "critical"].includes(obj.priority as string)) return false;
+
   // Max iterations validation
   if (obj.maxIterations !== undefined && (typeof obj.maxIterations !== "number" || obj.maxIterations < 1)) return false;
+
+  // Source validation: optional, length
+  if (obj.source !== undefined && (typeof obj.source !== "string" || obj.source.length > MAX_SOURCE_LENGTH)) return false;
+
+  // Source ref validation: optional, length
+  if (obj.sourceRef !== undefined && (typeof obj.sourceRef !== "string" || obj.sourceRef.length > MAX_SOURCE_REF_LENGTH)) return false;
+
   return true;
 }
 

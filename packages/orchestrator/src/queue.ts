@@ -8,6 +8,7 @@ import type { Database } from "./db.js";
 import type {
   WorkItem,
   WorkItemStatus,
+  WorkItemType,
   Priority,
   AddWorkItemRequest,
   QueueStatsResponse,
@@ -35,22 +36,41 @@ export class QueueManager {
    */
   async add(input: AddWorkItemRequest): Promise<WorkItem> {
     const id = uuid();
-    const branch = input.branch ?? `whim/${id.slice(0, 8)}`;
     const priority = input.priority ?? "medium";
     const maxIterations = input.maxIterations ?? 50;
     const metadata = input.metadata ?? {};
 
+    // Determine status based on whether spec or description is provided
+    // If description: status='generating', spec=NULL, branch=NULL (will be set later)
+    // If spec: status='queued', branch=default or provided
+    const hasDescription = !!input.description;
+    const status: WorkItemStatus = hasDescription ? "generating" : "queued";
+    const branch = hasDescription ? null : (input.branch ?? `whim/${id.slice(0, 8)}`);
+    const spec = hasDescription ? null : input.spec ?? null;
+    const description = input.description ?? null;
+
+    // Type is always 'execution' for API-created work items
+    const type: WorkItemType = "execution";
+
     const result = await this.db.queryOne<WorkItem>(
-      `INSERT INTO work_items (id, repo, branch, spec, priority, max_iterations, metadata)
-       VALUES ($1, $2, $3, $4, $5::priority, $6, $7::jsonb)
+      `INSERT INTO work_items (
+        id, repo, branch, spec, description, type, priority, status,
+        max_iterations, source, source_ref, metadata
+      )
+       VALUES ($1, $2, $3, $4, $5, $6::work_item_type, $7::priority, $8::work_item_status, $9, $10, $11, $12::jsonb)
        RETURNING *`,
       [
         id,
         input.repo,
         branch,
-        input.spec,
+        spec,
+        description,
+        type,
         priority,
+        status,
         maxIterations,
+        input.source ?? null,
+        input.sourceRef ?? null,
         JSON.stringify(metadata),
       ]
     );
