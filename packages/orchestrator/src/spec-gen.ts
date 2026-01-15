@@ -1,18 +1,19 @@
-/**
- * @deprecated This module has been moved to @whim/orchestrator/spec-gen
- * This file will be removed in Phase 2 after GitHub adapter integration is complete.
- */
-
 import { spawn, type ChildProcess } from "node:child_process";
-import type { GitHubIssue } from "./github.js";
+import { readFileSync } from "node:fs";
+
+export interface GenerateMetadata {
+  source?: string; // 'github', 'linear', 'api', etc.
+  sourceRef?: string; // 'issue:42', 'LIN-123', etc.
+  title?: string; // For spec title
+}
 
 export interface GeneratedSpec {
   title: string;
   spec: string;
   branch: string;
   metadata: {
-    issueNumber: number;
-    issueUrl: string;
+    source?: string;
+    sourceRef?: string;
     generatedAt: string;
   };
 }
@@ -52,6 +53,8 @@ export interface RalphSpecResult {
  * - LLM-powered spec creation from descriptions
  * - Automatic validation against spec conventions
  * - Structured JSON event output
+ *
+ * Generalized for use with any source (GitHub, Linear, API, etc.)
  */
 export class RalphSpecGenerator {
   private timeoutMs: number;
@@ -63,47 +66,31 @@ export class RalphSpecGenerator {
   }
 
   /**
-   * Generate a spec from a GitHub issue using Ralph
+   * Generate a spec from a description using Ralph
+   *
+   * @param description - The work description (can be from any source)
+   * @param metadata - Optional metadata for branch naming and tracking
    */
-  async generate(issue: GitHubIssue): Promise<GeneratedSpec> {
-    const description = this.formatIssueDescription(issue);
+  async generate(description: string, metadata?: GenerateMetadata): Promise<GeneratedSpec> {
     const result = await this.runRalphSpec(description);
 
     if (!result.success || !result.spec) {
       throw new Error(result.error ?? "Ralph spec generation failed");
     }
 
-    const branch = this.generateBranchName(issue);
+    const branch = this.generateBranchName(metadata);
+    const title = metadata?.title ?? this.extractTitleFromSpec(result.spec);
 
     return {
-      title: issue.title,
+      title,
       spec: result.spec,
       branch,
       metadata: {
-        issueNumber: issue.number,
-        issueUrl: issue.url,
+        source: metadata?.source,
+        sourceRef: metadata?.sourceRef,
         generatedAt: new Date().toISOString(),
       },
     };
-  }
-
-  /**
-   * Format GitHub issue into a description for Ralph
-   */
-  private formatIssueDescription(issue: GitHubIssue): string {
-    const parts = [
-      `GitHub Issue #${issue.number}: ${issue.title}`,
-      "",
-      `Repository: ${issue.owner}/${issue.repo}`,
-      `Labels: ${issue.labels.join(", ") || "none"}`,
-      "",
-    ];
-
-    if (issue.body && issue.body.trim()) {
-      parts.push("Description:", issue.body.trim());
-    }
-
-    return parts.join("\n");
   }
 
   /**
@@ -179,8 +166,7 @@ export class RalphSpecGenerator {
           // Read the generated SPEC.md file
           const specPath = `${this.workDir}/SPEC.md`;
           try {
-            const fs = require("fs");
-            const spec = fs.readFileSync(specPath, "utf-8");
+            const spec = readFileSync(specPath, "utf-8");
 
             resolve({
               success: true,
@@ -237,17 +223,59 @@ export class RalphSpecGenerator {
   }
 
   /**
-   * Generate a branch name from issue metadata
+   * Generate a branch name from metadata
+   *
+   * With source: ai/<source>-<sanitized-sourceRef>-<slug>
+   * Without source: ai/<timestamp>-<slug>
    */
-  private generateBranchName(issue: GitHubIssue): string {
-    const prefix = `ai/issue-${issue.number}-`;
-    const maxSlugLen = 60 - prefix.length;
-    const slug = issue.title
+  private generateBranchName(metadata?: GenerateMetadata): string {
+    if (metadata?.source && metadata?.sourceRef) {
+      // Branch format: ai/<source>-<sanitized-sourceRef>-<slug>
+      const sanitizedRef = this.sanitizeSourceRef(metadata.sourceRef);
+      const slug = metadata.title ? this.createSlug(metadata.title) : "task";
+      return `ai/${metadata.source}-${sanitizedRef}-${slug}`;
+    } else {
+      // Fallback: ai/<timestamp>-<slug>
+      const timestamp = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14); // YYYYMMDDHHmmss
+      const slug = metadata?.title ? this.createSlug(metadata.title) : "task";
+      return `ai/${timestamp}-${slug}`;
+    }
+  }
+
+  /**
+   * Sanitize sourceRef for use in branch names
+   * Replace colons and special chars with dashes
+   */
+  private sanitizeSourceRef(sourceRef: string): string {
+    return sourceRef
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
+
+  /**
+   * Create a URL-safe slug from a title
+   */
+  private createSlug(title: string): string {
+    const maxLen = 40;
+    return title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
-      .slice(0, maxSlugLen);
+      .slice(0, maxLen);
+  }
 
-    return `${prefix}${slug}`;
+  /**
+   * Extract title from spec markdown (first # heading)
+   */
+  private extractTitleFromSpec(spec: string): string {
+    const lines = spec.split("\n");
+    for (const line of lines) {
+      const match = line.match(/^#\s+(.+)$/);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+    return "Generated Task";
   }
 }

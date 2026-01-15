@@ -5,6 +5,9 @@
  * Manages work queue, worker lifecycle, and API endpoints.
  */
 
+// Re-export spec generation for use by other services
+export * from "./spec-gen.js";
+
 import Docker from "dockerode";
 import { createDatabase, type Database } from "./db.js";
 import { createRedisClient, type RedisClient } from "./redis.js";

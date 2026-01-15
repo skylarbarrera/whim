@@ -166,6 +166,7 @@ export class QueueManager {
     }>(`SELECT status, COUNT(*) as count FROM work_items GROUP BY status`);
 
     const byStatus: Record<WorkItemStatus, number> = {
+      generating: 0,
       queued: 0,
       assigned: 0,
       in_progress: 0,
@@ -206,8 +207,10 @@ export class QueueManager {
     return {
       id: row.id as string,
       repo: row.repo as string,
-      branch: row.branch as string,
-      spec: row.spec as string,
+      branch: (row.branch as string) ?? null,
+      spec: (row.spec as string) ?? null,
+      description: (row.description as string) ?? null,
+      type: (row.type as "execution" | "verification") ?? "execution",
       priority: row.priority as Priority,
       status: row.status as WorkItemStatus,
       workerId: (row.worker_id as string) ?? null,
@@ -215,6 +218,11 @@ export class QueueManager {
       maxIterations: row.max_iterations as number,
       retryCount: (row.retry_count as number) ?? 0,
       nextRetryAt: (row.next_retry_at as Date) ?? null,
+      prNumber: (row.pr_number as number) ?? null,
+      parentWorkItemId: (row.parent_work_item_id as string) ?? null,
+      verificationPassed: (row.verification_passed as boolean) ?? null,
+      source: (row.source as string) ?? null,
+      sourceRef: (row.source_ref as string) ?? null,
       createdAt: row.created_at as Date,
       updatedAt: row.updated_at as Date,
       completedAt: (row.completed_at as Date) ?? null,

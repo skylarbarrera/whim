@@ -11,11 +11,12 @@ import { runRalph } from "./ralph.js";
 import { runMockRalph } from "./mock-ralph.js";
 import { runTests } from "./testing.js";
 import { reviewPullRequest } from "./review.js";
+import type { ExecutionReadyWorkItem } from "./types.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;
   workerId: string;
-  workItem: WorkItem;
+  workItem: ExecutionReadyWorkItem;
   githubToken: string;
   workDir: string;
   claudeConfigDir?: string;
@@ -44,6 +45,21 @@ function getConfig(): WorkerConfig {
     throw new Error("WORK_ITEM must be valid JSON");
   }
 
+  // Validate execution-ready fields
+  if (!workItem.spec) {
+    throw new Error("Work item must have a spec to execute (spec is null/undefined)");
+  }
+  if (!workItem.branch) {
+    throw new Error("Work item must have a branch to execute (branch is null/undefined)");
+  }
+
+  // Type narrowing: we've validated spec and branch are present
+  const executionReadyWorkItem: ExecutionReadyWorkItem = {
+    ...workItem,
+    spec: workItem.spec,
+    branch: workItem.branch,
+  };
+
   const githubToken = process.env.GITHUB_TOKEN;
   if (!githubToken) {
     throw new Error("GITHUB_TOKEN environment variable is required");
@@ -55,7 +71,7 @@ function getConfig(): WorkerConfig {
   return {
     orchestratorUrl,
     workerId,
-    workItem,
+    workItem: executionReadyWorkItem,
     githubToken,
     workDir,
     claudeConfigDir,

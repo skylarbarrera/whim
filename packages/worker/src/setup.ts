@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { mkdir, writeFile, access, cp } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import type { WorkItem } from "@whim/shared";
 import { formatReviewComment, type ReviewFindings } from "./prompts/review-prompt.js";
+import type { ExecutionReadyWorkItem } from "./types.js";
 
 export interface WorkspaceConfig {
   workDir: string;
@@ -158,7 +158,7 @@ export async function verifyGitAuth(
 }
 
 export async function setupWorkspace(
-  workItem: WorkItem,
+  workItem: ExecutionReadyWorkItem,
   config: WorkspaceConfig
 ): Promise<string> {
   const repoDir = join(config.workDir, "repo");
@@ -445,7 +445,7 @@ function createPRError(
 
 export async function createPullRequest(
   repoDir: string,
-  workItem: WorkItem,
+  workItem: ExecutionReadyWorkItem,
   githubToken: string,
   reviewFindings?: ReviewFindings
 ): Promise<PRResult> {
