@@ -138,6 +138,14 @@ function createMockDeps(): ServerDependencies {
       getReviewByPR: mock(() => Promise.resolve(null)),
       query: mock(() => Promise.resolve([])),
     } as unknown as ServerDependencies["db"],
+
+    specGenManager: {
+      start: mock(() => {}),
+      isGenerating: mock(() => false),
+      getStatus: mock(() => ({ inProgress: false, attempt: 0 })),
+      getInFlightCount: mock(() => 0),
+      getInFlightIds: mock(() => []),
+    } as unknown as ServerDependencies["specGenManager"],
   };
 }
 

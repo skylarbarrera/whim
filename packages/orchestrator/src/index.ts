@@ -7,6 +7,7 @@
 
 // Re-export spec generation for use by other services
 export * from "./spec-gen.js";
+export * from "./spec-generation.js";
 
 import Docker from "dockerode";
 import { createDatabase, type Database } from "./db.js";
@@ -16,6 +17,7 @@ import { RateLimiter } from "./rate-limits.js";
 import { ConflictDetector } from "./conflicts.js";
 import { WorkerManager } from "./workers.js";
 import { MetricsCollector } from "./metrics.js";
+import { SpecGenerationManager } from "./spec-generation.js";
 import { createServer } from "./server.js";
 
 /**
@@ -174,6 +176,7 @@ async function main(): Promise<void> {
   const conflicts = new ConflictDetector(db);
   const workers = new WorkerManager(db, rateLimiter, conflicts, docker);
   const metrics = new MetricsCollector(db);
+  const specGenManager = new SpecGenerationManager(db);
 
   // Create Express server
   const app = createServer({
@@ -183,6 +186,7 @@ async function main(): Promise<void> {
     rateLimiter,
     metrics,
     db,
+    specGenManager,
   });
 
   // Start HTTP server

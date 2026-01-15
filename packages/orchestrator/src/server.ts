@@ -12,6 +12,7 @@ import type { ConflictDetector } from "./conflicts.js";
 import type { RateLimiter } from "./rate-limits.js";
 import type { MetricsCollector } from "./metrics.js";
 import type { Database } from "./db.js";
+import type { SpecGenerationManager } from "./spec-generation.js";
 import type {
   AddWorkItemRequest,
   WorkerRegisterRequest,
@@ -34,6 +35,7 @@ export interface ServerDependencies {
   rateLimiter: RateLimiter;
   metrics: MetricsCollector;
   db: Database;
+  specGenManager: SpecGenerationManager;
 }
 
 /**
@@ -227,6 +229,12 @@ export function createServer(deps: ServerDependencies): express.Application {
       }
 
       const workItem = await deps.queue.add(req.body);
+
+      // If work item has description (not spec), start background spec generation
+      if (workItem.status === "generating") {
+        deps.specGenManager.start(workItem);
+      }
+
       res.status(201).json({ id: workItem.id, status: workItem.status });
     })
   );
