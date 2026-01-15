@@ -1,6 +1,9 @@
 // Work Item Types
 
+export type WorkItemType = "execution" | "verification";
+
 export type WorkItemStatus =
+  | "generating"
   | "queued"
   | "assigned"
   | "in_progress"
@@ -13,8 +16,10 @@ export type Priority = "low" | "medium" | "high" | "critical";
 export interface WorkItem {
   id: string;
   repo: string;
-  branch: string;
-  spec: string;
+  branch: string | null;
+  spec: string | null;
+  description: string | null;
+  type: WorkItemType;
   priority: Priority;
   status: WorkItemStatus;
   workerId: string | null;
@@ -22,11 +27,16 @@ export interface WorkItem {
   maxIterations: number;
   retryCount: number;
   nextRetryAt: Date | null;
+  prUrl: string | null;
+  prNumber: number | null;
+  parentWorkItemId: string | null;
+  verificationPassed: boolean | null;
+  source: string | null;
+  sourceRef: string | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
   error: string | null;
-  prUrl: string | null;
   metadata: Record<string, unknown>;
 }
 
@@ -99,6 +109,8 @@ export interface PRReview {
 
 // Metrics Types
 
+export type TestStatus = "passed" | "failed" | "timeout" | "skipped" | "error";
+
 export interface WorkerMetrics {
   id: string;
   workerId: string;
@@ -111,7 +123,7 @@ export interface WorkerMetrics {
   testsRun: number;
   testsPassed: number;
   testsFailed: number;
-  testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error";
+  testStatus?: TestStatus;
   timestamp: Date;
 }
 
@@ -131,9 +143,12 @@ export interface WhimMetrics {
 export interface AddWorkItemRequest {
   repo: string;
   branch?: string;
-  spec: string;
+  spec?: string;
+  description?: string;
   priority?: Priority;
   maxIterations?: number;
+  source?: string;
+  sourceRef?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -156,6 +171,7 @@ export interface WorkerLockRequest {
 export interface WorkerCompleteRequest {
   prUrl?: string;
   prNumber?: number;
+  verificationEnabled?: boolean;
   review?: {
     modelUsed: string;
     findings: ReviewFindings;
@@ -168,7 +184,7 @@ export interface WorkerCompleteRequest {
     testsRun: number;
     testsPassed: number;
     testsFailed: number;
-    testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error";
+    testStatus?: TestStatus;
   };
   learnings?: Array<{
     content: string;
