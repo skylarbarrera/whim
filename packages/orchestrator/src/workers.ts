@@ -77,9 +77,10 @@ export class WorkerManager {
    * Records the spawn with the rate limiter.
    *
    * @param workItem - The work item to process
+   * @param mode - Worker mode: 'execution' (default) or 'verification'
    * @returns The worker ID and container ID
    */
-  async spawn(workItem: WorkItem): Promise<SpawnResult> {
+  async spawn(workItem: WorkItem, mode: 'execution' | 'verification' = 'execution'): Promise<SpawnResult> {
     const workerId = uuid();
 
     // Create worker record
@@ -109,19 +110,26 @@ export class WorkerManager {
         dockerHost
       );
 
+      const envVars = [
+        `WORKER_ID=${workerId}`,
+        `WORK_ITEM=${JSON.stringify(workItem)}`,
+        `ORCHESTRATOR_URL=${workerOrchestratorUrl}`,
+        `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
+        `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
+        // Pass through mock mode for testing lifecycle without Claude
+        `MOCK_RALPH=${process.env.MOCK_RALPH ?? ""}`,
+        `MOCK_FAIL=${process.env.MOCK_FAIL ?? ""}`,
+        `MOCK_STUCK=${process.env.MOCK_STUCK ?? ""}`,
+      ];
+
+      // Add WORKER_MODE for verification workers
+      if (mode === 'verification') {
+        envVars.push('WORKER_MODE=verification');
+      }
+
       container = await this.docker.createContainer({
         Image: this.config.workerImage,
-        Env: [
-          `WORKER_ID=${workerId}`,
-          `WORK_ITEM=${JSON.stringify(workItem)}`,
-          `ORCHESTRATOR_URL=${workerOrchestratorUrl}`,
-          `GITHUB_TOKEN=${process.env.GITHUB_TOKEN ?? ""}`,
-          `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ?? ""}`,
-          // Pass through mock mode for testing lifecycle without Claude
-          `MOCK_RALPH=${process.env.MOCK_RALPH ?? ""}`,
-          `MOCK_FAIL=${process.env.MOCK_FAIL ?? ""}`,
-          `MOCK_STUCK=${process.env.MOCK_STUCK ?? ""}`,
-        ],
+        Env: envVars,
         HostConfig: {
           AutoRemove: false,  // Keep for debugging
           NetworkMode: "whim-network",

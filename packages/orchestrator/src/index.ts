@@ -93,8 +93,10 @@ async function runMainLoop(
           break;
         }
 
-        log(`Spawning worker for work item: ${workItem.id} (${workItem.repo})`);
-        const { workerId, containerId } = await workers.spawn(workItem);
+        // Determine worker mode based on work item type
+        const mode = workItem.type === 'verification' ? 'verification' : 'execution';
+        log(`Spawning ${mode} worker for work item: ${workItem.id} (${workItem.repo})`);
+        const { workerId, containerId } = await workers.spawn(workItem, mode);
         log(`Spawned worker ${workerId} in container ${containerId.slice(0, 12)}`);
       }
     } catch (error) {

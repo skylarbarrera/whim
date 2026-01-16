@@ -400,6 +400,7 @@ class MockQueueManager {
 class MockDocker {
   containers: Map<string, { stopped: boolean }> = new Map();
   private idCounter = 0;
+  lastCreateOptions: any = null;
 
   async createContainer(options: unknown): Promise<{
     id: string;
@@ -408,6 +409,7 @@ class MockDocker {
     this.idCounter++;
     const id = `container-${this.idCounter}`;
     this.containers.set(id, { stopped: false });
+    this.lastCreateOptions = options;
     return {
       id,
       start: async () => {},
@@ -525,6 +527,39 @@ describe("WorkerManager", () => {
 
       const worker = await mockDb.getWorker(result.workerId);
       expect(worker?.containerId).toBe(result.containerId);
+    });
+
+    test("spawns execution worker without WORKER_MODE env var", async () => {
+      const workItem = createWorkItem({ type: "execution" });
+      mockDb._setWorkItem(workItem);
+
+      await manager.spawn(workItem, "execution");
+
+      const envVars = mockDocker.lastCreateOptions?.Env || [];
+      const hasWorkerMode = envVars.some((env: string) => env.startsWith("WORKER_MODE="));
+      expect(hasWorkerMode).toBe(false);
+    });
+
+    test("spawns verification worker with WORKER_MODE=verification", async () => {
+      const workItem = createWorkItem({ type: "verification" });
+      mockDb._setWorkItem(workItem);
+
+      await manager.spawn(workItem, "verification");
+
+      const envVars = mockDocker.lastCreateOptions?.Env || [];
+      const workerModeEnv = envVars.find((env: string) => env.startsWith("WORKER_MODE="));
+      expect(workerModeEnv).toBe("WORKER_MODE=verification");
+    });
+
+    test("defaults to execution mode when mode parameter not provided", async () => {
+      const workItem = createWorkItem({ type: "execution" });
+      mockDb._setWorkItem(workItem);
+
+      await manager.spawn(workItem);
+
+      const envVars = mockDocker.lastCreateOptions?.Env || [];
+      const hasWorkerMode = envVars.some((env: string) => env.startsWith("WORKER_MODE="));
+      expect(hasWorkerMode).toBe(false);
     });
   });
 
