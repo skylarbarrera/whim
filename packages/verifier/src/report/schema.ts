@@ -90,6 +90,8 @@ export interface TestResults {
   testsFailed: number;
   failingTests: string[];
   coverage?: number;
+  /** Tests that failed initially but passed on retry */
+  flakyTests?: FlakyTest[];
 }
 
 /**
@@ -205,6 +207,12 @@ export interface VerificationReport {
   // Metadata
   costUsd?: number;
 
+  // Phase 3: Advanced Review
+  /** Self-critique phase results (if performed) */
+  critique?: CritiqueOutput;
+  /** Cost tracking details */
+  costTracking?: CostTracking;
+
   // Feedback for Ralph (populated when verdict !== 'pass')
   feedback?: VerificationFeedback;
 }
@@ -271,6 +279,32 @@ export interface CritiqueOutput {
   filteredFindings: number;
   filterReasons: Array<{
     finding: string;
-    reason: 'false_positive' | 'not_actionable' | 'out_of_scope' | 'too_minor';
+    reason: 'false_positive' | 'not_actionable' | 'out_of_scope' | 'too_minor' | 'wrong_severity';
   }>;
+}
+
+/**
+ * Flaky test information.
+ */
+export interface FlakyTest {
+  name: string;
+  file?: string;
+  /** First run failed, retry passed */
+  passedOnRetry: boolean;
+}
+
+/**
+ * Cost tracking information.
+ */
+export interface CostTracking {
+  /** Total cost in USD */
+  totalCostUsd: number;
+  /** Number of LLM calls made */
+  llmCalls: number;
+  /** Total duration in ms */
+  totalDurationMs: number;
+  /** Whether budget was exceeded */
+  budgetExceeded: boolean;
+  /** Which budget limit was hit (if any) */
+  limitHit?: 'cost' | 'duration' | 'calls';
 }

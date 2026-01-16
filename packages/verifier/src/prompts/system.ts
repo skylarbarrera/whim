@@ -176,6 +176,97 @@ If no API endpoints were changed, output:
 }
 
 /**
+ * Build a prompt for self-critique of findings.
+ *
+ * This is Phase 4 (CRITIQUE) - a separate AI call to review and filter findings.
+ */
+export function buildCritiquePrompt(params: {
+  issues: Array<{
+    file: string;
+    line?: number;
+    severity: string;
+    category: string;
+    message: string;
+    suggestion?: string;
+  }>;
+  diff: string;
+}): string {
+  const { issues, diff } = params;
+
+  if (issues.length === 0) {
+    return ''; // No critique needed if no issues
+  }
+
+  return `## Task: Self-Critique Code Review Findings
+
+You are reviewing findings from an initial code review. Your job is to filter out false positives
+and ensure only actionable, accurate findings remain.
+
+### Original Findings (${issues.length} issues)
+
+\`\`\`json
+${JSON.stringify(issues, null, 2)}
+\`\`\`
+
+### PR Diff (for reference)
+
+${diff.slice(0, 30000)}
+
+### Self-Critique Checklist
+
+For EACH finding, evaluate:
+
+1. **Is this a real issue or false positive?**
+   - Does the code actually have this problem?
+   - Is there context you might be missing?
+
+2. **Would a senior engineer agree this is worth flagging?**
+   - Is this actually problematic or just stylistic?
+   - Is it severe enough to mention?
+
+3. **Is this actionable?**
+   - Can the author fix it?
+   - Is the suggestion concrete?
+
+4. **Is this the right severity level?**
+   - error = must fix before merge
+   - warning = should fix
+   - info = nice to have
+
+### What to Filter Out
+
+- Style nitpicks (spacing, naming preferences)
+- Issues in UNCHANGED code (only review the diff)
+- Suggestions requiring major refactoring
+- False positives from missing broader context
+- Duplicates or overlapping issues
+
+### Output Format
+
+\`\`\`json
+{
+  "filteredIssues": [
+    // Only issues that pass the self-critique checklist
+    // Use same format as input issues
+  ],
+  "removedIssues": [
+    {
+      "originalMessage": "the issue that was removed",
+      "reason": "false_positive|not_actionable|out_of_scope|too_minor|wrong_severity"
+    }
+  ],
+  "summary": {
+    "originalCount": ${issues.length},
+    "filteredCount": <number>,
+    "removedCount": <number>
+  }
+}
+\`\`\`
+
+Be rigorous but fair. Keep issues that are genuinely worth fixing.`;
+}
+
+/**
  * Build a prompt for browser check instructions.
  */
 export function buildBrowserCheckPrompt(params: {
@@ -219,4 +310,116 @@ ${pages.map((p) => `- http://localhost:${port}${p}`).join('\n')}
 \`\`\`
 
 Do NOT close the browser - cleanup happens after.`;
+}
+
+/**
+ * Build a prompt for temporary test generation.
+ *
+ * The AI will generate integration tests targeting coverage gaps in the PR.
+ * Tests are written to .whim/tmp-tests/ and deleted after verification.
+ */
+export function buildTempTestPrompt(params: {
+  diff: string;
+  existingTests: string[];
+  projectType: 'node' | 'python' | 'go';
+  testFramework?: string;
+}): string {
+  const { diff, existingTests, projectType, testFramework } = params;
+
+  const frameworkGuide = {
+    node: {
+      framework: testFramework ?? 'vitest',
+      extension: '.test.ts',
+      imports: `import { describe, it, expect } from '${testFramework ?? 'vitest'}';`,
+      runCommand: 'npx vitest run',
+    },
+    python: {
+      framework: testFramework ?? 'pytest',
+      extension: '_test.py',
+      imports: 'import pytest',
+      runCommand: 'pytest',
+    },
+    go: {
+      framework: 'testing',
+      extension: '_test.go',
+      imports: 'import "testing"',
+      runCommand: 'go test',
+    },
+  }[projectType];
+
+  return `## Task: Generate Integration Tests for Coverage Gaps
+
+You are generating temporary integration tests to verify the PR changes work correctly.
+These tests target functionality NOT covered by existing tests.
+
+### Changed Code (PR Diff)
+${diff.slice(0, 40000)}
+
+### Existing Test Coverage
+${existingTests.length > 0 ? existingTests.map((t) => `- ${t}`).join('\n') : 'No existing tests found for changed files.'}
+
+### Test Framework
+- Framework: ${frameworkGuide.framework}
+- File extension: ${frameworkGuide.extension}
+- Import template: \`${frameworkGuide.imports}\`
+
+### Instructions
+
+1. **Identify coverage gaps**: What changed code paths are NOT tested by existing tests?
+2. **Generate focused tests**: Write 1-3 integration tests targeting these gaps
+3. **Test real behavior**: Don't mock everything - test actual integration points
+4. **Be minimal**: Only test what's actually changed and uncovered
+
+### What to Test (Priority Order)
+
+1. **API endpoints**: If endpoints were added/changed, test they return correct responses
+2. **Data transformations**: If functions transform data, test edge cases
+3. **Error handling**: If error paths were added, test they throw correctly
+4. **Integration points**: If code connects systems, test the connection works
+
+### What NOT to Test
+
+- Code already covered by existing tests
+- Pure utility functions (unit tests exist)
+- Code outside the PR diff
+- External services (mock only external APIs)
+
+### Output Format
+
+Generate test files that can be written to .whim/tmp-tests/:
+
+\`\`\`json
+{
+  "tests": [
+    {
+      "filename": "example${frameworkGuide.extension}",
+      "description": "what this test verifies",
+      "content": "full test file content here",
+      "expectedToPass": true
+    }
+  ],
+  "coverageGaps": [
+    "description of gap 1",
+    "description of gap 2"
+  ],
+  "skippedReason": null
+}
+\`\`\`
+
+If there are no meaningful coverage gaps (existing tests are sufficient), output:
+\`\`\`json
+{
+  "tests": [],
+  "coverageGaps": [],
+  "skippedReason": "Existing tests adequately cover the changed code"
+}
+\`\`\`
+
+### Rules
+
+- Tests must be self-contained (can run independently)
+- Tests must be fast (< 10 seconds each)
+- Include setup/teardown if needed
+- Use clear, descriptive test names
+- Output valid ${frameworkGuide.framework} test syntax`;
 }

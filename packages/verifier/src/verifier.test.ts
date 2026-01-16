@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { loadConfig, DEFAULT_CONFIG, validateConfig } from './config.js';
-import { parseReviewOutput, parseEndpointOutput, extractEvents } from './report/parser.js';
+import { parseReviewOutput, parseEndpointOutput, parseBrowserOutput, extractEvents } from './report/parser.js';
 import type { VerificationReport } from './report/schema.js';
 
 describe('Config', () => {
@@ -245,5 +245,169 @@ describe('Schema', () => {
     expect(report.verdict).toBe('pass');
     expect(report.specCompliance.status).toBe('pass');
     expect(report.testResults.testsRun).toBe(10);
+  });
+});
+
+describe('Browser Check Parser', () => {
+  describe('parseBrowserOutput', () => {
+    it('should parse valid browser check output', () => {
+      const output = `
+Browser verification complete.
+
+\`\`\`json
+{
+  "pagesChecked": ["/", "/dashboard", "/settings"],
+  "issues": [],
+  "status": "pass"
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      expect(result.status).toBe('pass');
+      expect(result.pagesChecked).toEqual(['/', '/dashboard', '/settings']);
+      expect(result.issues).toEqual([]);
+    });
+
+    it('should parse browser check with issues', () => {
+      const output = `
+\`\`\`json
+{
+  "pagesChecked": ["/", "/dashboard"],
+  "issues": [
+    {
+      "page": "/dashboard",
+      "type": "console_error",
+      "message": "Warning: setState called on unmounted component"
+    },
+    {
+      "page": "/",
+      "type": "render",
+      "message": "Button with id='submit' not found"
+    }
+  ],
+  "status": "warnings"
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      expect(result.status).toBe('warnings');
+      expect(result.pagesChecked.length).toBe(2);
+      expect(result.issues.length).toBe(2);
+      expect(result.issues[0].type).toBe('console_error');
+      expect(result.issues[1].type).toBe('render');
+    });
+
+    it('should auto-determine status from issues when not provided', () => {
+      const output = `
+\`\`\`json
+{
+  "pagesChecked": ["/"],
+  "issues": [
+    {
+      "page": "/",
+      "type": "render",
+      "message": "Page failed to load"
+    }
+  ]
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      // render issue should cause 'fail' status
+      expect(result.status).toBe('fail');
+    });
+
+    it('should handle console_error as warnings', () => {
+      const output = `
+\`\`\`json
+{
+  "pagesChecked": ["/"],
+  "issues": [
+    {
+      "page": "/",
+      "type": "console_error",
+      "message": "Some console warning"
+    }
+  ]
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      // console_error should be 'warnings' not 'fail'
+      expect(result.status).toBe('warnings');
+    });
+
+    it('should handle invalid JSON gracefully', () => {
+      const output = 'This is not JSON at all';
+
+      const result = parseBrowserOutput(output);
+      expect(result.status).toBe('fail');
+      expect(result.pagesChecked).toEqual([]);
+      expect(result.issues.length).toBe(1);
+      expect(result.issues[0].message).toContain('Failed to parse');
+    });
+
+    it('should normalize unknown issue types to render', () => {
+      const output = `
+\`\`\`json
+{
+  "pagesChecked": ["/"],
+  "issues": [
+    {
+      "page": "/",
+      "type": "unknown_type",
+      "message": "Something went wrong"
+    }
+  ],
+  "status": "fail"
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      expect(result.issues[0].type).toBe('render');
+    });
+
+    it('should handle screenshots field', () => {
+      const output = `
+\`\`\`json
+{
+  "pagesChecked": ["/"],
+  "issues": [],
+  "status": "pass",
+  "screenshots": ["/tmp/screenshot-1.png", "/tmp/screenshot-2.png"]
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      expect(result.screenshots).toEqual(['/tmp/screenshot-1.png', '/tmp/screenshot-2.png']);
+    });
+
+    it('should parse issues with screenshot field', () => {
+      const output = `
+\`\`\`json
+{
+  "pagesChecked": ["/error"],
+  "issues": [
+    {
+      "page": "/error",
+      "type": "render",
+      "message": "Error page rendered incorrectly",
+      "screenshot": "/tmp/error-page.png"
+    }
+  ],
+  "status": "fail"
+}
+\`\`\`
+      `;
+
+      const result = parseBrowserOutput(output);
+      expect(result.issues[0].screenshot).toBe('/tmp/error-page.png');
+    });
   });
 });

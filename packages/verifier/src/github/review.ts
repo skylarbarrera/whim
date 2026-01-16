@@ -8,7 +8,7 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import type { VerificationReport, CodeIssue, Verdict, TestResults, TypeCheck } from '../report/schema.js';
+import type { VerificationReport, CodeIssue, Verdict, TestResults, TypeCheck, FlakyTest, CostTracking, CritiqueOutput } from '../report/schema.js';
 
 /**
  * Options for posting a PR review.
@@ -202,7 +202,12 @@ function buildQuickSummary(report: VerificationReport): string {
   // Tests
   if (report.testResults.status !== 'skipped') {
     const testIcon = report.testResults.testsFailed === 0 ? '✅' : '❌';
-    parts.push(`${testIcon} Tests: ${report.testResults.testsPassed}/${report.testResults.testsRun}`);
+    let testStr = `${testIcon} Tests: ${report.testResults.testsPassed}/${report.testResults.testsRun}`;
+    // Phase 3: Show flaky count if any
+    if (report.testResults.flakyTests && report.testResults.flakyTests.length > 0) {
+      testStr += ` (${report.testResults.flakyTests.length} flaky)`;
+    }
+    parts.push(testStr);
   }
 
   // Types
@@ -295,6 +300,18 @@ function buildReviewBody(report: VerificationReport): string {
       testContent += formatFailingTests(report.testResults.failingTests);
     }
 
+    // Phase 3: Show flaky tests
+    if (report.testResults.flakyTests && report.testResults.flakyTests.length > 0) {
+      testContent += '\n\n⚠️ **Flaky tests detected** (passed on retry):\n';
+      for (const flaky of report.testResults.flakyTests.slice(0, 10)) {
+        testContent += `- \`${flaky.name}\`\n`;
+      }
+      if (report.testResults.flakyTests.length > 10) {
+        testContent += `- _...and ${report.testResults.flakyTests.length - 10} more_\n`;
+      }
+      testContent += '\n_These tests are intermittently failing. Consider investigating._';
+    }
+
     const shouldOpen = report.testResults.testsFailed > 0;
     lines.push(collapsible(testTitle, testContent, shouldOpen));
   }
@@ -351,6 +368,31 @@ function buildReviewBody(report: VerificationReport): string {
     lines.push(collapsible(reviewTitle, reviewContent, shouldOpen));
   }
   lines.push('');
+
+  // Phase 3: Self-Critique Results
+  if (report.critique) {
+    const removed = report.critique.originalFindings - report.critique.filteredFindings;
+    if (removed > 0) {
+      lines.push(
+        `> 🔍 **Self-critique**: Filtered ${removed} issues (${report.critique.originalFindings} → ${report.critique.filteredFindings})`
+      );
+      lines.push('');
+    }
+  }
+
+  // Phase 3: Cost Tracking
+  if (report.costTracking) {
+    const costStr = report.costTracking.totalCostUsd > 0
+      ? `$${report.costTracking.totalCostUsd.toFixed(4)}`
+      : 'N/A';
+    lines.push(
+      `> 💰 **Cost**: ${costStr} | ${report.costTracking.llmCalls} LLM calls | ${formatDuration(report.costTracking.totalDurationMs)}`
+    );
+    if (report.costTracking.budgetExceeded) {
+      lines.push(`> ⚠️ **Budget exceeded** (${report.costTracking.limitHit})`);
+    }
+    lines.push('');
+  }
 
   // Optional Checks Section
   const hasOptional =

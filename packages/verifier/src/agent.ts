@@ -2,12 +2,12 @@
  * Agent Integration
  *
  * Wrapper for invoking the AI harness for verification tasks.
- * Note: The actual harness implementation is in @whim/worker.
- * This module provides a simplified interface for the verifier.
+ * Uses @whim/harness for unified Claude/Codex support.
  */
 
 import { spawn } from 'child_process';
 import * as path from 'path';
+import { getHarness, type HarnessName } from '@whim/harness';
 
 /**
  * Agent run options.
@@ -15,6 +15,8 @@ import * as path from 'path';
 export interface AgentRunOptions {
   cwd: string;
   timeoutMs?: number;
+  harness?: HarnessName;
+  systemPrompt?: string;
 }
 
 /**
@@ -31,8 +33,8 @@ export interface AgentRunResult {
 /**
  * Run a prompt through the AI agent.
  *
- * For MVP, this uses Claude Code CLI directly.
- * Future: Use the harness abstraction from @whim/worker.
+ * Uses the harness abstraction from @whim/harness.
+ * Requires ANTHROPIC_API_KEY (for Claude) or OPENAI_API_KEY (for Codex).
  *
  * @param prompt - The prompt to run
  * @param options - Run options
@@ -42,67 +44,30 @@ export async function runAgent(
   prompt: string,
   options: AgentRunOptions
 ): Promise<AgentRunResult> {
-  const startTime = Date.now();
-  const timeout = options.timeoutMs ?? 300000; // 5 min default
+  const harness = getHarness(options.harness ?? 'claude');
 
-  return new Promise((resolve) => {
-    let output = '';
-    let error = '';
-
-    // Use Claude Code CLI in print mode
-    const proc = spawn(
-      'claude',
-      ['--print', '--dangerously-skip-permissions'],
-      {
-        cwd: options.cwd,
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
+  const result = await harness.run(
+    prompt,
+    {
+      cwd: options.cwd,
+      timeoutMs: options.timeoutMs ?? 300000,
+      systemPrompt: options.systemPrompt,
+    },
+    (event) => {
+      // Log events for debugging (can be made configurable)
+      if (event.type === 'error') {
+        console.error(`[Harness Error] ${event.message}`);
       }
-    );
+    }
+  );
 
-    // Send prompt to stdin
-    proc.stdin.write(prompt);
-    proc.stdin.end();
-
-    proc.stdout.on('data', (data: Buffer) => {
-      output += data.toString();
-    });
-
-    proc.stderr.on('data', (data: Buffer) => {
-      error += data.toString();
-    });
-
-    // Set timeout
-    const timeoutId = setTimeout(() => {
-      proc.kill('SIGTERM');
-      resolve({
-        success: false,
-        output,
-        durationMs: Date.now() - startTime,
-        error: `Timeout after ${timeout}ms`,
-      });
-    }, timeout);
-
-    proc.on('close', (code) => {
-      clearTimeout(timeoutId);
-      resolve({
-        success: code === 0,
-        output,
-        durationMs: Date.now() - startTime,
-        error: code !== 0 ? error || `Exit code ${code}` : undefined,
-      });
-    });
-
-    proc.on('error', (err) => {
-      clearTimeout(timeoutId);
-      resolve({
-        success: false,
-        output,
-        durationMs: Date.now() - startTime,
-        error: err.message,
-      });
-    });
-  });
+  return {
+    success: result.success,
+    output: result.output ?? '',
+    durationMs: result.durationMs,
+    costUsd: result.costUsd,
+    error: result.error,
+  };
 }
 
 /**
