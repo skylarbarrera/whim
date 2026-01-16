@@ -307,6 +307,22 @@ export class QueueManager {
   }
 
   /**
+   * Get verification work item linked to an execution item
+   * Returns null if no verification item exists
+   */
+  async getVerificationForExecution(executionId: string): Promise<WorkItem | null> {
+    const result = await this.db.queryOne<WorkItem>(
+      `SELECT * FROM work_items
+       WHERE parent_work_item_id = $1
+         AND type = 'verification'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [executionId]
+    );
+    return result ?? null;
+  }
+
+  /**
    * Convert a database row to WorkItem
    * Used internally for transaction results where we can't use db.getWorkItem
    */

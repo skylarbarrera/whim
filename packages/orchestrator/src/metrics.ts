@@ -97,6 +97,9 @@ export class MetricsCollector {
         ? totalCompleted / (totalCompleted + totalFailed)
         : 0;
 
+    // Get verification-specific metrics
+    const verificationStats = await this.getVerificationStats();
+
     return {
       activeWorkers,
       queuedItems,
@@ -106,7 +109,52 @@ export class MetricsCollector {
       dailyBudget: this.dailyBudget,
       avgCompletionTime,
       successRate,
+      verification: verificationStats,
     };
+  }
+
+  /**
+   * Get verification-specific statistics
+   */
+  private async getVerificationStats(): Promise<{
+    total: number;
+    passed: number;
+    failed: number;
+    pending: number;
+    passRate: number;
+  }> {
+    // Total verification items
+    const totalResult = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM work_items WHERE type = 'verification'`
+    );
+    const total = parseInt(totalResult?.count ?? "0", 10);
+
+    // Passed verifications
+    const passedResult = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM work_items
+       WHERE type = 'verification' AND verification_passed = true`
+    );
+    const passed = parseInt(passedResult?.count ?? "0", 10);
+
+    // Failed verifications
+    const failedResult = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM work_items
+       WHERE type = 'verification' AND verification_passed = false`
+    );
+    const failed = parseInt(failedResult?.count ?? "0", 10);
+
+    // Pending verifications (queued, assigned, in_progress)
+    const pendingResult = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM work_items
+       WHERE type = 'verification' AND status IN ('queued', 'assigned', 'in_progress')`
+    );
+    const pending = parseInt(pendingResult?.count ?? "0", 10);
+
+    // Pass rate
+    const completed = passed + failed;
+    const passRate = completed > 0 ? passed / completed : 0;
+
+    return { total, passed, failed, pending, passRate };
   }
 
   /**

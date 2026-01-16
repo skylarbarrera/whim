@@ -18,7 +18,9 @@
 ## Features (v1)
 
 - **GitHub Issue → PR Pipeline** - Label an issue `whim`, get a PR back
-- **Issue Linking** - PRs reference source issues with `Closes #N` for auto-close on merge
+- **Generic API Intake** - Submit work via description or spec from any source
+- **AI-Driven Verification** - Separate worker validates PRs actually work
+- **Repository Initialization** - `whim init` detects project type and installs skills
 - **Parallel Workers** - Run multiple Claude Code instances simultaneously
 - **Learnings System** - Workers share discoveries across tasks via vector embeddings
 - **Rate Limiting** - Respects Claude Max limits with daily budgets and cooldowns
@@ -227,20 +229,34 @@ After startup:
 
 ### Manual Work Item
 
+Submit work via description (async spec generation):
+
 ```bash
-# Submit work via API (orchestrator runs on port 3002)
+# Submit with description - spec is generated automatically
 curl -X POST http://localhost:3002/api/work \
   -H "Content-Type: application/json" \
   -d '{
     "repo": "owner/repo",
-    "branch": "ai/add-hello-endpoint",
-    "spec": "# Task\n\n- [ ] Add hello world endpoint to src/index.ts",
+    "description": "Add a hello world endpoint that returns JSON",
     "priority": "medium",
-    "metadata": {
-      "issueNumber": 42,
-      "issueTitle": "Add hello endpoint"
-    }
+    "source": "api",
+    "sourceRef": "manual-1"
   }'
+# Returns: { "id": "...", "status": "generating" }
+# Poll GET /api/work/:id until status is "queued"
+```
+
+Or submit with a pre-generated spec:
+
+```bash
+curl -X POST http://localhost:3002/api/work \
+  -H "Content-Type: application/json" \
+  -d '{
+    "repo": "owner/repo",
+    "spec": "# Task\n\n- [ ] Add hello world endpoint to src/index.ts",
+    "priority": "medium"
+  }'
+# Returns: { "id": "...", "status": "queued" }
 ```
 
 ### GitHub Integration
@@ -269,13 +285,17 @@ curl -X POST http://localhost:3002/api/work \
 | `STALE_THRESHOLD` | `300` | Seconds before worker marked stale |
 | `INTAKE_LABEL` | `whim` | GitHub label to watch |
 | `POLL_INTERVAL` | `60000` | GitHub poll interval (ms) |
+| `VERIFICATION_ENABLED` | `true` | Global default for verification |
+| `SPEC_MAX_ATTEMPTS` | `3` | Max spec generation retries |
 
 ## API Endpoints
 
 ### Work Items
-- `POST /api/work` - Create work item
+- `POST /api/work` - Create work item (accepts `description` OR `spec`)
 - `GET /api/work/:id` - Get work item status
+- `GET /api/work/:id/verification` - Get linked verification item
 - `POST /api/work/:id/cancel` - Cancel work item
+- `POST /api/work/:id/requeue` - Requeue failed/completed item
 
 ### Workers (Management)
 - `GET /api/workers` - List all workers
@@ -366,6 +386,45 @@ bun test
 # Lint
 bun run lint
 ```
+
+## CLI Commands
+
+### whim init
+
+Initialize a repository for Whim:
+
+```bash
+whim init           # Interactive mode
+whim init --yes     # Non-interactive, accept defaults
+```
+
+Detects:
+- Project type (web, api, cli, library, monorepo)
+- Package manager (npm, pnpm, bun, yarn)
+- Test framework (vitest, jest, mocha, bun test)
+- AI harness (claude-code, codex, opencode)
+
+Creates:
+- `.ralph/config.yml` - Harness preference
+- `.whim/config.yml` - Project type and verification settings
+
+Installs:
+- Ralph skills (via `add-skill`)
+- Whim verify skill
+- vitest (if no test framework)
+- playwright (for web projects)
+
+### whim verify
+
+Run AI-driven verification:
+
+```bash
+whim verify                    # Run verification
+whim verify --pr 123           # Specify PR number
+whim verify --pr 123 --comment # Post results as PR comment
+```
+
+Requires Claude Code and `ANTHROPIC_API_KEY`.
 
 ## Monitoring
 

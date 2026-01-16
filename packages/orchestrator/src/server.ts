@@ -292,6 +292,35 @@ export function createServer(deps: ServerDependencies): express.Application {
     })
   );
 
+  /**
+   * GET /api/work/:id/verification - Get verification work item linked to an execution item
+   */
+  app.get(
+    "/api/work/:id/verification",
+    asyncHandler<IdParams>(async (req, res) => {
+      // First check if the execution item exists
+      const executionItem = await deps.queue.get(req.params.id);
+      if (!executionItem) {
+        res.status(404).json(errorResponse("Work item not found", "NOT_FOUND"));
+        return;
+      }
+
+      // Only execution items can have linked verification items
+      if (executionItem.type !== 'execution') {
+        res.status(400).json(errorResponse("Only execution items have linked verification items", "INVALID_TYPE"));
+        return;
+      }
+
+      const verificationItem = await deps.queue.getVerificationForExecution(req.params.id);
+      if (!verificationItem) {
+        res.status(404).json(errorResponse("No verification item found for this execution", "NOT_FOUND"));
+        return;
+      }
+
+      res.json(verificationItem);
+    })
+  );
+
   // ==========================================================================
   // Worker Routes
   // ==========================================================================

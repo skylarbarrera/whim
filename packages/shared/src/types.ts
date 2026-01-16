@@ -127,6 +127,14 @@ export interface WorkerMetrics {
   timestamp: Date;
 }
 
+export interface VerificationStats {
+  total: number;
+  passed: number;
+  failed: number;
+  pending: number;
+  passRate: number;
+}
+
 export interface WhimMetrics {
   activeWorkers: number;
   queuedItems: number;
@@ -136,6 +144,7 @@ export interface WhimMetrics {
   dailyBudget: number;
   avgCompletionTime: number;
   successRate: number;
+  verification?: VerificationStats;
 }
 
 // API Request Types
