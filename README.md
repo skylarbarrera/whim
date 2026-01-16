@@ -288,6 +288,7 @@ curl -X POST http://localhost:3002/api/work \
 | `VERIFICATION_ENABLED` | `true` | Global default for verification |
 | `SPEC_MAX_ATTEMPTS` | `3` | Max spec generation retries |
 | `HARNESS` | `claude` | AI harness for workers: `claude` or `codex` |
+| `OPENAI_API_KEY` | - | Required when `HARNESS=codex` |
 
 ## API Endpoints
 

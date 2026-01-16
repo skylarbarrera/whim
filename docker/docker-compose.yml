@@ -59,6 +59,9 @@ services:
       STALE_THRESHOLD: ${STALE_THRESHOLD:-300}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # AI harness selection (claude or codex)
+      HARNESS: ${HARNESS:-claude}
       # Mock mode for testing lifecycle without Claude tokens
       MOCK_RALPH: ${MOCK_RALPH:-}
       MOCK_FAIL: ${MOCK_FAIL:-}
