@@ -153,7 +153,7 @@ describe("RalphSpecGenerator", () => {
       await expect(promise).rejects.toThrow("LLM API error");
     });
 
-    it("should timeout if ralph takes too long", async () => {
+    it("should timeout if ralphie takes too long", async () => {
       const promise = generator.generate("Build something");
       mockProc.simulateTimeout();
 
@@ -277,7 +277,7 @@ describe("RalphSpecGenerator", () => {
       mockSpecContent = "# Test\n\nContent";
     });
 
-    it("should pass correct arguments to ralph", async () => {
+    it("should pass correct arguments to ralphie", async () => {
       const description = "Build something";
       const promise = generator.generate(description);
 
@@ -288,7 +288,7 @@ describe("RalphSpecGenerator", () => {
       expect(calls).toBeDefined();
       // Get the last call (there may be multiple from previous tests)
       const lastCall = calls[calls.length - 1];
-      expect(lastCall[0]).toBe("ralph");
+      expect(lastCall[0]).toBe("ralphie");
       expect(lastCall[1]).toEqual([
         "spec",
         "--headless",

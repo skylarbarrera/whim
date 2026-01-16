@@ -34,6 +34,14 @@ WORKDIR /app
 # Install curl for health checks (bun-slim is Debian-based)
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user for running Claude Code (required for --dangerously-skip-permissions)
+RUN groupadd -r whim && useradd -r -g whim -m whim
+
+# Install Ralphie CLI and Claude Code globally
+RUN bun install -g ralphie @anthropic-ai/claude-code && \
+    chmod -R 755 /root && \
+    chmod 755 /usr/local/bin/ralphie /usr/local/bin/claude
+
 # Copy package files and lockfile from builder (lockfile may have been updated)
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
@@ -46,8 +54,14 @@ COPY --from=builder /app/packages/orchestrator/dist ./packages/orchestrator/dist
 # Install production dependencies only
 RUN bun install --production
 
+# Set proper ownership for the app and create writable temp dir for spec generation
+RUN chown -R whim:whim /app && mkdir -p /tmp/spec && chown whim:whim /tmp/spec
+
 # Set working directory to orchestrator package
 WORKDIR /app/packages/orchestrator
+
+# Switch to non-root user
+USER whim
 
 # Environment variables with defaults
 ENV PORT=3000

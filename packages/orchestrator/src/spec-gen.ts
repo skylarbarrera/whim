@@ -24,7 +24,7 @@ export interface RalphSpecGeneratorConfig {
 }
 
 /**
- * Events emitted by ralph spec --headless
+ * Events emitted by ralphie spec --headless
  */
 type RalphSpecEvent =
   | { event: "spec_generation_started"; description: string; timestamp: string }
@@ -47,9 +47,9 @@ export interface RalphSpecResult {
 }
 
 /**
- * Wrapper for Ralph's autonomous spec generation (ralph spec --headless)
+ * Wrapper for Ralphie's autonomous spec generation (ralphie spec --headless)
  *
- * This uses Ralph's built-in spec generation capabilities including:
+ * This uses Ralphie's built-in spec generation capabilities including:
  * - LLM-powered spec creation from descriptions
  * - Automatic validation against spec conventions
  * - Structured JSON event output
@@ -62,7 +62,7 @@ export class RalphSpecGenerator {
 
   constructor(config: RalphSpecGeneratorConfig = {}) {
     this.timeoutMs = config.timeoutMs ?? 300000; // 5 minutes default
-    this.workDir = config.workDir ?? "/tmp";
+    this.workDir = config.workDir ?? "/tmp/spec";
   }
 
   /**
@@ -94,7 +94,7 @@ export class RalphSpecGenerator {
   }
 
   /**
-   * Run ralph spec --headless and parse JSON events
+   * Run ralphie spec --headless and parse JSON events
    */
   private async runRalphSpec(description: string): Promise<RalphSpecResult> {
     return new Promise((resolve) => {
@@ -108,9 +108,9 @@ export class RalphSpecGenerator {
         description,
       ];
 
-      console.log(`[RalphSpecGen] Running: ralph ${args.join(" ")}`);
+      console.log(`[RalphSpecGen] Running: ralphie ${args.join(" ")}`);
 
-      const proc: ChildProcess = spawn("ralph", args, {
+      const proc: ChildProcess = spawn("ralphie", args, {
         cwd: this.workDir,
         env: process.env,
         stdio: ["ignore", "pipe", "pipe"],
@@ -202,12 +202,12 @@ export class RalphSpecGenerator {
         if (code === 0) {
           resolve({
             success: false,
-            error: "Ralph exited successfully but no completion event received",
+            error: "Ralphie exited successfully but no completion event received",
           });
         } else {
           resolve({
             success: false,
-            error: `Ralph exited with code ${code}: ${stderr || "no error output"}`,
+            error: `Ralphie exited with code ${code}: ${stderr || "no error output"}`,
           });
         }
       });
@@ -216,7 +216,7 @@ export class RalphSpecGenerator {
         clearTimeout(timeout);
         resolve({
           success: false,
-          error: `Failed to spawn ralph: ${err.message}`,
+          error: `Failed to spawn ralphie: ${err.message}`,
         });
       });
     });
