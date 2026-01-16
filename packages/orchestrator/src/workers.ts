@@ -274,46 +274,77 @@ export class WorkerManager {
       throw new Error(`Worker ${workerId} is not active (status: ${worker.status})`);
     }
 
+    // Get work item to determine type-specific completion logic
+    const workItem = await this.db.getWorkItem(worker.workItemId);
+    if (!workItem) {
+      throw new Error(`Work item not found: ${worker.workItemId}`);
+    }
+
     // Update worker status
     await this.db.execute(
       `UPDATE workers SET status = 'completed', completed_at = NOW() WHERE id = $1`,
       [workerId]
     );
 
-    // Update work item with prNumber if provided
-    await this.db.execute(
-      `UPDATE work_items
-       SET status = 'completed', completed_at = NOW(), pr_url = $2, pr_number = $3
-       WHERE id = $1`,
-      [worker.workItemId, data.prUrl ?? null, data.prNumber ?? null]
-    );
+    if (workItem.type === 'verification') {
+      // Verification item completion
+      // Store verification result on the verification work item
+      await this.db.execute(
+        `UPDATE work_items
+         SET status = 'completed', completed_at = NOW(), verification_passed = $2
+         WHERE id = $1`,
+        [worker.workItemId, data.verificationPassed ?? null]
+      );
 
-    // Record PR review if provided
-    if (data.review && data.prNumber && worker.workItemId) {
-      try {
-        await this.db.insertPRReview(
-          worker.workItemId,
-          data.prNumber,
-          data.review.modelUsed,
-          data.review.findings
+      // Update parent execution item metadata with verification status
+      if (workItem.parentWorkItemId) {
+        const verificationStatus = JSON.stringify({
+          passed: data.verificationPassed ?? null,
+          verificationWorkItemId: workItem.id,
+          completedAt: new Date().toISOString()
+        });
+        await this.db.execute(
+          `UPDATE work_items
+           SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{verificationStatus}', $2::jsonb)
+           WHERE id = $1`,
+          [workItem.parentWorkItemId, verificationStatus]
         );
-      } catch (error) {
-        // Log but don't fail if review tracking fails
-        console.error(`Failed to save PR review for worker ${workerId}:`, error);
+        console.log(`Updated parent work item ${workItem.parentWorkItemId} with verification status: ${data.verificationPassed}`);
       }
-    }
+    } else {
+      // Execution item completion
+      // Update work item with prUrl and prNumber
+      await this.db.execute(
+        `UPDATE work_items
+         SET status = 'completed', completed_at = NOW(), pr_url = $2, pr_number = $3
+         WHERE id = $1`,
+        [worker.workItemId, data.prUrl ?? null, data.prNumber ?? null]
+      );
 
-    // Create verification work item if verification is enabled
-    if (data.verificationEnabled && data.prNumber && worker.workItemId) {
-      try {
-        const parentWorkItem = await this.db.getWorkItem(worker.workItemId);
-        if (parentWorkItem) {
-          await this.queue.addVerificationWorkItem(parentWorkItem, data.prNumber);
-          console.log(`Created verification work item for execution item ${worker.workItemId}`);
+      // Record PR review if provided
+      if (data.review && data.prNumber && worker.workItemId) {
+        try {
+          await this.db.insertPRReview(
+            worker.workItemId,
+            data.prNumber,
+            data.review.modelUsed,
+            data.review.findings
+          );
+        } catch (error) {
+          // Log but don't fail if review tracking fails
+          console.error(`Failed to save PR review for worker ${workerId}:`, error);
         }
-      } catch (error) {
-        // Log but don't fail if verification work item creation fails
-        console.error(`Failed to create verification work item for ${workerId}:`, error);
+      }
+
+      // Create verification work item if verification is enabled
+      if (data.verificationEnabled && data.prNumber && worker.workItemId) {
+        try {
+          await this.queue.addVerificationWorkItem(workItem, data.prNumber);
+          console.log(`Created verification work item for execution item ${worker.workItemId}`);
+        } catch (error) {
+          // Log but don't fail if verification work item creation fails
+          console.error(`Failed to create verification work item for ${workerId}:`, error);
+        }
       }
     }
 

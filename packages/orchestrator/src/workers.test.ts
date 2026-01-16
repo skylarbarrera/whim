@@ -167,7 +167,7 @@ class MockDatabase {
     }
 
     // Handle UPDATE workers SET status = 'completed'
-    if (text.includes("SET status = 'completed'") && values) {
+    if (text.includes("UPDATE workers") && text.includes("SET status = 'completed'") && values) {
       const id = values[0] as string;
       const worker = this.workers.get(id);
       if (worker) {
@@ -229,7 +229,20 @@ class MockDatabase {
         } else if (text.includes("status = 'completed'")) {
           workItem.status = "completed";
           workItem.completedAt = new Date();
-          workItem.prUrl = values[1] as string | null;
+          // Handle verification completion (verification_passed is in values[1])
+          if (text.includes("verification_passed")) {
+            workItem.verificationPassed = values[1] as boolean | null;
+          } else {
+            // Execution completion (pr_url, pr_number)
+            workItem.prUrl = values[1] as string | null;
+            if (text.includes("pr_number")) {
+              workItem.prNumber = values[2] as number | null;
+            }
+          }
+        } else if (text.includes("jsonb_set") && text.includes("verificationStatus")) {
+          // Handle parent metadata update with verification status
+          const verificationStatus = JSON.parse(values[1] as string);
+          workItem.metadata = { ...workItem.metadata, verificationStatus };
         } else if (text.includes("status = 'failed'")) {
           workItem.status = "failed";
           workItem.error = values[1] as string;
@@ -681,6 +694,94 @@ describe("WorkerManager", () => {
 
       expect(mockQueue.verificationWorkItems).toHaveLength(1);
       expect(mockQueue.verificationWorkItems[0]!.parentWorkItem.priority).toBe("high");
+    });
+
+    describe("verification item completion", () => {
+      test("stores verificationPassed=true on verification work item", async () => {
+        const parentWorkItem = createWorkItem({ id: "parent-1", status: "completed", type: "execution" });
+        const verificationWorkItem = createWorkItem({
+          id: "verify-1",
+          status: "in_progress",
+          type: "verification",
+          parentWorkItemId: parentWorkItem.id
+        });
+        const worker = createWorker({ workItemId: verificationWorkItem.id });
+        mockDb._setWorkItem(parentWorkItem);
+        mockDb._setWorkItem(verificationWorkItem);
+        mockDb._setWorker(worker);
+
+        await manager.complete(worker.id, { verificationPassed: true });
+
+        const updatedWorkItem = await mockDb.getWorkItem(verificationWorkItem.id);
+        expect(updatedWorkItem?.status).toBe("completed");
+        expect(updatedWorkItem?.verificationPassed).toBe(true);
+      });
+
+      test("stores verificationPassed=false on verification work item", async () => {
+        const parentWorkItem = createWorkItem({ id: "parent-1", status: "completed", type: "execution" });
+        const verificationWorkItem = createWorkItem({
+          id: "verify-1",
+          status: "in_progress",
+          type: "verification",
+          parentWorkItemId: parentWorkItem.id
+        });
+        const worker = createWorker({ workItemId: verificationWorkItem.id });
+        mockDb._setWorkItem(parentWorkItem);
+        mockDb._setWorkItem(verificationWorkItem);
+        mockDb._setWorker(worker);
+
+        await manager.complete(worker.id, { verificationPassed: false });
+
+        const updatedWorkItem = await mockDb.getWorkItem(verificationWorkItem.id);
+        expect(updatedWorkItem?.status).toBe("completed");
+        expect(updatedWorkItem?.verificationPassed).toBe(false);
+      });
+
+      test("updates parent execution item metadata with verification status", async () => {
+        const parentWorkItem = createWorkItem({ id: "parent-1", status: "completed", type: "execution", metadata: {} });
+        const verificationWorkItem = createWorkItem({
+          id: "verify-1",
+          status: "in_progress",
+          type: "verification",
+          parentWorkItemId: parentWorkItem.id
+        });
+        const worker = createWorker({ workItemId: verificationWorkItem.id });
+        mockDb._setWorkItem(parentWorkItem);
+        mockDb._setWorkItem(verificationWorkItem);
+        mockDb._setWorker(worker);
+
+        await manager.complete(worker.id, { verificationPassed: true });
+
+        const updatedParent = await mockDb.getWorkItem(parentWorkItem.id);
+        expect(updatedParent?.metadata).toBeDefined();
+        expect((updatedParent?.metadata as Record<string, unknown>).verificationStatus).toBeDefined();
+        const verificationStatus = (updatedParent?.metadata as Record<string, unknown>).verificationStatus as Record<string, unknown>;
+        expect(verificationStatus.passed).toBe(true);
+        expect(verificationStatus.verificationWorkItemId).toBe(verificationWorkItem.id);
+      });
+
+      test("does not create verification work item for verification type completion", async () => {
+        const parentWorkItem = createWorkItem({ id: "parent-1", status: "completed", type: "execution" });
+        const verificationWorkItem = createWorkItem({
+          id: "verify-1",
+          status: "in_progress",
+          type: "verification",
+          parentWorkItemId: parentWorkItem.id
+        });
+        const worker = createWorker({ workItemId: verificationWorkItem.id });
+        mockDb._setWorkItem(parentWorkItem);
+        mockDb._setWorkItem(verificationWorkItem);
+        mockDb._setWorker(worker);
+
+        await manager.complete(worker.id, {
+          verificationPassed: true,
+          verificationEnabled: true, // Should be ignored for verification items
+          prNumber: 123
+        });
+
+        // Should NOT create another verification work item
+        expect(mockQueue.verificationWorkItems).toHaveLength(0);
+      });
     });
   });
 
