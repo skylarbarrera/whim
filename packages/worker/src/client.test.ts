@@ -143,6 +143,111 @@ describe("OrchestratorClient", () => {
         })
       );
     });
+
+    it("should include prNumber when provided", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({}), { status: 200 })
+      );
+
+      await client.complete(
+        "https://github.com/owner/repo/pull/42",
+        undefined,
+        undefined,
+        42
+      );
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.prNumber).toBe(42);
+    });
+
+    it("should include verificationEnabled when provided", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({}), { status: 200 })
+      );
+
+      await client.complete(
+        "https://github.com/owner/repo/pull/1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.verificationEnabled).toBe(true);
+    });
+
+    it("should include review data when provided", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({}), { status: 200 })
+      );
+
+      const reviewData = {
+        modelUsed: "claude-sonnet-4-20250514",
+        findings: {
+          criticalIssues: [],
+          suggestions: [{ severity: "low" as const, message: "Consider adding types" }],
+          securityConcerns: [],
+        },
+      };
+
+      await client.complete(
+        "https://github.com/owner/repo/pull/1",
+        undefined,
+        undefined,
+        undefined,
+        reviewData
+      );
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.review).toEqual(reviewData);
+    });
+
+    it("should include all optional completion fields when provided", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({}), { status: 200 })
+      );
+
+      const metrics = {
+        tokensIn: 1000,
+        tokensOut: 500,
+        duration: 60000,
+        filesModified: 3,
+        testsRun: 10,
+        testsPassed: 10,
+        testsFailed: 0,
+        testStatus: "passed" as const,
+      };
+
+      const learnings = [{ content: "Learning 1", spec: "spec 1" }];
+
+      const reviewData = {
+        modelUsed: "claude-sonnet-4-20250514",
+        findings: {
+          criticalIssues: [],
+          suggestions: [],
+          securityConcerns: [],
+        },
+      };
+
+      await client.complete(
+        "https://github.com/owner/repo/pull/42",
+        metrics,
+        learnings,
+        42,
+        reviewData,
+        true
+      );
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.prUrl).toBe("https://github.com/owner/repo/pull/42");
+      expect(callBody.prNumber).toBe(42);
+      expect(callBody.metrics).toEqual(metrics);
+      expect(callBody.learnings).toEqual(learnings);
+      expect(callBody.review).toEqual(reviewData);
+      expect(callBody.verificationEnabled).toBe(true);
+    });
   });
 
   describe("fail", () => {
