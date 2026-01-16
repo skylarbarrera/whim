@@ -4,6 +4,7 @@ import React from 'react';
 import { render } from 'ink';
 import { Dashboard } from './commands/dashboard.js';
 import { loadConfig } from './config.js';
+import { runVerify } from './commands/verify.js';
 
 const config = loadConfig();
 const defaultApiUrl = config.apiUrl || process.env.ORCHESTRATOR_URL || 'http://localhost:3002';
@@ -50,6 +51,25 @@ program
       console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
+  });
+
+program
+  .command('verify')
+  .description('Run AI-driven verification via Claude Code')
+  .option('--pr <number>', 'PR number for commenting', parseInt)
+  .option('--comment', 'Post results as PR comment')
+  .action(async (options: { pr?: number; comment?: boolean }) => {
+    if (options.comment && options.pr === undefined) {
+      console.error('Error: --comment requires --pr <number>');
+      process.exit(2);
+    }
+
+    const result = await runVerify({
+      pr: options.pr,
+      comment: options.comment,
+    });
+
+    process.exit(result.exitCode);
   });
 
 program.parse(process.argv);
