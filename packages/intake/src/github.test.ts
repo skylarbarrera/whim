@@ -46,6 +46,7 @@ const mockListForRepo = mock(() =>
 
 const mockAddLabels = mock(() => Promise.resolve());
 const mockRemoveLabel = mock(() => Promise.resolve());
+const mockCreateComment = mock(() => Promise.resolve());
 
 // Mock the Octokit module
 mock.module("@octokit/rest", () => ({
@@ -54,6 +55,7 @@ mock.module("@octokit/rest", () => ({
       listForRepo: mockListForRepo,
       addLabels: mockAddLabels,
       removeLabel: mockRemoveLabel,
+      createComment: mockCreateComment,
     };
   },
 }));
@@ -248,6 +250,21 @@ describe("GitHubAdapter", () => {
         repo: "repo",
         issue_number: 42,
         name: "ai-processing",
+      });
+    });
+  });
+
+  describe("postComment", () => {
+    it("should post a comment on an issue", async () => {
+      mockCreateComment.mockClear();
+
+      await adapter.postComment("owner", "repo", 42, "Test comment");
+
+      expect(mockCreateComment).toHaveBeenCalledWith({
+        owner: "owner",
+        repo: "repo",
+        issue_number: 42,
+        body: "Test comment",
       });
     });
   });

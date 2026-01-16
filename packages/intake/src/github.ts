@@ -223,6 +223,25 @@ export class GitHubAdapter {
   }
 
   /**
+   * Post a comment on an issue
+   */
+  async postComment(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<void> {
+    await withRetry(() =>
+      this.octokit.issues.createComment({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        body,
+      })
+    );
+  }
+
+  /**
    * Get the configured labels
    */
   getLabels() {
