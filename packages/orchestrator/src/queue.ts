@@ -160,6 +160,38 @@ export class QueueManager {
   }
 
   /**
+   * Requeue a work item
+   * Only requeues if status is 'failed', 'completed', or 'cancelled'
+   * Resets status to 'queued', clears worker_id and error
+   * Returns the updated work item
+   */
+  async requeue(id: string): Promise<WorkItem> {
+    const workItem = await this.db.getWorkItem(id);
+    if (!workItem) {
+      throw new Error(`Work item not found: ${id}`);
+    }
+
+    const requeueableStatuses: WorkItemStatus[] = ['failed', 'completed', 'cancelled'];
+    if (!requeueableStatuses.includes(workItem.status)) {
+      throw new Error(`Cannot requeue work item with status: ${workItem.status}`);
+    }
+
+    const result = await this.db.queryOne<WorkItem>(
+      `UPDATE work_items
+       SET status = 'queued', worker_id = NULL, error = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    if (!result) {
+      throw new Error(`Failed to requeue work item: ${id}`);
+    }
+
+    return result;
+  }
+
+  /**
    * List active work items (queued, assigned, or in_progress)
    *
    * @param type - Optional filter by work item type

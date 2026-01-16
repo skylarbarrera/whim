@@ -270,6 +270,28 @@ export function createServer(deps: ServerDependencies): express.Application {
     })
   );
 
+  /**
+   * POST /api/work/:id/requeue - Requeue a failed/completed/cancelled work item
+   */
+  app.post(
+    "/api/work/:id/requeue",
+    asyncHandler<IdParams>(async (req, res) => {
+      try {
+        const workItem = await deps.queue.requeue(req.params.id);
+        res.json(workItem);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        if (message.includes("not found")) {
+          res.status(404).json(errorResponse(message, "NOT_FOUND"));
+        } else if (message.includes("Cannot requeue")) {
+          res.status(400).json(errorResponse(message, "INVALID_STATE"));
+        } else {
+          throw error;
+        }
+      }
+    })
+  );
+
   // ==========================================================================
   // Worker Routes
   // ==========================================================================

@@ -61,6 +61,7 @@ function createMockDeps(): ServerDependencies {
       add: mock(() => Promise.resolve(createWorkItem())),
       get: mock(() => Promise.resolve(createWorkItem())),
       cancel: mock(() => Promise.resolve(true)),
+      requeue: mock(() => Promise.resolve(createWorkItem({ status: "queued" }))),
       list: mock(() => Promise.resolve([createWorkItem()])),
       getStats: mock(() =>
         Promise.resolve({
@@ -483,6 +484,45 @@ describe("Server", () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain("Invalid type parameter");
+    });
+
+    it("POST /api/work/:id/requeue requeues failed work item", async () => {
+      const deps = createMockDeps();
+      const requeuedItem = createWorkItem({ status: "queued", error: null });
+      (deps.queue.requeue as ReturnType<typeof mock>).mockImplementation(() => Promise.resolve(requeuedItem));
+      const app = createServer(deps);
+
+      const res = await request(app).post("/api/work/work-123/requeue");
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe("queued");
+      expect(deps.queue.requeue).toHaveBeenCalledWith("work-123");
+    });
+
+    it("POST /api/work/:id/requeue returns 404 for non-existent work item", async () => {
+      const deps = createMockDeps();
+      (deps.queue.requeue as ReturnType<typeof mock>).mockImplementation(() => {
+        throw new Error("Work item not found: work-999");
+      });
+      const app = createServer(deps);
+
+      const res = await request(app).post("/api/work/work-999/requeue");
+
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("NOT_FOUND");
+    });
+
+    it("POST /api/work/:id/requeue returns 400 for non-requeueable status", async () => {
+      const deps = createMockDeps();
+      (deps.queue.requeue as ReturnType<typeof mock>).mockImplementation(() => {
+        throw new Error("Cannot requeue work item with status: in_progress");
+      });
+      const app = createServer(deps);
+
+      const res = await request(app).post("/api/work/work-123/requeue");
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe("INVALID_STATE");
     });
 
     it("GET /api/metrics returns whim metrics", async () => {
