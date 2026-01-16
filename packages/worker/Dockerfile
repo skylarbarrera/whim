@@ -59,12 +59,8 @@ RUN npm install -g jest ts-jest typescript @types/jest @types/node vitest
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
-# Install Ralph from GitHub
-RUN git clone https://github.com/skylarbarrera/ralph.git /opt/ralph \
-    && cd /opt/ralph \
-    && npm install \
-    && npm link
-ENV PATH="/opt/ralph/bin:${PATH}"
+# Install Ralphie from npm
+RUN npm install -g ralphie
 
 # Create non-root user for security (Claude blocks --dangerously-skip-permissions for root)
 RUN useradd -m -s /bin/bash worker
@@ -91,7 +87,7 @@ COPY --chown=worker:worker packages/worker/.claude /home/worker/.claude
 RUN mkdir -p /home/worker/.claude/todos /home/worker/.claude/debug
 
 # Set ownership of app directory and Claude config
-RUN chown -R worker:worker /app /opt/ralph /home/worker/.claude
+RUN chown -R worker:worker /app /home/worker/.claude
 
 # Switch to non-root user
 USER worker

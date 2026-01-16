@@ -100,6 +100,9 @@ export class MetricsCollector {
     // Get verification-specific metrics
     const verificationStats = await this.getVerificationStats();
 
+    // Get token usage today for cost estimation
+    const tokenUsage = await this.getTokenUsageToday();
+
     return {
       activeWorkers,
       queuedItems,
@@ -110,7 +113,36 @@ export class MetricsCollector {
       avgCompletionTime,
       successRate,
       verification: verificationStats,
+      tokenUsage,
     };
+  }
+
+  /**
+   * Get token usage for today with estimated cost
+   * Uses Claude Sonnet pricing: $3/MTok input, $15/MTok output
+   */
+  private async getTokenUsageToday(): Promise<{
+    tokensIn: number;
+    tokensOut: number;
+    estimatedCostUsd: number;
+  }> {
+    const result = await this.db.queryOne<{ tokens_in: string; tokens_out: string }>(
+      `SELECT
+        COALESCE(SUM(tokens_in), 0) as tokens_in,
+        COALESCE(SUM(tokens_out), 0) as tokens_out
+       FROM worker_metrics
+       WHERE timestamp >= CURRENT_DATE`
+    );
+
+    const tokensIn = parseInt(result?.tokens_in ?? "0", 10);
+    const tokensOut = parseInt(result?.tokens_out ?? "0", 10);
+
+    // Claude Sonnet pricing (as of 2024): $3/MTok input, $15/MTok output
+    const inputCost = (tokensIn / 1_000_000) * 3;
+    const outputCost = (tokensOut / 1_000_000) * 15;
+    const estimatedCostUsd = Math.round((inputCost + outputCost) * 100) / 100;
+
+    return { tokensIn, tokensOut, estimatedCostUsd };
   }
 
   /**

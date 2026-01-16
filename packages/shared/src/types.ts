@@ -135,6 +135,12 @@ export interface VerificationStats {
   passRate: number;
 }
 
+export interface TokenUsage {
+  tokensIn: number;
+  tokensOut: number;
+  estimatedCostUsd: number;
+}
+
 export interface WhimMetrics {
   activeWorkers: number;
   queuedItems: number;
@@ -145,6 +151,7 @@ export interface WhimMetrics {
   avgCompletionTime: number;
   successRate: number;
   verification?: VerificationStats;
+  tokenUsage?: TokenUsage;
 }
 
 // API Request Types
