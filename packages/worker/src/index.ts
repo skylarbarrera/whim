@@ -1,4 +1,4 @@
-import type { WorkItem, RalphConfig, WhimConfig } from "@whim/shared";
+import type { RalphConfig, WhimConfig } from "@whim/shared";
 import { OrchestratorClient } from "./client.js";
 import { setupWorkspace, createPullRequest, verifyGitAuth } from "./setup.js";
 import {
@@ -19,6 +19,7 @@ import {
   getDefaultWhimConfig,
 } from "./config.js";
 import { runVerificationWorker } from "./verification-worker.js";
+import { validateEnvironment } from "./shared-worker.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;
@@ -30,57 +31,31 @@ interface WorkerConfig {
 }
 
 function getConfig(): WorkerConfig {
-  const orchestratorUrl = process.env.ORCHESTRATOR_URL;
-  if (!orchestratorUrl) {
-    throw new Error("ORCHESTRATOR_URL environment variable is required");
-  }
-
-  const workerId = process.env.WORKER_ID;
-  if (!workerId) {
-    throw new Error("WORKER_ID environment variable is required");
-  }
-
-  const workItemJson = process.env.WORK_ITEM;
-  if (!workItemJson) {
-    throw new Error("WORK_ITEM environment variable is required");
-  }
-
-  let workItem: WorkItem;
-  try {
-    workItem = JSON.parse(workItemJson);
-  } catch {
-    throw new Error("WORK_ITEM must be valid JSON");
-  }
+  const env = validateEnvironment();
 
   // Validate execution-ready fields
-  if (!workItem.spec) {
+  if (!env.workItem.spec) {
     throw new Error("Work item must have a spec to execute (spec is null/undefined)");
   }
-  if (!workItem.branch) {
+  if (!env.workItem.branch) {
     throw new Error("Work item must have a branch to execute (branch is null/undefined)");
   }
 
   // Type narrowing: we've validated spec and branch are present
   const executionReadyWorkItem: ExecutionReadyWorkItem = {
-    ...workItem,
-    spec: workItem.spec,
-    branch: workItem.branch,
+    ...env.workItem,
+    spec: env.workItem.spec,
+    branch: env.workItem.branch,
   };
 
-  const githubToken = process.env.GITHUB_TOKEN;
-  if (!githubToken) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
-  const workDir = process.env.WORK_DIR ?? "/workspace";
   const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
 
   return {
-    orchestratorUrl,
-    workerId,
+    orchestratorUrl: env.orchestratorUrl,
+    workerId: env.workerId,
     workItem: executionReadyWorkItem,
-    githubToken,
-    workDir,
+    githubToken: env.githubToken,
+    workDir: env.workDir,
     claudeConfigDir,
   };
 }
