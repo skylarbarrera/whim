@@ -5,6 +5,7 @@ import { render } from 'ink';
 import { Dashboard } from './commands/dashboard.js';
 import { loadConfig } from './config.js';
 import { runVerify } from './commands/verify.js';
+import { runInit } from './commands/init.js';
 
 const config = loadConfig();
 const defaultApiUrl = config.apiUrl || process.env.ORCHESTRATOR_URL || 'http://localhost:3002';
@@ -70,6 +71,19 @@ program
     });
 
     process.exit(result.exitCode);
+  });
+
+program
+  .command('init')
+  .description('Initialize Whim in a repository')
+  .option('-y, --yes', 'Non-interactive mode, accept defaults')
+  .action(async (options: { yes?: boolean }) => {
+    try {
+      await runInit({ yes: options.yes });
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
   });
 
 program.parse(process.argv);
