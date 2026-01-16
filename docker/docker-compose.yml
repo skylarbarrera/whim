@@ -42,6 +42,9 @@ services:
       dockerfile: packages/orchestrator/Dockerfile
     container_name: whim-orchestrator
     restart: unless-stopped
+    # Run as root but use non-root for spec generation (handled in code)
+    # This allows Docker socket access for worker spawning
+    user: root
     depends_on:
       postgres:
         condition: service_healthy

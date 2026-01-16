@@ -289,15 +289,16 @@ describe("RalphSpecGenerator", () => {
       // Get the last call (there may be multiple from previous tests)
       const lastCall = calls[calls.length - 1];
       expect(lastCall[0]).toBe("ralphie");
-      expect(lastCall[1]).toEqual([
-        "spec",
-        "--headless",
-        "--timeout",
-        "1",
-        "--cwd",
-        "/tmp/test",
-        description,
-      ]);
+
+      // Check args - workDir now includes a UUID subdirectory for isolation
+      const args = lastCall[1] as string[];
+      expect(args[0]).toBe("spec");
+      expect(args[1]).toBe("--headless");
+      expect(args[2]).toBe("--timeout");
+      expect(args[3]).toBe("1");
+      expect(args[4]).toBe("--cwd");
+      expect(args[5]).toMatch(/^\/tmp\/test\/[0-9a-f-]{36}$/); // UUID pattern
+      expect(args[6]).toBe(description);
 
       mockProc.simulateSuccess();
       await promise;

@@ -459,7 +459,7 @@ describe("Server", () => {
 
       expect(res.status).toBe(200);
       expect(res.body.items).toHaveLength(1);
-      expect(deps.queue.list).toHaveBeenCalledWith("execution");
+      expect(deps.queue.list).toHaveBeenCalledWith("execution", undefined);
     });
 
     it("GET /api/queue?type=verification filters for verification items", async () => {
@@ -473,7 +473,22 @@ describe("Server", () => {
       expect(res.status).toBe(200);
       expect(res.body.items).toHaveLength(1);
       expect(res.body.items[0].type).toBe("verification");
-      expect(deps.queue.list).toHaveBeenCalledWith("verification");
+      expect(deps.queue.list).toHaveBeenCalledWith("verification", undefined);
+    });
+
+    it("GET /api/queue?status=failed shows failed items with errors", async () => {
+      const deps = createMockDeps();
+      const failedItem = createWorkItem({ status: "failed", error: "Spec generation failed" });
+      (deps.queue.list as ReturnType<typeof mock>).mockImplementation(() => Promise.resolve([failedItem]));
+      const app = createServer(deps);
+
+      const res = await request(app).get("/api/queue?status=failed");
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].status).toBe("failed");
+      expect(res.body.items[0].error).toBe("Spec generation failed");
+      expect(deps.queue.list).toHaveBeenCalledWith(undefined, "failed");
     });
 
     it("GET /api/queue?type=invalid returns 400 error", async () => {

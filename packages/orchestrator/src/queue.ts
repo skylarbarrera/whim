@@ -192,18 +192,50 @@ export class QueueManager {
   }
 
   /**
-   * List active work items (queued, assigned, or in_progress)
+   * List work items with optional filters
    *
    * @param type - Optional filter by work item type
+   * @param status - Optional status filter:
+   *   - undefined: show active items (queued, assigned, in_progress)
+   *   - 'failed': show only failed items
+   *   - 'completed': show only completed items
+   *   - 'generating': show only generating items
+   *   - 'all': show all items
    */
-  async list(type?: WorkItemType): Promise<WorkItem[]> {
-    const typeCondition = type ? `AND type = $1::work_item_type` : '';
-    const params = type ? [type] : [];
+  async list(
+    type?: WorkItemType,
+    status?: 'failed' | 'completed' | 'all' | 'generating'
+  ): Promise<WorkItem[]> {
+    const conditions: string[] = [];
+    const params: (string | undefined)[] = [];
+    let paramIndex = 1;
+
+    // Type filter
+    if (type) {
+      conditions.push(`type = $${paramIndex}::work_item_type`);
+      params.push(type);
+      paramIndex++;
+    }
+
+    // Status filter
+    if (status === 'all') {
+      // No status filter - show all
+    } else if (status === 'failed') {
+      conditions.push(`status = 'failed'::work_item_status`);
+    } else if (status === 'completed') {
+      conditions.push(`status = 'completed'::work_item_status`);
+    } else if (status === 'generating') {
+      conditions.push(`status = 'generating'::work_item_status`);
+    } else {
+      // Default: show active items
+      conditions.push(`status IN ('queued', 'assigned', 'in_progress')`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     return this.db.query<WorkItem>(
       `SELECT * FROM work_items
-       WHERE status IN ('queued', 'assigned', 'in_progress')
-         ${typeCondition}
+       ${whereClause}
        ORDER BY
          (type = 'execution') DESC,
          CASE priority

@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 
 export interface GenerateMetadata {
   source?: string; // 'github', 'linear', 'api', etc.
@@ -66,37 +67,48 @@ export class RalphSpecGenerator {
   }
 
   /**
-   * Generate a spec from a description using Ralph
+   * Generate a spec from a description using Ralphie
    *
    * @param description - The work description (can be from any source)
    * @param metadata - Optional metadata for branch naming and tracking
    */
   async generate(description: string, metadata?: GenerateMetadata): Promise<GeneratedSpec> {
-    const result = await this.runRalphSpec(description);
+    // Create unique work directory to avoid race conditions with concurrent generations
+    const uniqueDir = `${this.workDir}/${randomUUID()}`;
 
-    if (!result.success || !result.spec) {
-      throw new Error(result.error ?? "Ralph spec generation failed");
+    try {
+      mkdirSync(uniqueDir, { recursive: true });
+      const result = await this.runRalphSpec(description, uniqueDir);
+
+      if (!result.success || !result.spec) {
+        throw new Error(result.error ?? "Ralphie spec generation failed");
+      }
+
+      const branch = this.generateBranchName(metadata);
+      const title = metadata?.title ?? this.extractTitleFromSpec(result.spec);
+
+      return {
+        title,
+        spec: result.spec,
+        branch,
+        metadata: {
+          source: metadata?.source,
+          sourceRef: metadata?.sourceRef,
+          generatedAt: new Date().toISOString(),
+        },
+      };
+    } finally {
+      // Clean up unique directory
+      if (existsSync(uniqueDir)) {
+        rmSync(uniqueDir, { recursive: true, force: true });
+      }
     }
-
-    const branch = this.generateBranchName(metadata);
-    const title = metadata?.title ?? this.extractTitleFromSpec(result.spec);
-
-    return {
-      title,
-      spec: result.spec,
-      branch,
-      metadata: {
-        source: metadata?.source,
-        sourceRef: metadata?.sourceRef,
-        generatedAt: new Date().toISOString(),
-      },
-    };
   }
 
   /**
    * Run ralphie spec --headless and parse JSON events
    */
-  private async runRalphSpec(description: string): Promise<RalphSpecResult> {
+  private async runRalphSpec(description: string, workDir: string): Promise<RalphSpecResult> {
     return new Promise((resolve) => {
       const args = [
         "spec",
@@ -104,14 +116,20 @@ export class RalphSpecGenerator {
         "--timeout",
         String(Math.floor(this.timeoutMs / 1000)),
         "--cwd",
-        this.workDir,
+        workDir,
         description,
       ];
 
       console.log(`[RalphSpecGen] Running: ralphie ${args.join(" ")}`);
 
-      const proc: ChildProcess = spawn("ralphie", args, {
-        cwd: this.workDir,
+      // Run as non-root user 'whim' if we're root (required for Claude Code's --dangerously-skip-permissions)
+      // In non-Docker environments or when already non-root, run directly
+      const isRoot = process.getuid?.() === 0;
+      const command = isRoot ? "su" : "ralphie";
+      const commandArgs = isRoot ? ["-", "whim", "-c", `ralphie ${args.join(" ")}`] : args;
+
+      const proc: ChildProcess = spawn(command, commandArgs, {
+        cwd: workDir,
         env: process.env,
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -164,7 +182,7 @@ export class RalphSpecGenerator {
 
         if (completeEvent) {
           // Read the generated SPEC.md file
-          const specPath = `${this.workDir}/SPEC.md`;
+          const specPath = `${workDir}/SPEC.md`;
           try {
             const spec = readFileSync(specPath, "utf-8");
 

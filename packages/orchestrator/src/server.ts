@@ -518,7 +518,9 @@ export function createServer(deps: ServerDependencies): express.Application {
 
   /**
    * GET /api/queue - Queue contents and stats
-   * Supports optional ?type=execution|verification filter
+   * Supports optional filters:
+   *   ?type=execution|verification - filter by work item type
+   *   ?status=failed|completed|all - include non-active items (default shows active only)
    */
   app.get(
     "/api/queue",
@@ -537,7 +539,20 @@ export function createServer(deps: ServerDependencies): express.Application {
         type = typeParam as WorkItemType;
       }
 
-      const [items, stats] = await Promise.all([deps.queue.list(type), deps.queue.getStats()]);
+      // Validate status query parameter
+      const statusParam = req.query.status as string | undefined;
+      const validStatuses = ['failed', 'completed', 'all', 'generating'];
+      if (statusParam && !validStatuses.includes(statusParam)) {
+        res.status(400).json({
+          error: `Invalid status parameter. Must be one of: ${validStatuses.join(', ')}`
+        });
+        return;
+      }
+
+      const [items, stats] = await Promise.all([
+        deps.queue.list(type, statusParam as 'failed' | 'completed' | 'all' | 'generating' | undefined),
+        deps.queue.getStats()
+      ]);
       res.json({ items, stats });
     })
   );
