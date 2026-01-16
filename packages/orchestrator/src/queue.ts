@@ -93,19 +93,27 @@ export class QueueManager {
    * Get the next highest priority queued work item
    * Uses FOR UPDATE SKIP LOCKED for safe concurrent access
    * Returns null if no items are queued
+   *
+   * @param type - Optional filter by work item type. When omitted, execution items have priority over verification items.
    */
-  async getNext(): Promise<WorkItem | null> {
+  async getNext(type?: WorkItemType): Promise<WorkItem | null> {
     // Use a transaction to atomically select and update
     return this.db.transaction(async (client) => {
       // Select the highest priority queued item and lock it
       // Priority enum values are ordered naturally by PostgreSQL (critical > high > medium > low)
       // But we use CASE to be explicit about ordering
       // Also respect retry backoff: skip items whose next_retry_at is in the future
+      // When no type filter: execution items have priority over verification items
+      const typeCondition = type ? `AND type = $1::work_item_type` : '';
+      const params = type ? [type] : [];
+
       const selectResult = await client.query(
         `SELECT * FROM work_items
          WHERE status = 'queued'
            AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+           ${typeCondition}
          ORDER BY
+           ${type ? '' : "(type = 'execution') DESC,"}
            CASE priority
              WHEN 'critical' THEN 4
              WHEN 'high' THEN 3
@@ -115,7 +123,7 @@ export class QueueManager {
            created_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED`,
-        []
+        params
       );
 
       if (selectResult.rows.length === 0) {
@@ -153,19 +161,27 @@ export class QueueManager {
 
   /**
    * List active work items (queued, assigned, or in_progress)
+   *
+   * @param type - Optional filter by work item type
    */
-  async list(): Promise<WorkItem[]> {
+  async list(type?: WorkItemType): Promise<WorkItem[]> {
+    const typeCondition = type ? `AND type = $1::work_item_type` : '';
+    const params = type ? [type] : [];
+
     return this.db.query<WorkItem>(
       `SELECT * FROM work_items
        WHERE status IN ('queued', 'assigned', 'in_progress')
+         ${typeCondition}
        ORDER BY
+         (type = 'execution') DESC,
          CASE priority
            WHEN 'critical' THEN 4
            WHEN 'high' THEN 3
            WHEN 'medium' THEN 2
            WHEN 'low' THEN 1
          END DESC,
-         created_at ASC`
+         created_at ASC`,
+      params
     );
   }
 

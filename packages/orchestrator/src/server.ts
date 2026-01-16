@@ -23,6 +23,7 @@ import type {
   WorkerStuckRequest,
   ErrorResponse,
   StatusResponse,
+  WorkItemType,
 } from "@whim/shared";
 
 /**
@@ -466,11 +467,26 @@ export function createServer(deps: ServerDependencies): express.Application {
 
   /**
    * GET /api/queue - Queue contents and stats
+   * Supports optional ?type=execution|verification filter
    */
   app.get(
     "/api/queue",
-    asyncHandler(async (_req, res) => {
-      const [items, stats] = await Promise.all([deps.queue.list(), deps.queue.getStats()]);
+    asyncHandler(async (req, res) => {
+      // Validate type query parameter
+      const typeParam = req.query.type as string | undefined;
+      let type: WorkItemType | undefined;
+
+      if (typeParam) {
+        if (typeParam !== 'execution' && typeParam !== 'verification') {
+          res.status(400).json({
+            error: 'Invalid type parameter. Must be "execution" or "verification"'
+          });
+          return;
+        }
+        type = typeParam as WorkItemType;
+      }
+
+      const [items, stats] = await Promise.all([deps.queue.list(type), deps.queue.getStats()]);
       res.json({ items, stats });
     })
   );

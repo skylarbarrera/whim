@@ -448,6 +448,43 @@ describe("Server", () => {
       expect(res.body.stats.total).toBe(1);
     });
 
+    it("GET /api/queue?type=execution filters for execution items", async () => {
+      const deps = createMockDeps();
+      const executionItem = createWorkItem({ type: "execution" });
+      (deps.queue.list as ReturnType<typeof mock>).mockImplementation(() => Promise.resolve([executionItem]));
+      const app = createServer(deps);
+
+      const res = await request(app).get("/api/queue?type=execution");
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(1);
+      expect(deps.queue.list).toHaveBeenCalledWith("execution");
+    });
+
+    it("GET /api/queue?type=verification filters for verification items", async () => {
+      const deps = createMockDeps();
+      const verificationItem = createWorkItem({ type: "verification", prNumber: 42, parentWorkItemId: "parent-123" });
+      (deps.queue.list as ReturnType<typeof mock>).mockImplementation(() => Promise.resolve([verificationItem]));
+      const app = createServer(deps);
+
+      const res = await request(app).get("/api/queue?type=verification");
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].type).toBe("verification");
+      expect(deps.queue.list).toHaveBeenCalledWith("verification");
+    });
+
+    it("GET /api/queue?type=invalid returns 400 error", async () => {
+      const deps = createMockDeps();
+      const app = createServer(deps);
+
+      const res = await request(app).get("/api/queue?type=invalid");
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("Invalid type parameter");
+    });
+
     it("GET /api/metrics returns whim metrics", async () => {
       const deps = createMockDeps();
       const app = createServer(deps);
