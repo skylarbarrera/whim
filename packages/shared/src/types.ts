@@ -255,6 +255,32 @@ export interface WorkerLogsResponse {
   logs: string[];
 }
 
+// Config Types
+
+export type HarnessType = "claude-code" | "codex" | "opencode";
+export type ProjectType = "web" | "api" | "cli" | "library" | "monorepo";
+
+export interface RalphConfig {
+  harness: HarnessType;
+}
+
+export interface VerificationSettings {
+  enabled: boolean;
+  browser?: boolean;
+  unit?: boolean;
+  api?: boolean;
+}
+
+export interface WhimConfig {
+  type: ProjectType;
+  verification: VerificationSettings;
+  packages?: Array<{
+    path: string;
+    type: ProjectType;
+    verification: VerificationSettings;
+  }>;
+}
+
 // Error Response
 
 export interface ErrorResponse {

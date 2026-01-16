@@ -112,7 +112,8 @@ export class OrchestratorClient {
     metrics?: WorkerCompleteRequest["metrics"],
     learnings?: WorkerCompleteRequest["learnings"],
     prNumber?: number,
-    review?: WorkerCompleteRequest["review"]
+    review?: WorkerCompleteRequest["review"],
+    verificationEnabled?: boolean
   ): Promise<void> {
     const body: WorkerCompleteRequest = {
       prUrl,
@@ -120,6 +121,7 @@ export class OrchestratorClient {
       review,
       metrics,
       learnings,
+      verificationEnabled,
     };
 
     await this.request<void>(

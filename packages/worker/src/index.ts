@@ -1,4 +1,4 @@
-import type { WorkItem } from "@whim/shared";
+import type { WorkItem, RalphConfig, WhimConfig } from "@whim/shared";
 import { OrchestratorClient } from "./client.js";
 import { setupWorkspace, createPullRequest, verifyGitAuth } from "./setup.js";
 import {
@@ -12,6 +12,12 @@ import { runMockRalph } from "./mock-ralph.js";
 import { runTests } from "./testing.js";
 import { reviewPullRequest } from "./review.js";
 import type { ExecutionReadyWorkItem } from "./types.js";
+import {
+  readRalphConfig,
+  readWhimConfig,
+  getDefaultRalphConfig,
+  getDefaultWhimConfig,
+} from "./config.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;
@@ -100,6 +106,14 @@ async function main(): Promise<void> {
     claudeConfigDir: config.claudeConfigDir,
   });
   console.log(`Workspace ready at: ${repoDir}`);
+
+  // Read config files from target repo
+  console.log("Reading repository configs...");
+  const ralphConfig = (await readRalphConfig(repoDir)) ?? getDefaultRalphConfig();
+  const whimConfig = (await readWhimConfig(repoDir)) ?? getDefaultWhimConfig();
+  console.log(`Ralph harness: ${ralphConfig.harness}`);
+  console.log(`Project type: ${whimConfig.type}`);
+  console.log(`Verification enabled: ${whimConfig.verification.enabled}`);
 
   // Verify git push access BEFORE doing any work
   console.log("Verifying git push access...");
@@ -248,7 +262,14 @@ async function main(): Promise<void> {
         }
       : undefined;
 
-    await client.complete(prUrl, result.metrics, learnings, prNumber, reviewData);
+    await client.complete(
+      prUrl,
+      result.metrics,
+      learnings,
+      prNumber,
+      reviewData,
+      whimConfig.verification.enabled
+    );
     console.log("Completion reported to orchestrator");
   } else {
     console.error("Ralph failed:", result.error);
