@@ -20,6 +20,7 @@ class MockDatabase {
   workItems: Map<string, WorkItem> = new Map();
   metrics: Array<Record<string, unknown>> = [];
   private idCounter = 0;
+  lastExecute?: { query: string; params: unknown[] };
 
   async query<T>(text: string, values?: unknown[]): Promise<T[]> {
     // Handle SELECT workers with status filter for healthCheck
@@ -106,6 +107,9 @@ class MockDatabase {
   }
 
   async execute(text: string, values?: unknown[]): Promise<{ rowCount: number }> {
+    // Capture last execute for testing
+    this.lastExecute = { query: text, params: values || [] };
+
     // Handle INSERT INTO workers
     if (text.includes("INSERT INTO workers") && values) {
       const id = values[0] as string;
@@ -174,7 +178,7 @@ class MockDatabase {
     }
 
     // Handle UPDATE workers SET status = 'failed'
-    if (text.includes("SET status = 'failed'") && text.includes("FROM workers") === false && values) {
+    if (text.includes("UPDATE workers") && text.includes("SET status = 'failed'") && values) {
       const id = values[0] as string;
       const worker = this.workers.get(id);
       if (worker) {
@@ -213,23 +217,40 @@ class MockDatabase {
     if (text.includes("UPDATE work_items") && values) {
       const id = values[0] as string;
       const workItem = this.workItems.get(id);
+      console.log('[Mock] UPDATE work_items - id:', id, 'found:', !!workItem);
+      if (text.includes("status = 'failed'")) {
+        console.log('[Mock] Status change to failed detected');
+      }
       if (workItem) {
+        // Parse status change
         if (text.includes("status = 'in_progress'")) {
           workItem.status = "in_progress";
           workItem.workerId = values[0] as string;
-        }
-        if (text.includes("status = 'completed'")) {
+        } else if (text.includes("status = 'completed'")) {
           workItem.status = "completed";
           workItem.completedAt = new Date();
           workItem.prUrl = values[1] as string | null;
-        }
-        if (text.includes("status = 'failed'")) {
+        } else if (text.includes("status = 'failed'")) {
           workItem.status = "failed";
           workItem.error = values[1] as string;
-        }
-        if (text.includes("status = 'queued'")) {
+          if (text.includes("retry_count")) {
+            workItem.retryCount = values[2] as number;
+          }
+          if (text.includes("iteration")) {
+            const iterationIndex = text.includes("retry_count") ? 3 : 2;
+            workItem.iteration = values[iterationIndex] as number;
+          }
+        } else if (text.includes("status = 'queued'")) {
           workItem.status = "queued";
           workItem.workerId = null;
+          workItem.error = values[1] as string;
+          if (text.includes("retry_count")) {
+            workItem.retryCount = values[2] as number;
+          }
+          if (text.includes("iteration")) {
+            const iterationIndex = text.includes("next_retry_at") ? 4 : 3;
+            workItem.iteration = values[iterationIndex] as number;
+          }
         }
         return { rowCount: 1 };
       }
@@ -684,6 +705,173 @@ describe("WorkerManager", () => {
       await expect(manager.fail("unknown", "error", 1)).rejects.toThrow(
         "Worker not found"
       );
+    });
+
+    describe("execution item retry (exponential backoff)", () => {
+      test("requeues execution item with 1min backoff on first failure", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "execution",
+          retryCount: 0
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Build failed", 1);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("queued");
+        expect(updatedWorkItem?.retryCount).toBe(1);
+        expect(updatedWorkItem?.error).toContain("Execution failed (retry 1/3)");
+        expect(mockDb.lastExecute?.query).toContain("next_retry_at");
+        expect(mockDb.lastExecute?.params).toContain(1); // 1 minute backoff
+      });
+
+      test("requeues execution item with 5min backoff on second failure", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "execution",
+          retryCount: 1
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Build failed again", 2);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("queued");
+        expect(updatedWorkItem?.retryCount).toBe(2);
+        expect(updatedWorkItem?.error).toContain("Execution failed (retry 2/3)");
+        expect(mockDb.lastExecute?.params).toContain(5); // 5 minute backoff
+      });
+
+      test("requeues execution item with 30min backoff on third failure", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "execution",
+          retryCount: 2
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Build failed yet again", 3);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("queued");
+        expect(updatedWorkItem?.retryCount).toBe(3);
+        expect(updatedWorkItem?.error).toContain("Execution failed (retry 3/3)");
+        expect(mockDb.lastExecute?.params).toContain(30); // 30 minute backoff
+      });
+
+      test("marks execution item failed after max retries", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "execution",
+          retryCount: 3
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Final failure", 4);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        console.log('Last query:', mockDb.lastExecute?.query);
+        console.log('Last params:', mockDb.lastExecute?.params);
+        console.log('Updated work item:', updatedWorkItem);
+        expect(updatedWorkItem?.status).toBe("failed");
+        expect(updatedWorkItem?.retryCount).toBe(4);
+        expect(updatedWorkItem?.error).toContain("Execution failed (max retries 3)");
+        expect(mockDb.lastExecute?.query).not.toContain("next_retry_at");
+      });
+    });
+
+    describe("verification item retry (immediate)", () => {
+      test("requeues verification item immediately on first failure", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "verification",
+          retryCount: 0
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Verification failed", 1);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("queued");
+        expect(updatedWorkItem?.retryCount).toBe(1);
+        expect(updatedWorkItem?.error).toContain("Verification failed (retry 1/3)");
+        // No backoff for verification
+        expect(mockDb.lastExecute?.query).not.toContain("next_retry_at");
+      });
+
+      test("requeues verification item immediately on second failure", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "verification",
+          retryCount: 1
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Verification failed again", 2);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("queued");
+        expect(updatedWorkItem?.retryCount).toBe(2);
+        expect(updatedWorkItem?.error).toContain("Verification failed (retry 2/3)");
+      });
+
+      test("marks verification item failed after max retries (default 3)", async () => {
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "verification",
+          retryCount: 3
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Final verification failure", 4);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("failed");
+        expect(updatedWorkItem?.retryCount).toBe(4);
+        expect(updatedWorkItem?.error).toContain("Verification failed (max retries 3)");
+      });
+
+      test("respects VERIFICATION_MAX_RETRIES env var", async () => {
+        const oldEnv = process.env.VERIFICATION_MAX_RETRIES;
+        process.env.VERIFICATION_MAX_RETRIES = "5";
+
+        const workItem = createWorkItem({
+          status: "in_progress",
+          type: "verification",
+          retryCount: 5
+        });
+        const worker = createWorker({ workItemId: workItem.id, status: "running" });
+        mockDb._setWorkItem(workItem);
+        mockDb._setWorker(worker);
+
+        await manager.fail(worker.id, "Final failure", 6);
+
+        const updatedWorkItem = await mockDb.getWorkItem(workItem.id);
+        expect(updatedWorkItem?.status).toBe("failed");
+        expect(updatedWorkItem?.error).toContain("max retries 5");
+
+        // Restore env
+        if (oldEnv) {
+          process.env.VERIFICATION_MAX_RETRIES = oldEnv;
+        } else {
+          delete process.env.VERIFICATION_MAX_RETRIES;
+        }
+      });
     });
   });
 

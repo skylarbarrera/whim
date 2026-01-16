@@ -375,13 +375,60 @@ export class WorkerManager {
       [workerId, error, iteration]
     );
 
-    // Update work item
-    await this.db.execute(
-      `UPDATE work_items
-       SET status = 'failed', error = $2, iteration = $3
-       WHERE id = $1`,
-      [worker.workItemId, error, iteration]
-    );
+    // Get work item to determine retry strategy
+    const workItem = await this.db.getWorkItem(worker.workItemId);
+    if (!workItem) {
+      throw new Error(`Work item not found: ${worker.workItemId}`);
+    }
+
+    // Per-type retry logic
+    if (workItem.type === 'verification') {
+      // Verification: immediate retry up to max attempts
+      const maxRetries = parseInt(process.env.VERIFICATION_MAX_RETRIES || '3', 10);
+      const newRetryCount = workItem.retryCount + 1;
+
+      if (newRetryCount > maxRetries) {
+        // Max retries exceeded - mark as permanently failed
+        await this.db.execute(
+          `UPDATE work_items
+           SET status = 'failed', error = $2, retry_count = $3, iteration = $4
+           WHERE id = $1`,
+          [worker.workItemId, `Verification failed (max retries ${maxRetries}): ${error}`, newRetryCount, iteration]
+        );
+      } else {
+        // Immediate requeue (no backoff for verification)
+        await this.db.execute(
+          `UPDATE work_items
+           SET status = 'queued', worker_id = NULL, error = $2, retry_count = $3, iteration = $4
+           WHERE id = $1`,
+          [worker.workItemId, `Verification failed (retry ${newRetryCount}/${maxRetries}): ${error}`, newRetryCount, iteration]
+        );
+      }
+    } else {
+      // Execution: exponential backoff
+      const maxRetries = 3;
+      const newRetryCount = workItem.retryCount + 1;
+
+      if (newRetryCount > maxRetries) {
+        // Max retries exceeded - mark as permanently failed
+        await this.db.execute(
+          `UPDATE work_items
+           SET status = 'failed', error = $2, retry_count = $3, iteration = $4
+           WHERE id = $1`,
+          [worker.workItemId, `Execution failed (max retries ${maxRetries}): ${error}`, newRetryCount, iteration]
+        );
+      } else {
+        // Calculate exponential backoff: 1min, 5min, 30min
+        const backoffMinutes = [1, 5, 30][Math.min(newRetryCount - 1, 2)] ?? 30;
+        await this.db.execute(
+          `UPDATE work_items
+           SET status = 'queued', worker_id = NULL, error = $2,
+               retry_count = $3, next_retry_at = NOW() + INTERVAL '1 minute' * $4, iteration = $5
+           WHERE id = $1`,
+          [worker.workItemId, `Execution failed (retry ${newRetryCount}/${maxRetries}): ${error}`, newRetryCount, backoffMinutes, iteration]
+        );
+      }
+    }
 
     // Release all file locks
     await this.conflictDetector.releaseAllLocks(workerId);
