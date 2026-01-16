@@ -30,7 +30,7 @@ import { loadConfig, type VerifierConfig } from './config.js';
 import { runAgent, runCommand, getPRDiff, getGitSha, getGitBranch, readFile, startDevServer, checkEndpoint } from './agent.js';
 import { VERIFIER_SYSTEM_PROMPT, buildReviewPrompt, buildEndpointDetectionPrompt } from './prompts/system.js';
 import { parseReviewOutput, parseEndpointOutput, type DetectedEndpoint } from './report/parser.js';
-import { postPRReview, postComment } from './github/review.js';
+import { postPRReview, postComment, createCheckRun, updatePRLabels } from './github/review.js';
 
 // Re-export types
 export type {
@@ -438,13 +438,42 @@ export async function verify(options: VerifyOptions): Promise<VerificationReport
 
   // 10. Post to GitHub
   try {
+    // Post PR review with inline comments
     await postPRReview({
       githubToken,
       owner,
       repo: repoName,
       prNumber,
+      sha,
       report,
     });
+
+    // Create GitHub Check Run for status check integration
+    try {
+      await createCheckRun({
+        githubToken,
+        owner,
+        repo: repoName,
+        sha,
+        report,
+      });
+    } catch (checkError) {
+      // Check runs require GitHub App permissions, may fail for personal tokens
+      console.warn('Failed to create check run (may require GitHub App):', checkError);
+    }
+
+    // Update PR labels (optional, best-effort)
+    try {
+      await updatePRLabels({
+        githubToken,
+        owner,
+        repo: repoName,
+        prNumber,
+        verdict: report.verdict,
+      });
+    } catch {
+      // Labels may not exist in the repo, ignore
+    }
   } catch (error) {
     console.error('Failed to post PR review:', error);
     // Try to post a simple comment as fallback

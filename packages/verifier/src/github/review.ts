@@ -1,11 +1,14 @@
 /**
  * GitHub PR Review Integration
  *
- * Posts verification reports to GitHub PRs.
+ * Posts verification reports to GitHub PRs with:
+ * - PR review API with inline comments
+ * - GitHub Checks API for status checks
+ * - Collapsible sections for detailed output
  */
 
 import { Octokit } from '@octokit/rest';
-import type { VerificationReport, CodeIssue, Verdict } from '../report/schema.js';
+import type { VerificationReport, CodeIssue, Verdict, TestResults, TypeCheck } from '../report/schema.js';
 
 /**
  * Options for posting a PR review.
@@ -15,6 +18,18 @@ export interface PostReviewOptions {
   owner: string;
   repo: string;
   prNumber: number;
+  sha: string;
+  report: VerificationReport;
+}
+
+/**
+ * Options for creating a status check.
+ */
+export interface CreateCheckOptions {
+  githubToken: string;
+  owner: string;
+  repo: string;
+  sha: string;
   report: VerificationReport;
 }
 
@@ -71,6 +86,26 @@ function getSeverityEmoji(severity: string): string {
 }
 
 /**
+ * Get category emoji.
+ */
+function getCategoryEmoji(category: string): string {
+  switch (category) {
+    case 'security':
+      return '🔒';
+    case 'bugs':
+      return '🐛';
+    case 'performance':
+      return '⚡';
+    case 'quality':
+      return '✨';
+    case 'api_contract':
+      return '📋';
+    default:
+      return '📝';
+  }
+}
+
+/**
  * Format duration as human-readable string.
  */
 function formatDuration(ms: number): string {
@@ -87,24 +122,103 @@ function formatDuration(ms: number): string {
 }
 
 /**
- * Format code issues as markdown.
+ * Create a collapsible details section.
  */
-function formatIssues(issues: CodeIssue[]): string {
-  if (issues.length === 0) {
-    return 'No issues found.';
-  }
+function collapsible(summary: string, content: string, open = false): string {
+  return `<details${open ? ' open' : ''}>
+<summary>${summary}</summary>
 
-  return issues
-    .map((issue) => {
-      const location = issue.line ? `${issue.file}:${issue.line}` : issue.file;
-      const suggestion = issue.suggestion ? ` (${issue.suggestion})` : '';
-      return `- ${getSeverityEmoji(issue.severity)} \`${location}\` - ${issue.message}${suggestion}`;
-    })
-    .join('\n');
+${content}
+
+</details>`;
 }
 
 /**
- * Build the PR review body.
+ * Format code issues as markdown table.
+ */
+function formatIssuesTable(issues: CodeIssue[]): string {
+  if (issues.length === 0) {
+    return '_No issues found._';
+  }
+
+  const lines = [
+    '| Severity | File | Line | Message |',
+    '|----------|------|------|---------|',
+  ];
+
+  for (const issue of issues.slice(0, 20)) {
+    const severity = `${getSeverityEmoji(issue.severity)} ${issue.severity}`;
+    const file = `\`${issue.file}\``;
+    const line = issue.line ? `${issue.line}` : '-';
+    const message = issue.suggestion
+      ? `${issue.message}<br/>💡 _${issue.suggestion}_`
+      : issue.message;
+    lines.push(`| ${severity} | ${file} | ${line} | ${message} |`);
+  }
+
+  if (issues.length > 20) {
+    lines.push(`| | | | _...and ${issues.length - 20} more issues_ |`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format failing tests.
+ */
+function formatFailingTests(tests: string[]): string {
+  if (tests.length === 0) return '';
+
+  const items = tests.slice(0, 15).map((t) => `- \`${t}\``);
+  if (tests.length > 15) {
+    items.push(`- _...and ${tests.length - 15} more_`);
+  }
+
+  return items.join('\n');
+}
+
+/**
+ * Format type errors.
+ */
+function formatTypeErrors(errors: TypeCheck['errors']): string {
+  if (errors.length === 0) return '';
+
+  const items = errors.slice(0, 10).map(
+    (e) => `- \`${e.file}:${e.line}\` - ${e.message}`
+  );
+  if (errors.length > 10) {
+    items.push(`- _...and ${errors.length - 10} more_`);
+  }
+
+  return items.join('\n');
+}
+
+/**
+ * Build the quick summary line.
+ */
+function buildQuickSummary(report: VerificationReport): string {
+  const parts: string[] = [];
+
+  // Tests
+  if (report.testResults.status !== 'skipped') {
+    const testIcon = report.testResults.testsFailed === 0 ? '✅' : '❌';
+    parts.push(`${testIcon} Tests: ${report.testResults.testsPassed}/${report.testResults.testsRun}`);
+  }
+
+  // Types
+  const typeIcon = report.typeCheck.status === 'pass' ? '✅' : '❌';
+  parts.push(`${typeIcon} Types: ${report.typeCheck.errors.length} errors`);
+
+  // Issues
+  const issueCount = report.codeReview.counts.errors + report.codeReview.counts.warnings;
+  const issueIcon = report.codeReview.counts.errors === 0 ? '✅' : '⚠️';
+  parts.push(`${issueIcon} Issues: ${issueCount}`);
+
+  return parts.join(' | ');
+}
+
+/**
+ * Build the PR review body with collapsible sections.
  */
 function buildReviewBody(report: VerificationReport): string {
   const lines: string[] = [];
@@ -113,164 +227,237 @@ function buildReviewBody(report: VerificationReport): string {
   lines.push(`## 🔍 Whim Verification Report`);
   lines.push('');
   lines.push(
-    `**Verdict: ${getVerdictEmoji(report.verdict)} ${report.verdict.toUpperCase()}** | Verified in ${formatDuration(report.durationMs)} using ${report.harness}`
+    `**Verdict: ${getVerdictEmoji(report.verdict)} ${report.verdict.toUpperCase()}** | ⏱️ ${formatDuration(report.durationMs)} | 🤖 ${report.harness}`
   );
   lines.push('');
-
-  // Summary
   lines.push(`> ${report.summary}`);
   lines.push('');
 
+  // Quick summary bar
+  lines.push(`### 📊 Quick Summary`);
+  lines.push(buildQuickSummary(report));
+  lines.push('');
+
+  // Required Checks Section
+  lines.push('---');
+  lines.push('### Required Checks');
+  lines.push('');
+
   // Spec Compliance
-  lines.push(
-    `### Spec Compliance: ${getStatusEmoji(report.specCompliance.status)} ${report.specCompliance.status}`
-  );
+  const specTitle = `${getStatusEmoji(report.specCompliance.status)} **Spec Compliance**: ${report.specCompliance.status}`;
   if (report.specCompliance.status === 'skipped') {
-    lines.push('No SPEC.md found - spec compliance check skipped.');
+    lines.push(`${specTitle} - _No SPEC.md found_`);
   } else {
-    lines.push(
-      `${report.specCompliance.requirementsMet}/${report.specCompliance.requirementsChecked} requirements implemented.`
-    );
+    let specContent = `**${report.specCompliance.requirementsMet}/${report.specCompliance.requirementsChecked}** requirements implemented.\n`;
+
     if (report.specCompliance.missingRequirements.length > 0) {
-      lines.push('');
-      lines.push('**Missing requirements:**');
+      specContent += '\n**Missing requirements:**\n';
       for (const req of report.specCompliance.missingRequirements) {
-        lines.push(`- [ ] ${req}`);
+        specContent += `- [ ] ${req}\n`;
       }
     }
+
     if (report.specCompliance.scopeCreep.length > 0) {
-      lines.push('');
-      lines.push('**Scope creep detected:**');
+      specContent += '\n**⚠️ Scope creep detected:**\n';
       for (const item of report.specCompliance.scopeCreep) {
-        lines.push(`- ${item}`);
+        specContent += `- ${item}\n`;
       }
     }
+
+    if (report.specCompliance.notes.length > 0) {
+      specContent += '\n**Notes:**\n';
+      for (const note of report.specCompliance.notes) {
+        specContent += `- ${note}\n`;
+      }
+    }
+
+    lines.push(collapsible(specTitle, specContent));
   }
   lines.push('');
 
-  // Code Review
-  lines.push(
-    `### Code Review: ${getStatusEmoji(report.codeReview.status)} ${report.codeReview.status}`
-  );
-  const totalIssues =
-    report.codeReview.counts.errors +
-    report.codeReview.counts.warnings +
-    report.codeReview.counts.info;
-  if (totalIssues === 0) {
-    lines.push('No critical issues found.');
-  } else {
-    lines.push(
-      `Found ${report.codeReview.counts.errors} errors, ${report.codeReview.counts.warnings} warnings, ${report.codeReview.counts.info} info.`
-    );
-    lines.push('');
-
-    // Group by category for display
-    const categories: Array<[string, CodeIssue[]]> = [
-      ['Security', report.codeReview.issuesByCategory.security],
-      ['Bugs', report.codeReview.issuesByCategory.bugs],
-      ['Performance', report.codeReview.issuesByCategory.performance],
-      ['Quality', report.codeReview.issuesByCategory.quality],
-      ['API Contract', report.codeReview.issuesByCategory.api_contract],
-    ];
-
-    for (const [name, issues] of categories) {
-      if (issues.length > 0) {
-        lines.push(`**${name}:**`);
-        lines.push(formatIssues(issues));
-        lines.push('');
-      }
-    }
-  }
-
-  if (report.codeReview.suggestions.length > 0) {
-    lines.push('**Suggestions:**');
-    for (const suggestion of report.codeReview.suggestions) {
-      lines.push(`- ${suggestion}`);
-    }
-    lines.push('');
-  }
-
   // Test Results
-  lines.push(
-    `### Tests: ${getStatusEmoji(report.testResults.status)} ${report.testResults.status}`
-  );
+  const testTitle = `${getStatusEmoji(report.testResults.status)} **Tests**: ${report.testResults.status}`;
   if (report.testResults.status === 'skipped') {
-    lines.push('Test run skipped.');
+    lines.push(`${testTitle} - _Test run skipped_`);
   } else {
-    lines.push(
-      `${report.testResults.testsRun} tests run, ${report.testResults.testsPassed} passed, ${report.testResults.testsFailed} failed`
-    );
-    if (report.testResults.failingTests.length > 0) {
-      lines.push('');
-      lines.push('**Failing tests:**');
-      for (const test of report.testResults.failingTests.slice(0, 10)) {
-        lines.push(`- ${test}`);
-      }
-      if (report.testResults.failingTests.length > 10) {
-        lines.push(`- ... and ${report.testResults.failingTests.length - 10} more`);
-      }
+    let testContent = `**${report.testResults.testsPassed}/${report.testResults.testsRun}** tests passed`;
+    if (report.testResults.testsFailed > 0) {
+      testContent += ` (${report.testResults.testsFailed} failed)`;
     }
+    testContent += '\n';
+
     if (report.testResults.coverage !== undefined) {
-      lines.push(`Coverage: ${report.testResults.coverage}%`);
+      testContent += `\n📈 Coverage: **${report.testResults.coverage}%**\n`;
     }
+
+    if (report.testResults.failingTests.length > 0) {
+      testContent += '\n**Failing tests:**\n';
+      testContent += formatFailingTests(report.testResults.failingTests);
+    }
+
+    const shouldOpen = report.testResults.testsFailed > 0;
+    lines.push(collapsible(testTitle, testContent, shouldOpen));
   }
   lines.push('');
 
   // Type Check
-  lines.push(
-    `### Type Check: ${getStatusEmoji(report.typeCheck.status)} ${report.typeCheck.status}`
-  );
+  const typeTitle = `${getStatusEmoji(report.typeCheck.status)} **Type Check**: ${report.typeCheck.status}`;
   if (report.typeCheck.errors.length === 0) {
-    lines.push('No type errors');
+    lines.push(`${typeTitle} - _No type errors_`);
   } else {
-    lines.push(`${report.typeCheck.errors.length} type errors:`);
-    for (const error of report.typeCheck.errors.slice(0, 10)) {
-      lines.push(`- \`${error.file}:${error.line}\` - ${error.message}`);
-    }
-    if (report.typeCheck.errors.length > 10) {
-      lines.push(`- ... and ${report.typeCheck.errors.length - 10} more`);
-    }
+    let typeContent = `**${report.typeCheck.errors.length}** type errors found:\n\n`;
+    typeContent += formatTypeErrors(report.typeCheck.errors);
+    lines.push(collapsible(typeTitle, typeContent, true));
   }
   lines.push('');
 
-  // Integration Check (optional)
-  if (report.integrationCheck) {
-    lines.push(
-      `### Integration: ${getStatusEmoji(report.integrationCheck.status)} ${report.integrationCheck.status}`
-    );
-    lines.push(`Tested ${report.integrationCheck.endpointsTested.length} endpoints.`);
-    if (report.integrationCheck.issues.length > 0) {
-      lines.push('');
-      lines.push('**Issues:**');
-      for (const issue of report.integrationCheck.issues) {
-        lines.push(`- ${issue}`);
-      }
-    }
-    lines.push('');
-  }
+  // Code Review
+  const reviewTitle = `${getStatusEmoji(report.codeReview.status)} **Code Review**: ${report.codeReview.status}`;
+  const totalIssues =
+    report.codeReview.counts.errors +
+    report.codeReview.counts.warnings +
+    report.codeReview.counts.info;
 
-  // Browser Check (optional)
-  if (report.browserCheck) {
-    lines.push(
-      `### Browser Check: ${getStatusEmoji(report.browserCheck.status)} ${report.browserCheck.status}`
-    );
-    lines.push(`Checked ${report.browserCheck.pagesChecked.length} pages.`);
-    if (report.browserCheck.issues.length > 0) {
-      lines.push('');
-      for (const issue of report.browserCheck.issues) {
-        lines.push(
-          `- ${getSeverityEmoji(issue.type === 'console_error' ? 'error' : 'warning')} \`${issue.page}\` - ${issue.message}`
-        );
+  if (totalIssues === 0) {
+    lines.push(`${reviewTitle} - _No issues found_`);
+  } else {
+    let reviewContent = `Found **${report.codeReview.counts.errors}** errors, **${report.codeReview.counts.warnings}** warnings, **${report.codeReview.counts.info}** info.\n\n`;
+
+    // Group by category
+    const categories: Array<[string, string, CodeIssue[]]> = [
+      ['security', 'Security', report.codeReview.issuesByCategory.security],
+      ['bugs', 'Bugs', report.codeReview.issuesByCategory.bugs],
+      ['performance', 'Performance', report.codeReview.issuesByCategory.performance],
+      ['quality', 'Quality', report.codeReview.issuesByCategory.quality],
+      ['api_contract', 'API Contract', report.codeReview.issuesByCategory.api_contract],
+    ];
+
+    for (const [key, name, issues] of categories) {
+      if (issues.length > 0) {
+        reviewContent += `#### ${getCategoryEmoji(key)} ${name} (${issues.length})\n\n`;
+        reviewContent += formatIssuesTable(issues);
+        reviewContent += '\n\n';
       }
     }
+
+    if (report.codeReview.suggestions.length > 0) {
+      reviewContent += '#### 💡 Suggestions\n\n';
+      for (const suggestion of report.codeReview.suggestions) {
+        reviewContent += `- ${suggestion}\n`;
+      }
+    }
+
+    const shouldOpen = report.codeReview.counts.errors > 0;
+    lines.push(collapsible(reviewTitle, reviewContent, shouldOpen));
+  }
+  lines.push('');
+
+  // Optional Checks Section
+  const hasOptional =
+    report.integrationCheck ||
+    report.browserCheck ||
+    report.performanceCheck ||
+    report.temporaryTests;
+
+  if (hasOptional) {
+    lines.push('---');
+    lines.push('### Optional Checks');
     lines.push('');
+
+    // Integration Check
+    if (report.integrationCheck) {
+      const intTitle = `${getStatusEmoji(report.integrationCheck.status)} **Integration**: ${report.integrationCheck.status}`;
+      let intContent = `Tested **${report.integrationCheck.endpointsTested.length}** endpoints:\n\n`;
+
+      for (const endpoint of report.integrationCheck.endpointsTested) {
+        intContent += `- \`${endpoint}\`\n`;
+      }
+
+      if (report.integrationCheck.issues.length > 0) {
+        intContent += '\n**Issues:**\n';
+        for (const issue of report.integrationCheck.issues) {
+          intContent += `- ❌ ${issue}\n`;
+        }
+      }
+
+      lines.push(collapsible(intTitle, intContent, report.integrationCheck.status === 'fail'));
+      lines.push('');
+    }
+
+    // Browser Check
+    if (report.browserCheck) {
+      const browserTitle = `${getStatusEmoji(report.browserCheck.status)} **Browser Check**: ${report.browserCheck.status}`;
+      let browserContent = `Checked **${report.browserCheck.pagesChecked.length}** pages:\n\n`;
+
+      for (const page of report.browserCheck.pagesChecked) {
+        browserContent += `- \`${page}\`\n`;
+      }
+
+      if (report.browserCheck.issues.length > 0) {
+        browserContent += '\n**Issues:**\n';
+        for (const issue of report.browserCheck.issues) {
+          const icon = issue.type === 'console_error' ? '🔴' : '🟡';
+          browserContent += `- ${icon} \`${issue.page}\` - ${issue.message}\n`;
+        }
+      }
+
+      lines.push(collapsible(browserTitle, browserContent, report.browserCheck.status === 'fail'));
+      lines.push('');
+    }
+
+    // Performance Check
+    if (report.performanceCheck) {
+      const perfTitle = `${getStatusEmoji(report.performanceCheck.status)} **Performance**: ${report.performanceCheck.status}`;
+      let perfContent = '';
+
+      if (report.performanceCheck.buildSizeKb) {
+        perfContent += `Build size: **${report.performanceCheck.buildSizeKb}KB**\n\n`;
+      }
+
+      if (report.performanceCheck.bundleAnalysis) {
+        perfContent += `Total bundle: **${report.performanceCheck.bundleAnalysis.totalSizeKb}KB**\n\n`;
+        perfContent += 'Largest chunks:\n';
+        for (const chunk of report.performanceCheck.bundleAnalysis.largestChunks) {
+          perfContent += `- \`${chunk.name}\`: ${chunk.sizeKb}KB\n`;
+        }
+      }
+
+      if (report.performanceCheck.issues.length > 0) {
+        perfContent += '\n**Issues:**\n';
+        for (const issue of report.performanceCheck.issues) {
+          perfContent += `- ⚠️ ${issue}\n`;
+        }
+      }
+
+      lines.push(collapsible(perfTitle, perfContent));
+      lines.push('');
+    }
   }
 
   // Footer
   lines.push('---');
-  lines.push('*🏭 Verified by Whim*');
+  const footerParts = ['🏭 _Verified by [Whim](https://github.com/whim-ai/whim)_'];
   if (report.costUsd !== undefined) {
-    lines.push(` | Cost: $${report.costUsd.toFixed(4)}`);
+    footerParts.push(`💰 $${report.costUsd.toFixed(4)}`);
+  }
+  lines.push(footerParts.join(' | '));
+
+  return lines.join('\n');
+}
+
+/**
+ * Build inline comment for an issue.
+ */
+function buildInlineComment(issue: CodeIssue): string {
+  const lines = [
+    `${getSeverityEmoji(issue.severity)} **${getCategoryEmoji(issue.category)} ${issue.category.replace('_', ' ')}**`,
+    '',
+    issue.message,
+  ];
+
+  if (issue.suggestion) {
+    lines.push('');
+    lines.push(`💡 **Suggestion:** ${issue.suggestion}`);
   }
 
   return lines.join('\n');
@@ -291,61 +478,167 @@ function getReviewEvent(verdict: Verdict): 'APPROVE' | 'REQUEST_CHANGES' | 'COMM
 }
 
 /**
- * Post a verification report as a PR review.
+ * Map verdict to check conclusion.
+ */
+function getCheckConclusion(
+  verdict: Verdict
+): 'success' | 'failure' | 'neutral' | 'action_required' {
+  switch (verdict) {
+    case 'pass':
+      return 'success';
+    case 'fail':
+      return 'failure';
+    case 'needs_work':
+      return 'action_required';
+  }
+}
+
+/**
+ * Build check run annotations from code issues.
+ */
+function buildAnnotations(
+  report: VerificationReport
+): Array<{
+  path: string;
+  start_line: number;
+  end_line: number;
+  annotation_level: 'notice' | 'warning' | 'failure';
+  message: string;
+  title: string;
+}> {
+  const annotations: Array<{
+    path: string;
+    start_line: number;
+    end_line: number;
+    annotation_level: 'notice' | 'warning' | 'failure';
+    message: string;
+    title: string;
+  }> = [];
+
+  // Add code review issues
+  for (const issue of report.codeReview.issues) {
+    if (issue.line) {
+      annotations.push({
+        path: issue.file,
+        start_line: issue.line,
+        end_line: issue.line,
+        annotation_level:
+          issue.severity === 'error' ? 'failure' : issue.severity === 'warning' ? 'warning' : 'notice',
+        message: issue.suggestion ? `${issue.message}\n\nSuggestion: ${issue.suggestion}` : issue.message,
+        title: `${issue.category}: ${issue.severity}`,
+      });
+    }
+  }
+
+  // Add type errors
+  for (const error of report.typeCheck.errors) {
+    annotations.push({
+      path: error.file,
+      start_line: error.line,
+      end_line: error.line,
+      annotation_level: 'failure',
+      message: error.message,
+      title: 'Type Error',
+    });
+  }
+
+  // GitHub limits to 50 annotations per request
+  return annotations.slice(0, 50);
+}
+
+/**
+ * Post a verification report as a PR review with inline comments.
  *
  * @param options - Review options
  */
 export async function postPRReview(options: PostReviewOptions): Promise<void> {
-  const { githubToken, owner, repo, prNumber, report } = options;
+  const { githubToken, owner, repo, prNumber, sha, report } = options;
 
   const octokit = new Octokit({ auth: githubToken });
 
   const body = buildReviewBody(report);
   const event = getReviewEvent(report.verdict);
 
+  // Collect inline comments for errors and warnings with line numbers
+  const inlineIssues = report.codeReview.issues.filter(
+    (issue) =>
+      issue.line !== undefined &&
+      (issue.severity === 'error' || issue.severity === 'warning')
+  );
+
+  // GitHub API allows up to 50 comments per review
+  const comments = inlineIssues.slice(0, 50).map((issue) => ({
+    path: issue.file,
+    line: issue.line!,
+    body: buildInlineComment(issue),
+  }));
+
+  // Post review with inline comments in a single API call
   await octokit.pulls.createReview({
     owner,
     repo,
     pull_number: prNumber,
+    commit_id: sha,
     body,
     event,
+    comments: comments.length > 0 ? comments : undefined,
   });
 }
 
 /**
- * Post inline comments on specific lines.
+ * Create a GitHub Check Run for the verification.
  *
- * @param options - Review options including inline comments
+ * This integrates with GitHub's Checks API to show verification
+ * status directly in the PR checks section.
+ *
+ * @param options - Check options
  */
-export async function postInlineComments(
-  options: PostReviewOptions & { sha: string }
-): Promise<void> {
-  const { githubToken, owner, repo, prNumber, report, sha } = options;
+export async function createCheckRun(options: CreateCheckOptions): Promise<void> {
+  const { githubToken, owner, repo, sha, report } = options;
 
   const octokit = new Octokit({ auth: githubToken });
 
-  // Only post inline comments for errors and warnings
-  const issues = report.codeReview.issues.filter(
-    (issue) => issue.line !== undefined && (issue.severity === 'error' || issue.severity === 'warning')
-  );
+  const conclusion = getCheckConclusion(report.verdict);
+  const annotations = buildAnnotations(report);
 
-  // GitHub API limits to 10 comments per request
-  const comments = issues.slice(0, 10).map((issue) => ({
-    path: issue.file,
-    line: issue.line!,
-    body: `${getSeverityEmoji(issue.severity)} **${issue.category}**: ${issue.message}${issue.suggestion ? `\n\n💡 Suggestion: ${issue.suggestion}` : ''}`,
-  }));
+  // Build summary text
+  const summaryLines = [
+    `## Verdict: ${getVerdictEmoji(report.verdict)} ${report.verdict.toUpperCase()}`,
+    '',
+    report.summary,
+    '',
+    '### Results',
+    '',
+    `| Check | Status |`,
+    `|-------|--------|`,
+    `| Spec Compliance | ${getStatusEmoji(report.specCompliance.status)} ${report.specCompliance.status} |`,
+    `| Tests | ${getStatusEmoji(report.testResults.status)} ${report.testResults.testsPassed}/${report.testResults.testsRun} |`,
+    `| Type Check | ${getStatusEmoji(report.typeCheck.status)} ${report.typeCheck.errors.length} errors |`,
+    `| Code Review | ${getStatusEmoji(report.codeReview.status)} ${report.codeReview.counts.errors} errors, ${report.codeReview.counts.warnings} warnings |`,
+  ];
 
-  if (comments.length > 0) {
-    await octokit.pulls.createReview({
-      owner,
-      repo,
-      pull_number: prNumber,
-      commit_id: sha,
-      event: 'COMMENT',
-      comments,
-    });
+  if (report.integrationCheck) {
+    summaryLines.push(
+      `| Integration | ${getStatusEmoji(report.integrationCheck.status)} ${report.integrationCheck.endpointsTested.length} endpoints |`
+    );
   }
+
+  await octokit.checks.create({
+    owner,
+    repo,
+    name: 'Whim Verifier',
+    head_sha: sha,
+    status: 'completed',
+    conclusion,
+    started_at: new Date(Date.now() - report.durationMs).toISOString(),
+    completed_at: new Date().toISOString(),
+    output: {
+      title: `Verification ${report.verdict}`,
+      summary: summaryLines.join('\n'),
+      text: buildReviewBody(report),
+      annotations: annotations.length > 0 ? annotations : undefined,
+    },
+  });
 }
 
 /**
@@ -370,4 +663,50 @@ export async function postComment(options: {
     issue_number: prNumber,
     body,
   });
+}
+
+/**
+ * Update PR labels based on verification result.
+ *
+ * @param options - Label options
+ */
+export async function updatePRLabels(options: {
+  githubToken: string;
+  owner: string;
+  repo: string;
+  prNumber: number;
+  verdict: Verdict;
+}): Promise<void> {
+  const { githubToken, owner, repo, prNumber, verdict } = options;
+
+  const octokit = new Octokit({ auth: githubToken });
+
+  // Remove any existing verification labels
+  const labelsToRemove = ['verified', 'verification-failed', 'needs-work'];
+  for (const label of labelsToRemove) {
+    try {
+      await octokit.issues.removeLabel({
+        owner,
+        repo,
+        issue_number: prNumber,
+        name: label,
+      });
+    } catch {
+      // Label might not exist, ignore
+    }
+  }
+
+  // Add new label based on verdict
+  const labelToAdd = verdict === 'pass' ? 'verified' : verdict === 'fail' ? 'verification-failed' : 'needs-work';
+
+  try {
+    await octokit.issues.addLabels({
+      owner,
+      repo,
+      issue_number: prNumber,
+      labels: [labelToAdd],
+    });
+  } catch {
+    // Label might not exist in repo, ignore
+  }
 }
