@@ -437,6 +437,51 @@ Service ports:
 - Check Redis for active locks: `redis-cli keys "lock:*"`
 - Consider increasing task granularity
 
+## Landscape & Future Directions
+
+### Related Projects
+
+Whim exists in a growing ecosystem of AI coding agents. Here's how it compares:
+
+| Feature | Whim | [Open SWE](https://github.com/langchain-ai/open-swe) | [SWE-agent](https://github.com/SWE-agent/SWE-agent) | [Aider](https://github.com/Aider-AI/aider) | [GitHub Copilot Agent](https://github.blog/news-insights/product-news/github-copilot-meet-the-new-coding-agent/) | [Sweep AI](https://github.com/sweepai/sweep) |
+|---------|------|----------|-----------|-------|----------------------|----------|
+| **LLM Support** | Claude Code, Codex | Claude (Opus 4.1 option) | Any (GPT-4o, Claude, etc.) | Any (Claude, GPT-4o, DeepSeek, local) | GitHub models | Multiple (GPT-4, Claude) |
+| **Trigger** | GitHub label, API | GitHub label, Web UI | CLI, batch mode | CLI | GitHub issue assignment | GitHub issue (`Sweep:` prefix) |
+| **Orchestration** | Custom queue + Docker workers | LangGraph | YAML config | None (single session) | GitHub Actions | GitHub App |
+| **Parallel Execution** | ✅ Multiple workers | ✅ Cloud sandboxes | ❌ | ❌ | ✅ Mission Control | ❌ |
+| **Verification** | ✅ AI verifies PR works† | ❌ | ❌ | Lint/test on change | ✅ Runs existing tests | ❌ |
+| **Learnings/Memory** | ✅ Vector embeddings, cross-worker | ❌ | ❌ | ❌ | ✅ Codebase memory (Pro) | ❌ |
+| **Hosting** | Self-hosted (Docker) | Cloud (LangChain) | Self-hosted | Self-hosted | Cloud (GitHub) | Cloud or self-hosted |
+| **Open Source** | ✅ MIT | ✅ | ✅ | ✅ Apache 2.0 | ❌ Closed | ✅ |
+| **Spec Generation** | ✅ Ralph interview → SPEC.md | Plan phase | ❌ | ❌ | ❌ | ❌ |
+| **Rate Limiting** | ✅ Daily budget, cooldowns | Cloud-managed | ❌ | ❌ | Cloud-managed | Cloud-managed |
+
+† **Verification difference**: Most tools run your existing test suite before/during PR creation. Whim's verification worker goes further—after the PR is created, an AI agent checks out the branch, runs existing tests, *and* intelligently writes additional tests based on what changed. This catches issues that existing tests miss.
+
+### Why Whim?
+
+- **Self-hosted control** - Your infrastructure, your data, no cloud dependency
+- **Verification workflow** - Separate AI worker verifies PRs actually work (not just "tests pass")
+- **Harness flexibility** - Swap between Claude Code and Codex
+- **Ralph spec generation** - Structured interview → SPEC.md with quality checks
+- **Learnings system** - Knowledge persists and transfers across workers
+
+### Future Considerations
+
+**Orchestration alternatives** we're evaluating:
+
+| Tool | What It Offers | Trade-off |
+|------|----------------|-----------|
+| [Temporal](https://temporal.io) | Durable execution, automatic retries, full event history, survives crashes | Additional infrastructure (self-hosted is free, or use Temporal Cloud) |
+| [pg-boss](https://github.com/timgit/pg-boss) | Battle-tested PostgreSQL job queue | Less control than custom, but handles edge cases |
+
+Current custom orchestration works well for our scale. Temporal becomes attractive if:
+- Worker retry logic gets complex
+- Need better observability into stuck/failed workflows
+- Multi-node orchestrator deployment required
+
+See [Temporal's AI agent orchestration guide](https://temporal.io/blog/of-course-you-can-build-dynamic-ai-agents-with-temporal) for context.
+
 ## License
 
 MIT
