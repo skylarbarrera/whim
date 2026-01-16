@@ -8,6 +8,7 @@ import { WorkerManager } from "./workers.js";
 import type { Database } from "./db.js";
 import type { RateLimiter } from "./rate-limits.js";
 import type { ConflictDetector } from "./conflicts.js";
+import type { QueueManager } from "./queue.js";
 import type Docker from "dockerode";
 import type { Worker, WorkItem, WorkerStatus } from "@whim/shared";
 
@@ -320,6 +321,46 @@ class MockConflictDetector {
 }
 
 /**
+ * Mock Queue Manager
+ */
+class MockQueueManager {
+  verificationWorkItems: Array<{ parentWorkItem: WorkItem; prNumber: number }> = [];
+
+  async addVerificationWorkItem(
+    parentWorkItem: WorkItem,
+    prNumber: number
+  ): Promise<WorkItem> {
+    this.verificationWorkItems.push({ parentWorkItem, prNumber });
+    return {
+      id: "verification-work-item-1",
+      repo: parentWorkItem.repo,
+      branch: parentWorkItem.branch,
+      spec: null,
+      description: null,
+      type: "verification",
+      priority: parentWorkItem.priority,
+      status: "queued",
+      workerId: null,
+      iteration: 0,
+      maxIterations: parentWorkItem.maxIterations,
+      retryCount: 0,
+      nextRetryAt: null,
+      prNumber,
+      parentWorkItemId: parentWorkItem.id,
+      verificationPassed: null,
+      source: null,
+      sourceRef: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      completedAt: null,
+      error: null,
+      prUrl: null,
+      metadata: {},
+    };
+  }
+}
+
+/**
  * Mock Docker
  */
 class MockDocker {
@@ -398,6 +439,7 @@ describe("WorkerManager", () => {
   let mockRateLimiter: MockRateLimiter;
   let mockConflictDetector: MockConflictDetector;
   let mockDocker: MockDocker;
+  let mockQueue: MockQueueManager;
   let manager: WorkerManager;
 
   beforeEach(() => {
@@ -405,12 +447,14 @@ describe("WorkerManager", () => {
     mockRateLimiter = new MockRateLimiter();
     mockConflictDetector = new MockConflictDetector();
     mockDocker = new MockDocker();
+    mockQueue = new MockQueueManager();
 
     manager = new WorkerManager(
       mockDb as unknown as Database,
       mockRateLimiter as unknown as RateLimiter,
       mockConflictDetector as unknown as ConflictDetector,
       mockDocker as unknown as Docker,
+      mockQueue as unknown as QueueManager,
       { staleThresholdSeconds: 60 }
     );
   });
@@ -554,6 +598,68 @@ describe("WorkerManager", () => {
       await expect(manager.complete("unknown", {})).rejects.toThrow(
         "Worker not found"
       );
+    });
+
+    test("creates verification work item when verificationEnabled is true", async () => {
+      const workItem = createWorkItem({ status: "in_progress" });
+      const worker = createWorker({ workItemId: workItem.id });
+      mockDb._setWorkItem(workItem);
+      mockDb._setWorker(worker);
+
+      await manager.complete(worker.id, {
+        prUrl: "https://github.com/pr/1",
+        prNumber: 1,
+        verificationEnabled: true,
+      });
+
+      expect(mockQueue.verificationWorkItems).toHaveLength(1);
+      expect(mockQueue.verificationWorkItems[0]!.parentWorkItem.id).toBe(workItem.id);
+      expect(mockQueue.verificationWorkItems[0]!.prNumber).toBe(1);
+    });
+
+    test("does not create verification work item when verificationEnabled is false", async () => {
+      const workItem = createWorkItem({ status: "in_progress" });
+      const worker = createWorker({ workItemId: workItem.id });
+      mockDb._setWorkItem(workItem);
+      mockDb._setWorker(worker);
+
+      await manager.complete(worker.id, {
+        prUrl: "https://github.com/pr/1",
+        prNumber: 1,
+        verificationEnabled: false,
+      });
+
+      expect(mockQueue.verificationWorkItems).toHaveLength(0);
+    });
+
+    test("does not create verification work item when prNumber is missing", async () => {
+      const workItem = createWorkItem({ status: "in_progress" });
+      const worker = createWorker({ workItemId: workItem.id });
+      mockDb._setWorkItem(workItem);
+      mockDb._setWorker(worker);
+
+      await manager.complete(worker.id, {
+        prUrl: "https://github.com/pr/1",
+        verificationEnabled: true,
+      });
+
+      expect(mockQueue.verificationWorkItems).toHaveLength(0);
+    });
+
+    test("inherits priority from parent work item", async () => {
+      const workItem = createWorkItem({ status: "in_progress", priority: "high" });
+      const worker = createWorker({ workItemId: workItem.id });
+      mockDb._setWorkItem(workItem);
+      mockDb._setWorker(worker);
+
+      await manager.complete(worker.id, {
+        prUrl: "https://github.com/pr/1",
+        prNumber: 1,
+        verificationEnabled: true,
+      });
+
+      expect(mockQueue.verificationWorkItems).toHaveLength(1);
+      expect(mockQueue.verificationWorkItems[0]!.parentWorkItem.priority).toBe("high");
     });
   });
 

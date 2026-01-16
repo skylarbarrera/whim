@@ -174,7 +174,7 @@ async function main(): Promise<void> {
     },
   });
   const conflicts = new ConflictDetector(db);
-  const workers = new WorkerManager(db, rateLimiter, conflicts, docker);
+  const workers = new WorkerManager(db, rateLimiter, conflicts, docker, queue);
   const metrics = new MetricsCollector(db);
   const specGenManager = new SpecGenerationManager(db);
 

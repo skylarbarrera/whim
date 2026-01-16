@@ -10,6 +10,7 @@ import type Docker from "dockerode";
 import type { Database } from "./db.js";
 import type { RateLimiter } from "./rate-limits.js";
 import type { ConflictDetector } from "./conflicts.js";
+import type { QueueManager } from "./queue.js";
 import type {
   Worker,
   WorkerStatus,
@@ -50,6 +51,7 @@ export class WorkerManager {
     private rateLimiter: RateLimiter,
     private conflictDetector: ConflictDetector,
     private docker: Docker,
+    private queue: QueueManager,
     config?: Partial<WorkerManagerConfig>
   ) {
     this.config = {
@@ -278,12 +280,12 @@ export class WorkerManager {
       [workerId]
     );
 
-    // Update work item
+    // Update work item with prNumber if provided
     await this.db.execute(
       `UPDATE work_items
-       SET status = 'completed', completed_at = NOW(), pr_url = $2
+       SET status = 'completed', completed_at = NOW(), pr_url = $2, pr_number = $3
        WHERE id = $1`,
-      [worker.workItemId, data.prUrl ?? null]
+      [worker.workItemId, data.prUrl ?? null, data.prNumber ?? null]
     );
 
     // Record PR review if provided
@@ -298,6 +300,20 @@ export class WorkerManager {
       } catch (error) {
         // Log but don't fail if review tracking fails
         console.error(`Failed to save PR review for worker ${workerId}:`, error);
+      }
+    }
+
+    // Create verification work item if verification is enabled
+    if (data.verificationEnabled && data.prNumber && worker.workItemId) {
+      try {
+        const parentWorkItem = await this.db.getWorkItem(worker.workItemId);
+        if (parentWorkItem) {
+          await this.queue.addVerificationWorkItem(parentWorkItem, data.prNumber);
+          console.log(`Created verification work item for execution item ${worker.workItemId}`);
+        }
+      } catch (error) {
+        // Log but don't fail if verification work item creation fails
+        console.error(`Failed to create verification work item for ${workerId}:`, error);
       }
     }
 

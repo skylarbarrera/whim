@@ -170,6 +170,45 @@ export class QueueManager {
   }
 
   /**
+   * Add a verification work item linked to a parent execution item
+   * Called when execution worker completes with verification enabled
+   */
+  async addVerificationWorkItem(
+    parentWorkItem: WorkItem,
+    prNumber: number
+  ): Promise<WorkItem> {
+    const id = uuid();
+
+    const result = await this.db.queryOne<WorkItem>(
+      `INSERT INTO work_items (
+        id, repo, branch, spec, type, priority, status,
+        max_iterations, pr_number, parent_work_item_id, metadata
+      )
+       VALUES ($1, $2, $3, $4, $5::work_item_type, $6::priority, $7::work_item_status, $8, $9, $10, $11::jsonb)
+       RETURNING *`,
+      [
+        id,
+        parentWorkItem.repo,
+        parentWorkItem.branch,
+        null, // verification items don't have specs
+        "verification",
+        parentWorkItem.priority, // inherit priority from parent
+        "queued",
+        parentWorkItem.maxIterations, // inherit max iterations
+        prNumber,
+        parentWorkItem.id, // link to parent
+        JSON.stringify({}), // empty metadata for now
+      ]
+    );
+
+    if (!result) {
+      throw new Error("Failed to insert verification work item");
+    }
+
+    return result;
+  }
+
+  /**
    * Get queue statistics
    */
   async getStats(): Promise<QueueStatsResponse> {
