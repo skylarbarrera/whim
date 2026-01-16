@@ -18,6 +18,7 @@ import {
   getDefaultRalphConfig,
   getDefaultWhimConfig,
 } from "./config.js";
+import { runVerificationWorker } from "./verification-worker.js";
 
 interface WorkerConfig {
   orchestratorUrl: string;
@@ -280,7 +281,19 @@ async function main(): Promise<void> {
   console.log("Worker finished");
 }
 
-main().catch((error) => {
-  console.error("Worker error:", error);
-  process.exit(1);
-});
+// Route to appropriate worker based on WORKER_MODE environment variable
+const workerMode = process.env.WORKER_MODE || "execution";
+
+if (workerMode === "verification") {
+  console.log("Starting in VERIFICATION mode");
+  runVerificationWorker().catch((error) => {
+    console.error("Verification worker error:", error);
+    process.exit(1);
+  });
+} else {
+  console.log("Starting in EXECUTION mode");
+  main().catch((error) => {
+    console.error("Worker error:", error);
+    process.exit(1);
+  });
+}

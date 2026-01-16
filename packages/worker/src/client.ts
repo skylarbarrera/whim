@@ -131,6 +131,18 @@ export class OrchestratorClient {
     );
   }
 
+  async completeVerification(verificationPassed: boolean): Promise<void> {
+    const body: WorkerCompleteRequest = {
+      verificationPassed,
+    };
+
+    await this.request<void>(
+      "POST",
+      `/api/worker/${this.workerId}/complete`,
+      body
+    );
+  }
+
   async fail(error: string, iteration: number): Promise<void> {
     const body: WorkerFailRequest = { error, iteration };
     await this.request<void>(

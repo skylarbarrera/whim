@@ -172,6 +172,7 @@ export interface WorkerCompleteRequest {
   prUrl?: string;
   prNumber?: number;
   verificationEnabled?: boolean;
+  verificationPassed?: boolean;
   review?: {
     modelUsed: string;
     findings: ReviewFindings;

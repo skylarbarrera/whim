@@ -186,9 +186,18 @@ describe("OrchestratorClient", () => {
       const reviewData = {
         modelUsed: "claude-sonnet-4-20250514",
         findings: {
-          criticalIssues: [],
-          suggestions: [{ severity: "low" as const, message: "Consider adding types" }],
-          securityConcerns: [],
+          specAlignment: {
+            score: "aligned" as const,
+            summary: "Code matches spec",
+            gaps: [],
+            extras: [],
+          },
+          codeQuality: {
+            score: "good" as const,
+            summary: "Code quality is good",
+            concerns: [],
+          },
+          overallSummary: "Looks good",
         },
       };
 
@@ -225,9 +234,18 @@ describe("OrchestratorClient", () => {
       const reviewData = {
         modelUsed: "claude-sonnet-4-20250514",
         findings: {
-          criticalIssues: [],
-          suggestions: [],
-          securityConcerns: [],
+          specAlignment: {
+            score: "aligned" as const,
+            summary: "Code matches spec",
+            gaps: [],
+            extras: [],
+          },
+          codeQuality: {
+            score: "good" as const,
+            summary: "Code quality is good",
+            concerns: [],
+          },
+          overallSummary: "Looks good",
         },
       };
 
@@ -247,6 +265,40 @@ describe("OrchestratorClient", () => {
       expect(callBody.learnings).toEqual(learnings);
       expect(callBody.review).toEqual(reviewData);
       expect(callBody.verificationEnabled).toBe(true);
+    });
+  });
+
+  describe("completeVerification", () => {
+    it("should POST verification passed", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({}), { status: 200 })
+      );
+
+      await client.completeVerification(true);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3000/api/worker/worker-123/complete",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ verificationPassed: true }),
+        })
+      );
+    });
+
+    it("should POST verification failed", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({}), { status: 200 })
+      );
+
+      await client.completeVerification(false);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3000/api/worker/worker-123/complete",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ verificationPassed: false }),
+        })
+      );
     });
   });
 
