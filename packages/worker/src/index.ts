@@ -21,6 +21,17 @@ import {
 import { runVerificationWorker } from "./verification-worker.js";
 import { validateEnvironment } from "./shared-worker.js";
 
+/**
+ * Get harness from HARNESS env var (overrides config file)
+ */
+function getHarnessFromEnv(): "claude" | "codex" | undefined {
+  const harness = process.env.HARNESS?.toLowerCase();
+  if (harness === "claude" || harness === "codex") {
+    return harness;
+  }
+  return undefined;
+}
+
 interface WorkerConfig {
   orchestratorUrl: string;
   workerId: string;
@@ -87,7 +98,8 @@ async function main(): Promise<void> {
   console.log("Reading repository configs...");
   const ralphConfig = (await readRalphConfig(repoDir)) ?? getDefaultRalphConfig();
   const whimConfig = (await readWhimConfig(repoDir)) ?? getDefaultWhimConfig();
-  console.log(`Ralph harness: ${ralphConfig.harness}`);
+  const effectiveHarness = getHarnessFromEnv() ?? ralphConfig.harness ?? "claude";
+  console.log(`Ralph harness: ${effectiveHarness}${getHarnessFromEnv() ? " (from HARNESS env)" : ""}`);
   console.log(`Project type: ${whimConfig.type}`);
   console.log(`Verification enabled: ${whimConfig.verification.enabled}`);
 
@@ -131,6 +143,7 @@ async function main(): Promise<void> {
       })
     : await runRalph(repoDir, client, {
         maxIterations: config.workItem.maxIterations,
+        harness: getHarnessFromEnv() ?? ralphConfig.harness as "claude" | "codex" | undefined,
         onOutput,
         // Push after each commit so work is never lost
         incrementalPush: {

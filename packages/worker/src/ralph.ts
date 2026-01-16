@@ -93,6 +93,7 @@ export async function runRalph(
     maxIterations?: number;
     stuckThreshold?: number;
     timeoutIdle?: number; // Idle timeout in seconds (default 300)
+    harness?: "claude" | "codex"; // AI harness to use
     onEvent?: (event: RalphEvent) => void;
     onOutput?: (line: string) => void;
     incrementalPush?: { enabled: boolean; branch: string };
@@ -133,6 +134,11 @@ export async function runRalph(
   // Set idle timeout (default 5 minutes - builds can take a while)
   const idleTimeout = options.timeoutIdle ?? 300;
   args.push("--timeout-idle", String(idleTimeout));
+
+  // Set AI harness (claude or codex)
+  if (options.harness) {
+    args.push("--harness", options.harness);
+  }
 
   const proc = spawn("ralph", args, {
     cwd: repoDir,
