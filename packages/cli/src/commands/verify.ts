@@ -35,7 +35,6 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyResult> {
     });
 
     let stdout = '';
-    let stderr = '';
 
     claude.stdout?.on('data', (data: Buffer) => {
       const text = data.toString();
@@ -45,7 +44,6 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyResult> {
 
     claude.stderr?.on('data', (data: Buffer) => {
       const text = data.toString();
-      stderr += text;
       process.stderr.write(text);
     });
 

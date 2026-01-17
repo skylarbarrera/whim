@@ -1,5 +1,5 @@
 {
-  "name": "@whim/verifier",
+  "name": "@whim/harness",
   "version": "0.1.0",
   "license": "MIT",
   "private": true,
@@ -17,19 +17,15 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "clean": "rm -rf dist",
-    "start": "node dist/index.js"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@octokit/rest": "^21.0.0",
-    "@whim/harness": "workspace:*",
-    "@whim/shared": "workspace:*",
-    "dotenv": "^17.2.3",
-    "js-yaml": "^4.1.1"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.9",
+    "@openai/codex-sdk": "^0.87.0",
+    "@opencode-ai/sdk": "^1.1.1"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }

@@ -143,8 +143,22 @@ export class OrchestratorClient {
     );
   }
 
-  async fail(error: string, iteration: number): Promise<void> {
-    const body: WorkerFailRequest = { error, iteration };
+  async fail(
+    error: string,
+    iteration: number,
+    options?: {
+      stack?: string;
+      category?: WorkerFailRequest["category"];
+      context?: Record<string, unknown>;
+    }
+  ): Promise<void> {
+    const body: WorkerFailRequest = {
+      error,
+      iteration,
+      stack: options?.stack,
+      category: options?.category,
+      context: options?.context,
+    };
     await this.request<void>(
       "POST",
       `/api/worker/${this.workerId}/fail`,

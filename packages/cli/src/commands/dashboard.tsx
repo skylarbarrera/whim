@@ -76,9 +76,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl = process.env.ORCHE
         }
       }
     } else if (input === 'k') {
-      // TODO: Kill selected worker
+      // FUTURE: Kill selected worker (requires POST /api/workers/:id/kill integration)
     } else if (input === 'c') {
-      // TODO: Cancel selected queue item
+      // FUTURE: Cancel selected queue item (requires POST /api/work/:id/cancel integration)
     } else if (key.upArrow && focusedSection) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow && focusedSection) {

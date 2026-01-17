@@ -5,6 +5,7 @@ import type { Harness, HarnessEvent, HarnessResult, HarnessRunOptions } from "./
  * Claude harness using the official Claude Agent SDK.
  *
  * Uses the `query` function for agentic execution with streaming events.
+ * Requires ANTHROPIC_API_KEY environment variable.
  */
 export const claudeHarness: Harness = {
   name: "claude",

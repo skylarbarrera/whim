@@ -21,6 +21,12 @@ import type {
 } from "@whim/shared";
 
 /**
+ * Retry backoff schedule in minutes: 1min, 5min, 30min
+ */
+const RETRY_BACKOFF_MINUTES = [1, 5, 30] as const;
+const DEFAULT_BACKOFF_MINUTES = 30;
+
+/**
  * Configuration for WorkerManager
  */
 export interface WorkerManagerConfig {
@@ -82,13 +88,20 @@ export class WorkerManager {
    */
   async spawn(workItem: WorkItem, mode: 'execution' | 'verification' = 'execution'): Promise<SpawnResult> {
     const workerId = uuid();
+    const maxWorkers = parseInt(process.env.MAX_WORKERS ?? "2", 10);
 
-    // Create worker record
-    await this.db.execute(
+    // Atomically create worker record only if under capacity
+    // This prevents TOCTOU race between hasCapacity() and spawn()
+    const result = await this.db.execute(
       `INSERT INTO workers (id, work_item_id, status, iteration)
-       VALUES ($1, $2, 'starting', 0)`,
-      [workerId, workItem.id]
+       SELECT $1, $2, 'starting', 0
+       WHERE (SELECT COUNT(*) FROM workers WHERE status IN ('starting', 'running')) < $3`,
+      [workerId, workItem.id, maxWorkers]
     );
+
+    if (result.rowCount === 0) {
+      throw new Error(`Cannot spawn worker: at capacity (max ${maxWorkers} workers)`);
+    }
 
     // Update work item with worker assignment
     await this.db.execute(
@@ -393,8 +406,18 @@ export class WorkerManager {
    * @param workerId - The worker ID
    * @param error - Error message
    * @param iteration - Current iteration when failure occurred
+   * @param stack - Optional stack trace for debugging
+   * @param category - Optional error category for classification
+   * @param context - Optional additional context
    */
-  async fail(workerId: string, error: string, iteration: number): Promise<void> {
+  async fail(
+    workerId: string,
+    error: string,
+    iteration: number,
+    stack?: string,
+    category?: string,
+    context?: Record<string, unknown>
+  ): Promise<void> {
     // Get worker
     const worker = await this.db.getWorker(workerId);
     if (!worker) {
@@ -406,12 +429,33 @@ export class WorkerManager {
       throw new Error(`Worker ${workerId} is not active (status: ${worker.status})`);
     }
 
-    // Update worker status
+    // Build structured error with full context for debugging
+    const errorParts = [error];
+    if (category) {
+      errorParts.unshift(`[${category}]`);
+    }
+    if (context && Object.keys(context).length > 0) {
+      errorParts.push(`\nContext: ${JSON.stringify(context)}`);
+    }
+    if (stack) {
+      errorParts.push(`\nStack: ${stack}`);
+    }
+    const fullError = errorParts.join(" ");
+
+    // Log full error for observability
+    console.error(`Worker ${workerId} failed at iteration ${iteration}:`, {
+      error,
+      category: category ?? "UNKNOWN",
+      context,
+      stack: stack?.split("\n").slice(0, 5).join("\n"), // First 5 lines
+    });
+
+    // Update worker status with full error context
     await this.db.execute(
       `UPDATE workers
        SET status = 'failed', completed_at = NOW(), error = $2, iteration = $3
        WHERE id = $1`,
-      [workerId, error, iteration]
+      [workerId, fullError, iteration]
     );
 
     // Get work item to determine retry strategy
@@ -457,8 +501,8 @@ export class WorkerManager {
           [worker.workItemId, `Execution failed (max retries ${maxRetries}): ${error}`, newRetryCount, iteration]
         );
       } else {
-        // Calculate exponential backoff: 1min, 5min, 30min
-        const backoffMinutes = [1, 5, 30][Math.min(newRetryCount - 1, 2)] ?? 30;
+        /// Calculate exponential backoff using defined schedule
+        const backoffMinutes = RETRY_BACKOFF_MINUTES[Math.min(newRetryCount - 1, 2)] ?? DEFAULT_BACKOFF_MINUTES;
         await this.db.execute(
           `UPDATE work_items
            SET status = 'queued', worker_id = NULL, error = $2,
@@ -594,8 +638,8 @@ export class WorkerManager {
           [worker.workItemId, `Worker killed (max iterations): ${reason}`]
         );
       } else {
-        // Calculate exponential backoff: 1min, 5min, 30min
-        const backoffMinutes = [1, 5, 30][Math.min(newRetryCount - 1, 2)] ?? 30;
+        /// Calculate exponential backoff using defined schedule
+        const backoffMinutes = RETRY_BACKOFF_MINUTES[Math.min(newRetryCount - 1, 2)] ?? DEFAULT_BACKOFF_MINUTES;
         await this.db.execute(
           `UPDATE work_items
            SET status = 'queued', worker_id = NULL, error = $2,
@@ -699,8 +743,8 @@ export class WorkerManager {
       // Get container
       const container = this.docker.getContainer(worker.containerId);
 
-      // Check if container exists
-      const containerInfo = await container.inspect();
+      // Check if container exists (throws if not found)
+      await container.inspect();
 
       // Get logs
       const logStream = await container.logs({
@@ -717,7 +761,8 @@ export class WorkerManager {
       return logLines;
     } catch (error) {
       // If container doesn't exist or error accessing logs, return empty array
-      if ((error as any).statusCode === 404) {
+      const dockerError = error as { statusCode?: number };
+      if (dockerError.statusCode === 404) {
         throw new Error(`Container not found for worker ${workerId}`);
       }
       throw error;

@@ -1,23 +1,25 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { spawn as spawnSync } from "node:child_process";
-import type { OrchestratorClient } from "./client.js";
+import { spawn, type ChildProcess } from 'node:child_process';
+import type { OrchestratorClient } from './client.js';
 
 /**
  * Push current branch to origin (for incremental push after commits)
  */
-async function pushBranch(repoDir: string, branch: string): Promise<{ success: boolean; error?: string }> {
+async function pushBranch(
+  repoDir: string,
+  branch: string
+): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
-    const proc = spawnSync("git", ["push", "-u", "origin", branch], {
+    const proc = spawn('git', ['push', '-u', 'origin', branch], {
       cwd: repoDir,
       shell: false,
     });
 
-    let stderr = "";
-    proc.stderr?.on("data", (data: Buffer) => {
+    let stderr = '';
+    proc.stderr?.on('data', (data: Buffer) => {
       stderr += data.toString();
     });
 
-    proc.on("close", (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         resolve({ success: true });
       } else {
@@ -25,7 +27,7 @@ async function pushBranch(repoDir: string, branch: string): Promise<{ success: b
       }
     });
 
-    proc.on("error", (err) => {
+    proc.on('error', (err) => {
       resolve({ success: false, error: err.message });
     });
   });
@@ -35,15 +37,15 @@ async function pushBranch(repoDir: string, branch: string): Promise<{ success: b
  * Ralph headless event types (JSON from stdout)
  */
 export type RalphEventType =
-  | "started"
-  | "iteration"
-  | "tool"
-  | "commit"
-  | "task_complete"
-  | "iteration_done"
-  | "stuck"
-  | "complete"
-  | "failed";
+  | 'started'
+  | 'iteration'
+  | 'tool'
+  | 'commit'
+  | 'task_complete'
+  | 'iteration_done'
+  | 'stuck'
+  | 'complete'
+  | 'failed';
 
 export interface RalphEvent {
   event: RalphEventType;
@@ -58,7 +60,7 @@ export interface RalphMetrics {
   testsRun: number;
   testsPassed: number;
   testsFailed: number;
-  testStatus?: "passed" | "failed" | "timeout" | "skipped" | "error";
+  testStatus?: 'passed' | 'failed' | 'timeout' | 'skipped' | 'error';
 }
 
 export interface RalphResult {
@@ -74,7 +76,7 @@ export interface RalphResult {
 export function parseRalphEvent(line: string): RalphEvent | null {
   try {
     const event = JSON.parse(line);
-    if (event && typeof event.event === "string") {
+    if (event && typeof event.event === 'string') {
       return event as RalphEvent;
     }
     return null;
@@ -93,7 +95,7 @@ export async function runRalph(
     maxIterations?: number;
     stuckThreshold?: number;
     timeoutIdle?: number; // Idle timeout in seconds (default 300)
-    harness?: "claude" | "codex"; // AI harness to use
+    harness?: 'claude' | 'codex' | 'opencode'; // AI harness to use
     onEvent?: (event: RalphEvent) => void;
     onOutput?: (line: string) => void;
     incrementalPush?: { enabled: boolean; branch: string };
@@ -117,30 +119,26 @@ export async function runRalph(
   const startTime = Date.now();
 
   // Spawn Ralph in headless mode
-  const args = [
-    "run",
-    "--headless",
-    "--all",
-  ];
+  const args = ['run', '--headless', '--all'];
 
   if (options.maxIterations) {
-    args.push("-n", String(options.maxIterations));
+    args.push('-n', String(options.maxIterations));
   }
 
   if (options.stuckThreshold) {
-    args.push("--stuck-threshold", String(options.stuckThreshold));
+    args.push('--stuck-threshold', String(options.stuckThreshold));
   }
 
   // Set idle timeout (default 5 minutes - builds can take a while)
   const idleTimeout = options.timeoutIdle ?? 300;
-  args.push("--timeout-idle", String(idleTimeout));
+  args.push('--timeout-idle', String(idleTimeout));
 
   // Set AI harness (claude or codex)
   if (options.harness) {
-    args.push("--harness", options.harness);
+    args.push('--harness', options.harness);
   }
 
-  const proc = spawn("ralph", args, {
+  const proc = spawn('ralph', args, {
     cwd: repoDir,
     shell: false,
     env: process.env,
@@ -157,38 +155,38 @@ export async function runRalph(
     options.onEvent?.(event);
 
     switch (event.event) {
-      case "started": {
+      case 'started': {
         console.log(`Ralph started: ${event.tasks} tasks`);
         break;
       }
 
-      case "iteration": {
+      case 'iteration': {
         iteration = (event.n as number) ?? iteration + 1;
-        await client.heartbeat(iteration, "running", {
+        await client.heartbeat(iteration, 'running', {
           in: metrics.tokensIn,
           out: metrics.tokensOut,
         });
         break;
       }
 
-      case "tool": {
+      case 'tool': {
         // Send heartbeat on every tool call to prevent stale detection
-        await client.heartbeat(iteration, "running", {
+        await client.heartbeat(iteration, 'running', {
           in: metrics.tokensIn,
           out: metrics.tokensOut,
         });
-        if (event.type === "write" && event.path) {
+        if (event.type === 'write' && event.path) {
           metrics.filesModified++;
           await client.lockFile([event.path as string]);
         }
         break;
       }
 
-      case "commit": {
+      case 'commit': {
         // Push after each commit if incremental push is enabled
         if (options.incrementalPush?.enabled) {
-          const hash = (event.hash as string) ?? "unknown";
-          const message = (event.message as string) ?? "";
+          const hash = (event.hash as string) ?? 'unknown';
+          const message = (event.message as string) ?? '';
           console.log(`[PUSH] Pushing commit ${hash}: ${message.slice(0, 50)}`);
 
           const pushResult = await pushBranch(repoDir, options.incrementalPush.branch);
@@ -203,7 +201,7 @@ export async function runRalph(
         break;
       }
 
-      case "iteration_done": {
+      case 'iteration_done': {
         const stats = event.stats as Record<string, number> | undefined;
         if (stats) {
           metrics.tokensIn += stats.tokensIn ?? 0;
@@ -212,23 +210,23 @@ export async function runRalph(
         break;
       }
 
-      case "stuck": {
-        const reason = (event.reason as string) ?? "Unknown reason";
+      case 'stuck': {
+        const reason = (event.reason as string) ?? 'Unknown reason';
         const attempts = (event.iterations_without_progress as number) ?? 1;
         await client.stuck(reason, attempts);
         break;
       }
 
-      case "complete": {
+      case 'complete': {
         success = true;
         metrics.testsRun = (event.tests_run as number) ?? 0;
         metrics.testsPassed = (event.tests_passed as number) ?? 0;
         break;
       }
 
-      case "failed": {
+      case 'failed': {
         success = false;
-        error = (event.error as string) ?? "Unknown error";
+        error = (event.error as string) ?? 'Unknown error';
         await client.fail(error, iteration);
         break;
       }
@@ -236,20 +234,20 @@ export async function runRalph(
   };
 
   return new Promise((resolve, reject) => {
-    let stdoutBuffer = "";
+    let stdoutBuffer = '';
 
-    proc.stdout.on("data", (data: Buffer) => {
+    proc.stdout.on('data', (data: Buffer) => {
       stdoutBuffer += data.toString();
-      const lines = stdoutBuffer.split("\n");
-      stdoutBuffer = lines.pop() ?? "";
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop() ?? '';
 
       for (const line of lines) {
         processLine(line).catch(console.error);
       }
     });
 
-    proc.stderr.on("data", (data: Buffer) => {
-      const lines = data.toString().split("\n");
+    proc.stderr.on('data', (data: Buffer) => {
+      const lines = data.toString().split('\n');
       for (const line of lines) {
         if (line.trim()) {
           options.onOutput?.(`[stderr] ${line}`);
@@ -257,7 +255,7 @@ export async function runRalph(
       }
     });
 
-    proc.on("close", (code) => {
+    proc.on('close', (code) => {
       if (stdoutBuffer) {
         processLine(stdoutBuffer).catch(console.error);
       }
@@ -268,9 +266,9 @@ export async function runRalph(
       if (code === 0) {
         success = true;
       } else if (code === 1) {
-        error = error ?? "Stuck: no progress";
+        error = error ?? 'Stuck: no progress';
       } else if (code === 2) {
-        error = error ?? "Max iterations reached";
+        error = error ?? 'Max iterations reached';
       } else if (!success && !error) {
         error = `Process exited with code ${code}`;
       }
@@ -283,28 +281,8 @@ export async function runRalph(
       });
     });
 
-    proc.on("error", (err) => {
+    proc.on('error', (err) => {
       reject(err);
     });
   });
-}
-
-export function createMockRalphProcess(
-  events: RalphEvent[]
-): {
-  process: ChildProcess;
-  emitEvent: (event: RalphEvent) => void;
-  close: (code: number) => void;
-} {
-  const proc = spawn("echo", [], { shell: false });
-
-  return {
-    process: proc,
-    emitEvent: (event: RalphEvent) => {
-      proc.stdout?.emit("data", Buffer.from(JSON.stringify(event) + "\n"));
-    },
-    close: (code: number) => {
-      proc.emit("close", code);
-    },
-  };
 }

@@ -96,8 +96,17 @@ async function runMainLoop(
         // Determine worker mode based on work item type
         const mode = workItem.type === 'verification' ? 'verification' : 'execution';
         log(`Spawning ${mode} worker for work item: ${workItem.id} (${workItem.repo})`);
-        const { workerId, containerId } = await workers.spawn(workItem, mode);
-        log(`Spawned worker ${workerId} in container ${containerId.slice(0, 12)}`);
+        try {
+          const { workerId, containerId } = await workers.spawn(workItem, mode);
+          log(`Spawned worker ${workerId} in container ${containerId.slice(0, 12)}`);
+        } catch (spawnError) {
+          // If at capacity (race condition), break and wait for next loop
+          if (spawnError instanceof Error && spawnError.message.includes("at capacity")) {
+            log("At capacity, waiting for next loop iteration");
+            break;
+          }
+          throw spawnError;
+        }
       }
     } catch (error) {
       log("Error in main loop:", error);
@@ -162,7 +171,12 @@ async function main(): Promise<void> {
   log("Redis connected");
 
   // Initialize Docker client
-  const docker = new Docker();
+  // Reads DOCKER_HOST env var automatically (e.g., tcp://docker-proxy:2375)
+  const dockerHost = process.env.DOCKER_HOST;
+  const docker = dockerHost
+    ? new Docker({ host: dockerHost.replace(/^tcp:\/\//, "").split(":")[0], port: parseInt(dockerHost.split(":")[2] || "2375", 10) })
+    : new Docker();
+  log(`Docker client initialized${dockerHost ? ` via ${dockerHost}` : " (local socket)"}`);
 
   // Initialize components
   const queue = new QueueManager(db);

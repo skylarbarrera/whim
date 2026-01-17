@@ -22,7 +22,7 @@ class MockDatabase {
   private idCounter = 0;
   lastExecute?: { query: string; params: unknown[] };
 
-  async query<T>(text: string, values?: unknown[]): Promise<T[]> {
+  async query<T>(text: string, _values?: unknown[]): Promise<T[]> {
     // Handle SELECT workers with status filter for healthCheck
     if (text.includes("FROM workers") && text.includes("status IN")) {
       const results: Worker[] = [];
@@ -400,7 +400,7 @@ class MockQueueManager {
 class MockDocker {
   containers: Map<string, { stopped: boolean }> = new Map();
   private idCounter = 0;
-  lastCreateOptions: any = null;
+  lastCreateOptions: { Env?: string[] } | null = null;
 
   async createContainer(options: unknown): Promise<{
     id: string;
@@ -409,7 +409,7 @@ class MockDocker {
     this.idCounter++;
     const id = `container-${this.idCounter}`;
     this.containers.set(id, { stopped: false });
-    this.lastCreateOptions = options;
+    this.lastCreateOptions = options as { Env?: string[] };
     return {
       id,
       start: async () => {},

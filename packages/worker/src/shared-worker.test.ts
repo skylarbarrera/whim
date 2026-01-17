@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   validateEnvironment,
   cloneRepository,
-  configureGitAuth,
-  startHeartbeat,
   checkoutBranch,
   exec,
 } from "./shared-worker.js";
-import type { OrchestratorClient } from "./client.js";
 
 describe("validateEnvironment", () => {
   const originalEnv = process.env;
@@ -141,99 +138,6 @@ describe("cloneRepository", () => {
     await expect(
       cloneRepository("owner/nonexistent-repo-12345", "invalid-token", "/tmp/test-clone")
     ).rejects.toThrow(/Failed to clone repo owner\/nonexistent-repo-12345/);
-  });
-});
-
-describe("configureGitAuth", () => {
-  it("should set git config for user and credentials", async () => {
-    // Create a temporary directory for testing
-    const testDir = "/tmp/git-auth-test-" + Date.now();
-    await exec("mkdir", ["-p", testDir]);
-    await exec("git", ["init"], { cwd: testDir });
-
-    await configureGitAuth(testDir, "test-token");
-
-    // Verify git config was set
-    const nameResult = await exec("git", ["config", "user.name"], { cwd: testDir });
-    expect(nameResult.stdout.trim()).toBe("Whim Worker");
-
-    const emailResult = await exec("git", ["config", "user.email"], { cwd: testDir });
-    expect(emailResult.stdout.trim()).toBe("worker@whim.dev");
-
-    const credResult = await exec("git", ["config", "credential.helper"], { cwd: testDir });
-    expect(credResult.stdout.trim()).toBe("store");
-
-    // Cleanup
-    await exec("rm", ["-rf", testDir]);
-  });
-});
-
-describe("startHeartbeat", () => {
-  it("should send periodic heartbeats to orchestrator", async () => {
-    const mockHeartbeat = vi.fn().mockResolvedValue(undefined);
-    const mockClient = {
-      heartbeat: mockHeartbeat,
-    } as unknown as OrchestratorClient;
-
-    // Use very short interval for testing (10ms), iteration 0
-    const stopHeartbeat = startHeartbeat(mockClient, 0, 10);
-
-    // Initially no calls
-    expect(mockHeartbeat).not.toHaveBeenCalled();
-
-    // Wait for heartbeat to be called
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    expect(mockHeartbeat).toHaveBeenCalledWith(0);
-
-    // Stop heartbeat
-    stopHeartbeat();
-
-    // Reset call count
-    const callCount = mockHeartbeat.mock.calls.length;
-
-    // Wait and verify no more calls after stop
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    expect(mockHeartbeat.mock.calls.length).toBe(callCount);
-  });
-
-  it("should handle heartbeat errors gracefully", async () => {
-    let rejectError: Error | null = null;
-    const mockHeartbeat = vi.fn().mockImplementation(() => {
-      rejectError = new Error("Network error");
-      return Promise.reject(rejectError);
-    });
-    const mockClient = {
-      heartbeat: mockHeartbeat,
-    } as unknown as OrchestratorClient;
-
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const stopHeartbeat = startHeartbeat(mockClient, 0, 10);
-
-    // Wait for heartbeat to be called
-    await new Promise((resolve) => setTimeout(resolve, 25));
-
-    // Should have logged error but not thrown
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(mockHeartbeat).toHaveBeenCalledWith(0);
-
-    stopHeartbeat();
-    consoleErrorSpy.mockRestore();
-  });
-
-  it("should return cleanup function that stops heartbeat", () => {
-    const mockHeartbeat = vi.fn().mockResolvedValue(undefined);
-    const mockClient = {
-      heartbeat: mockHeartbeat,
-    } as unknown as OrchestratorClient;
-
-    const stopHeartbeat = startHeartbeat(mockClient, 0, 10);
-
-    // Should return a function
-    expect(typeof stopHeartbeat).toBe("function");
-
-    // Cleanup
-    stopHeartbeat();
   });
 });
 

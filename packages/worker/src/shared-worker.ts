@@ -1,5 +1,4 @@
 import type { WorkItem } from "@whim/shared";
-import type { OrchestratorClient } from "./client.js";
 import { mkdir } from "fs/promises";
 import { join } from "path";
 import { spawn } from "child_process";
@@ -121,46 +120,6 @@ export async function cloneRepository(
   }
 
   return repoDir;
-}
-
-/**
- * Configure git authentication for pushing commits
- * @param workDir Working directory containing git repository
- * @param token GitHub personal access token
- */
-export async function configureGitAuth(workDir: string, token: string): Promise<void> {
-  // Set git user for commits
-  await exec("git", ["config", "user.name", "Whim Worker"], { cwd: workDir });
-  await exec("git", ["config", "user.email", "worker@whim.dev"], { cwd: workDir });
-
-  // Configure credential helper to use the token
-  await exec("git", ["config", "credential.helper", "store"], { cwd: workDir });
-}
-
-/**
- * Start periodic heartbeat to orchestrator
- * @param client OrchestratorClient instance
- * @param iteration Current iteration number (0 for verification workers)
- * @param intervalMs Heartbeat interval in milliseconds (default: 30000 = 30 seconds)
- * @returns Cleanup function to stop the heartbeat
- */
-export function startHeartbeat(
-  client: OrchestratorClient,
-  iteration: number = 0,
-  intervalMs: number = 30000
-): () => void {
-  const interval = setInterval(async () => {
-    try {
-      await client.heartbeat(iteration);
-    } catch (error) {
-      console.error("Heartbeat failed:", error);
-    }
-  }, intervalMs);
-
-  // Return cleanup function
-  return () => {
-    clearInterval(interval);
-  };
 }
 
 /**

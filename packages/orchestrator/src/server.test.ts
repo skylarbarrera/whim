@@ -2,7 +2,7 @@
  * Server API Tests
  */
 
-import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
+import { describe, it, expect,  mock } from "bun:test";
 import request from "supertest";
 import { createServer, type ServerDependencies } from "./server.js";
 import type { WorkItem, Worker, WhimMetrics, Learning } from "@whim/shared";
@@ -382,7 +382,14 @@ describe("Server", () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(deps.workers.fail).toHaveBeenCalledWith("worker-123", "Something went wrong", 5);
+      expect(deps.workers.fail).toHaveBeenCalledWith(
+        "worker-123",
+        "Something went wrong",
+        5,
+        undefined,  // stack
+        undefined,  // category
+        undefined   // context
+      );
     });
 
     it("POST /api/worker/:id/stuck marks worker stuck", async () => {

@@ -5,6 +5,7 @@ import type { Harness, HarnessEvent, HarnessResult, HarnessRunOptions } from "./
  * Codex harness using the official OpenAI Codex SDK.
  *
  * Uses `runStreamed()` for streaming events during execution.
+ * Requires OPENAI_API_KEY environment variable.
  */
 export const codexHarness: Harness = {
   name: "codex",

@@ -18,6 +18,7 @@ Thumbs.db
 # Environment/Secrets
 .env
 .env.local
+docker/.env
 *.pem
 credentials.json
 

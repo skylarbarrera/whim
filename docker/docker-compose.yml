@@ -1,4 +1,30 @@
 services:
+  # Docker Socket Proxy - secure access to Docker API
+  # Only exposes specific endpoints needed for worker management
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: whim-docker-proxy
+    restart: unless-stopped
+    privileged: true
+    environment:
+      # Deny all by default, only allow what we need
+      CONTAINERS: 1    # List, inspect, create, start, stop, kill, remove
+      IMAGES: 1        # List images (needed to verify worker image exists)
+      POST: 1          # Allow POST requests (create/start containers)
+      # Everything else denied by default:
+      # AUTH, BUILD, COMMIT, CONFIGS, DISTRIBUTION, EVENTS, EXEC,
+      # GRPC, INFO, NETWORKS, NODES, PING, PLUGINS, SECRETS,
+      # SERVICES, SESSION, SWARM, SYSTEM, TASKS, VERSION, VOLUMES
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:2375/_ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # PostgreSQL with pgvector extension for vector similarity search
   postgres:
     image: pgvector/pgvector:pg16
@@ -42,17 +68,18 @@ services:
       dockerfile: packages/orchestrator/Dockerfile
     container_name: whim-orchestrator
     restart: unless-stopped
-    # Run as root but use non-root for spec generation (handled in code)
-    # This allows Docker socket access for worker spawning
-    user: root
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      docker-proxy:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://whim:whim@postgres:5432/whim
       REDIS_URL: redis://redis:6379
+      # Connect to Docker via socket proxy (not direct socket)
+      DOCKER_HOST: tcp://docker-proxy:2375
       MAX_WORKERS: ${MAX_WORKERS:-2}
       DAILY_BUDGET: ${DAILY_BUDGET:-200}
       COOLDOWN_SECONDS: ${COOLDOWN_SECONDS:-60}
@@ -69,8 +96,7 @@ services:
       PORT: 3000
     ports:
       - "${ORCHESTRATOR_PORT:-3002}:3000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    # No direct Docker socket mount - uses docker-proxy instead
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s

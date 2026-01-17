@@ -2,13 +2,13 @@ import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
-export interface WhimConfig {
+export interface CliConfig {
   apiUrl?: string;
 }
 
-export function loadConfig(): WhimConfig {
+export function loadConfig(): CliConfig {
   const configPath = join(homedir(), '.whimrc');
-  const config: WhimConfig = {};
+  const config: CliConfig = {};
 
   try {
     const content = readFileSync(configPath, 'utf-8');

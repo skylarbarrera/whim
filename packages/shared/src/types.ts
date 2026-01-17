@@ -1,17 +1,17 @@
 // Work Item Types
 
-export type WorkItemType = "execution" | "verification";
+export type WorkItemType = 'execution' | 'verification';
 
 export type WorkItemStatus =
-  | "generating"
-  | "queued"
-  | "assigned"
-  | "in_progress"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  | 'generating'
+  | 'queued'
+  | 'assigned'
+  | 'in_progress'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
-export type Priority = "low" | "medium" | "high" | "critical";
+export type Priority = 'low' | 'medium' | 'high' | 'critical';
 
 export interface WorkItem {
   id: string;
@@ -42,13 +42,7 @@ export interface WorkItem {
 
 // Worker Types
 
-export type WorkerStatus =
-  | "starting"
-  | "running"
-  | "completed"
-  | "failed"
-  | "stuck"
-  | "killed";
+export type WorkerStatus = 'starting' | 'running' | 'completed' | 'failed' | 'stuck' | 'killed';
 
 export interface Worker {
   id: string;
@@ -78,13 +72,13 @@ export interface Learning {
 
 export interface ReviewFindings {
   specAlignment: {
-    score: "aligned" | "partial" | "misaligned";
+    score: 'aligned' | 'partial' | 'misaligned';
     summary: string;
     gaps: string[];
     extras: string[];
   };
   codeQuality: {
-    score: "good" | "acceptable" | "needs-work";
+    score: 'good' | 'acceptable' | 'needs-work';
     summary: string;
     concerns: Array<{
       file: string;
@@ -109,7 +103,7 @@ export interface PRReview {
 
 // Metrics Types
 
-export type TestStatus = "passed" | "failed" | "timeout" | "skipped" | "error";
+export type TestStatus = 'passed' | 'failed' | 'timeout' | 'skipped' | 'error';
 
 export interface WorkerMetrics {
   id: string;
@@ -209,9 +203,24 @@ export interface WorkerCompleteRequest {
   }>;
 }
 
+export type WorkerErrorCategory =
+  | 'EXECUTION_ERROR' // Error during code execution
+  | 'TIMEOUT' // Operation timed out
+  | 'RESOURCE_ERROR' // Resource exhaustion (memory, disk, etc.)
+  | 'NETWORK_ERROR' // Network/connectivity issues
+  | 'VALIDATION_ERROR' // Input/output validation failed
+  | 'INTERNAL_ERROR' // Unexpected internal error
+  | 'UNKNOWN'; // Uncategorized error
+
 export interface WorkerFailRequest {
   error: string;
   iteration: number;
+  /** Optional stack trace for debugging */
+  stack?: string;
+  /** Error category for classification */
+  category?: WorkerErrorCategory;
+  /** Additional context (e.g., file being processed, command that failed) */
+  context?: Record<string, unknown>;
 }
 
 export interface WorkerStuckRequest {
@@ -237,7 +246,7 @@ export interface WorkerLockResponse {
 }
 
 export interface StatusResponse {
-  status: "healthy" | "degraded" | "error";
+  status: 'healthy' | 'degraded' | 'error';
   workers: {
     active: number;
     maxWorkers: number;
@@ -274,8 +283,8 @@ export interface WorkerLogsResponse {
 
 // Config Types
 
-export type HarnessType = "claude-code" | "codex" | "opencode";
-export type ProjectType = "web" | "api" | "cli" | "library" | "monorepo";
+export type HarnessType = 'claude-code' | 'codex' | 'opencode';
+export type ProjectType = 'web' | 'api' | 'cli' | 'library' | 'monorepo';
 
 export interface RalphConfig {
   harness: HarnessType;

@@ -134,7 +134,6 @@ export class RalphSpecGenerator {
         stdio: ["ignore", "pipe", "pipe"],
       });
 
-      let stdout = "";
       let stderr = "";
       const events: RalphSpecEvent[] = [];
 
@@ -148,7 +147,6 @@ export class RalphSpecGenerator {
       }, this.timeoutMs);
 
       proc.stdout?.on("data", (data: Buffer) => {
-        stdout += data.toString();
 
         // Parse JSON events line by line
         const lines = data.toString().split("\n");

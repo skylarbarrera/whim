@@ -1,23 +1,10 @@
-export * from './types.js';
-
-import type { Harness, HarnessName } from './types.js';
-import { claudeHarness } from './claude.js';
-import { codexHarness } from './codex.js';
-
 /**
- * Get a harness by name.
+ * Re-export harness from @whim/harness package.
  *
- * @param name - The harness name ('claude' or 'codex')
- * @returns The harness implementation
+ * This maintains backward compatibility for existing imports.
  */
-export function getHarness(name: HarnessName = 'claude'): Harness {
-  switch (name) {
-    case 'claude':
-      return claudeHarness;
-    case 'codex':
-      return codexHarness;
-  }
-}
+export * from '@whim/harness';
 
-export { claudeHarness } from './claude.js';
-export { codexHarness } from './codex.js';
+// Also export opencodeHarness for direct import in tests
+import { opencodeHarness } from '@whim/harness';
+export { opencodeHarness };

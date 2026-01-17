@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { mkdir, writeFile, access, cp } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { formatReviewComment, type ReviewFindings } from "./prompts/review-prompt.js";
 import type { ExecutionReadyWorkItem } from "./types.js";
 
@@ -100,7 +100,7 @@ export interface GitAuthResult {
  */
 export async function verifyGitAuth(
   repoDir: string,
-  githubToken: string
+  _githubToken: string
 ): Promise<GitAuthResult> {
   const testBranch = `whim-auth-test-${Date.now()}`;
 

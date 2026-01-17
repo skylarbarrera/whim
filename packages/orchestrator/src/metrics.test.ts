@@ -61,7 +61,7 @@ class MockDatabase {
     return [];
   }
 
-  async queryOne<T>(text: string, values?: unknown[]): Promise<T | null> {
+  async queryOne<T>(text: string, _values?: unknown[]): Promise<T | null> {
     // Handle COUNT(*) for active workers
     if (text.includes("COUNT(*)") && text.includes("FROM workers") && text.includes("starting")) {
       const count = this.workers.filter(

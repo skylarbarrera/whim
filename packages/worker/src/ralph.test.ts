@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseRalphEvent, type RalphEvent } from "./ralph.js";
+import { parseRalphEvent } from "./ralph.js";
 
 describe("parseRalphEvent", () => {
   it("should parse started event", () => {

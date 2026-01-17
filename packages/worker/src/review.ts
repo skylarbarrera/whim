@@ -7,6 +7,7 @@ import {
   REVIEW_USER_PROMPT,
   type ReviewFindings,
 } from "./prompts/review-prompt.js";
+import { getHarness, type HarnessName, type HarnessEvent } from "./harness/index.js";
 
 export { type ReviewFindings } from "./prompts/review-prompt.js";
 
@@ -192,5 +193,130 @@ export async function reviewPullRequest(
     console.error("[REVIEW] Review failed:", error instanceof Error ? error.message : String(error));
     // Don't throw - we don't want review failures to block PR creation
     return null;
+  }
+}
+
+/**
+ * Check if review findings have actionable issues to fix
+ */
+export function hasActionableIssues(findings: ReviewFindings): boolean {
+  const hasGaps = findings.specAlignment.gaps.length > 0;
+  const hasConcerns = findings.codeQuality.concerns.length > 0;
+  return hasGaps || hasConcerns;
+}
+
+/**
+ * Format review findings into a prompt for the fix agent
+ */
+function formatFixPrompt(findings: ReviewFindings): string {
+  const lines: string[] = [
+    "A code review found the following issues that need to be fixed:",
+    "",
+  ];
+
+  // Add spec gaps
+  if (findings.specAlignment.gaps.length > 0) {
+    lines.push("## Missing Requirements (from SPEC.md)");
+    for (const gap of findings.specAlignment.gaps) {
+      lines.push(`- ${gap}`);
+    }
+    lines.push("");
+  }
+
+  // Add code quality concerns
+  if (findings.codeQuality.concerns.length > 0) {
+    lines.push("## Code Quality Issues");
+    for (const concern of findings.codeQuality.concerns) {
+      const location = concern.line
+        ? `${concern.file}:${concern.line}`
+        : concern.file;
+      lines.push(`- **${location}**: ${concern.issue}`);
+      lines.push(`  - Suggestion: ${concern.suggestion}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Instructions");
+  lines.push("1. Fix each issue listed above");
+  lines.push("2. Run tests to verify fixes work");
+  lines.push("3. Commit your changes with a descriptive message");
+  lines.push("");
+  lines.push("Focus on the specific issues - don't refactor unrelated code.");
+
+  return lines.join("\n");
+}
+
+export interface ReviewFixResult {
+  applied: boolean;
+  tokensIn?: number;
+  tokensOut?: number;
+  costUsd?: number;
+  error?: string;
+}
+
+/**
+ * Run the fix agent to address review findings
+ */
+export async function runReviewFixes(
+  repoDir: string,
+  findings: ReviewFindings,
+  harnessName: HarnessName = "claude"
+): Promise<ReviewFixResult> {
+  if (!hasActionableIssues(findings)) {
+    console.log("[FIX] No actionable issues to fix");
+    return { applied: false };
+  }
+
+  const harness = getHarness(harnessName);
+  const prompt = formatFixPrompt(findings);
+
+  console.log(`[FIX] Running fix agent with ${harness.name} harness...`);
+  console.log(`[FIX] Issues to fix:`);
+  console.log(`[FIX]   Spec gaps: ${findings.specAlignment.gaps.length}`);
+  console.log(`[FIX]   Code concerns: ${findings.codeQuality.concerns.length}`);
+
+  const onEvent = (event: HarnessEvent) => {
+    switch (event.type) {
+      case "tool_start":
+        console.log(`[FIX:${harness.name}] Tool start: ${event.name}`);
+        break;
+      case "tool_end":
+        console.log(`[FIX:${harness.name}] Tool end: ${event.name}${event.error ? " (error)" : ""}`);
+        break;
+      case "message":
+        console.log(`[FIX:${harness.name}] ${event.text}`);
+        break;
+      case "error":
+        console.error(`[FIX:${harness.name}] Error: ${event.message}`);
+        break;
+    }
+  };
+
+  try {
+    const result = await harness.run(prompt, { cwd: repoDir }, onEvent);
+
+    console.log(`[FIX] Harness completed: success=${result.success}, duration=${result.durationMs}ms`);
+
+    if (!result.success) {
+      console.error(`[FIX] Fix agent failed: ${result.error}`);
+      return {
+        applied: false,
+        tokensIn: result.usage?.inputTokens,
+        tokensOut: result.usage?.outputTokens,
+        costUsd: result.costUsd,
+        error: result.error,
+      };
+    }
+
+    return {
+      applied: true,
+      tokensIn: result.usage?.inputTokens,
+      tokensOut: result.usage?.outputTokens,
+      costUsd: result.costUsd,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[FIX] Unexpected error: ${errorMessage}`);
+    return { applied: false, error: errorMessage };
   }
 }

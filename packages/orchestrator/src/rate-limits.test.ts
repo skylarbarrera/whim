@@ -52,13 +52,16 @@ class MockRedisClient {
 describe("RateLimiter", () => {
   let mockRedis: MockRedisClient;
   let rateLimiter: RateLimiter;
+  let mockActiveWorkerCount: number;
 
   beforeEach(() => {
     mockRedis = new MockRedisClient();
+    mockActiveWorkerCount = 0;
     rateLimiter = new RateLimiter(mockRedis as unknown as RedisClient, {
       maxWorkers: 2,
       dailyBudget: 100,
       cooldownSeconds: 60,
+      getActiveWorkerCount: async () => mockActiveWorkerCount,
     });
   });
 
@@ -69,13 +72,13 @@ describe("RateLimiter", () => {
     });
 
     test("returns false when at max workers", async () => {
-      mockRedis._set("rate:active_workers", "2");
+      mockActiveWorkerCount = 2;
       const result = await rateLimiter.canSpawnWorker();
       expect(result).toBe(false);
     });
 
     test("returns false when over max workers", async () => {
-      mockRedis._set("rate:active_workers", "5");
+      mockActiveWorkerCount = 5;
       const result = await rateLimiter.canSpawnWorker();
       expect(result).toBe(false);
     });
@@ -119,12 +122,6 @@ describe("RateLimiter", () => {
   });
 
   describe("recordSpawn", () => {
-    test("increments active workers", async () => {
-      await rateLimiter.recordSpawn();
-      const status = await rateLimiter.getStatus();
-      expect(status.activeWorkers).toBe(1);
-    });
-
     test("sets last spawn timestamp", async () => {
       const before = Date.now();
       await rateLimiter.recordSpawn();
@@ -136,31 +133,27 @@ describe("RateLimiter", () => {
       expect(status.lastSpawn!.getTime()).toBeLessThanOrEqual(after);
     });
 
-    test("increments multiple times", async () => {
-      await rateLimiter.recordSpawn();
-      await rateLimiter.recordSpawn();
+    test("activeWorkers comes from DB function, not Redis", async () => {
+      // Active workers are tracked via DB, not Redis
+      mockActiveWorkerCount = 3;
       await rateLimiter.recordSpawn();
 
       const status = await rateLimiter.getStatus();
+      // recordSpawn doesn't change activeWorkers - that comes from DB
       expect(status.activeWorkers).toBe(3);
     });
   });
 
   describe("recordWorkerDone", () => {
-    test("decrements active workers", async () => {
-      mockRedis._set("rate:active_workers", "2");
+    test("is a no-op since active workers tracked in DB", async () => {
+      // Active worker count is derived from DB workers table status
+      // recordWorkerDone is a no-op - just verify it doesn't throw
+      mockActiveWorkerCount = 2;
       await rateLimiter.recordWorkerDone();
 
       const status = await rateLimiter.getStatus();
-      expect(status.activeWorkers).toBe(1);
-    });
-
-    test("does not go below zero", async () => {
-      mockRedis._set("rate:active_workers", "0");
-      await rateLimiter.recordWorkerDone();
-
-      const status = await rateLimiter.getStatus();
-      expect(status.activeWorkers).toBe(0);
+      // Count unchanged - comes from mock function
+      expect(status.activeWorkers).toBe(2);
     });
   });
 
@@ -221,9 +214,9 @@ describe("RateLimiter", () => {
     test("returns correct status after activity", async () => {
       const today = new Date().toISOString().split("T")[0]!;
       mockRedis._set("rate:daily_reset_date", today);
-      mockRedis._set("rate:active_workers", "1");
       mockRedis._set("rate:daily_iterations", "25");
       mockRedis._set("rate:last_spawn", Date.now().toString());
+      mockActiveWorkerCount = 1; // Active workers come from DB function
 
       const status = await rateLimiter.getStatus();
 

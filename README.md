@@ -12,6 +12,7 @@
   <a href="#quick-start">Quick Start</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#api-endpoints">API</a> •
+  <a href="#security">Security</a> •
   <a href="#monitoring">Monitoring</a>
 </p>
 
@@ -372,6 +373,14 @@ When multiple workers run simultaneously, Redis-based file locking prevents conf
 2. If file locked by another worker, conflict is flagged
 3. Locks auto-expire after 1 hour
 4. Released on worker completion
+
+## Security
+
+- **Docker Socket Proxy** - Orchestrator connects via [tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) instead of mounting the socket directly. Only container operations allowed; `exec`, `volumes`, `build` blocked.
+- **Container Isolation** - Workers run with 4GB memory, 2 CPU cores, 256 PID limit
+- **Input Validation** - Parameterized queries, request size limits, repo format validation
+
+See [ARCHITECTURE.md](ARCHITECTURE.md#security-model) for details.
 
 ## Development
 

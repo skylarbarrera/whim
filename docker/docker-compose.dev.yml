@@ -35,27 +35,3 @@ services:
         - action: rebuild
           path: ../packages/intake/package.json
 
-  dashboard:
-    profiles: []  # Enable in dev (removes profile restriction)
-    build:
-      context: ..
-      dockerfile: packages/dashboard/Dockerfile
-      target: builder
-    command: npm run dev
-    ports:
-      - "3003:3000"
-    environment:
-      - ORCHESTRATOR_URL=http://whim-orchestrator:3000
-    volumes:
-      - ../packages/dashboard/app:/app/app
-      - ../packages/dashboard/components:/app/components
-    develop:
-      watch:
-        - action: sync
-          path: ../packages/dashboard/app
-          target: /app/app
-        - action: sync
-          path: ../packages/dashboard/components
-          target: /app/components
-        - action: rebuild
-          path: ../packages/dashboard/package.json

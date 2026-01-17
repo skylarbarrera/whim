@@ -1,52 +1,47 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, writeFile, mkdir, rm } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { mkdtemp, writeFile, mkdir, rm } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import {
   readRalphConfig,
   readWhimConfig,
   getDefaultRalphConfig,
   getDefaultWhimConfig,
-} from "./config";
+} from './config';
+import type { HarnessType } from '@whim/shared';
 
-describe("Config Reader", () => {
+describe('Config Reader', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = await mkdtemp(join(tmpdir(), "whim-config-test-"));
+    testDir = await mkdtemp(join(tmpdir(), 'whim-config-test-'));
   });
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  describe("readRalphConfig", () => {
-    it("should read valid ralph config", async () => {
-      await mkdir(join(testDir, ".ralph"), { recursive: true });
-      await writeFile(
-        join(testDir, ".ralph", "config.yml"),
-        "harness: claude-code\n"
-      );
+  describe('readRalphConfig', () => {
+    it('should read valid ralph config', async () => {
+      await mkdir(join(testDir, '.ralph'), { recursive: true });
+      await writeFile(join(testDir, '.ralph', 'config.yml'), 'harness: claude-code\n');
 
       const config = await readRalphConfig(testDir);
-      expect(config).toEqual({ harness: "claude-code" });
+      expect(config).toEqual({ harness: 'claude-code' });
     });
 
-    it("should accept all valid harness types", async () => {
-      await mkdir(join(testDir, ".ralph"), { recursive: true });
+    it('should accept all valid harness types', async () => {
+      await mkdir(join(testDir, '.ralph'), { recursive: true });
 
-      const harnesses: Array<"claude-code" | "codex" | "opencode"> = [
-        "claude-code",
-        "codex",
-        "opencode",
+      const harnesses: Array<'claude-code' | 'codex' | 'opencode'> = [
+        'claude-code',
+        'codex',
+        'opencode',
       ];
       for (const harness of harnesses) {
-        await writeFile(
-          join(testDir, ".ralph", "config.yml"),
-          `harness: ${harness}\n`
-        );
+        await writeFile(join(testDir, '.ralph', 'config.yml'), `harness: ${harness}\n`);
         const config = await readRalphConfig(testDir);
-        expect(config).toEqual({ harness });
+        expect(config).toEqual({ harness: harness as HarnessType });
       }
     });
 
@@ -55,42 +50,36 @@ describe("Config Reader", () => {
       expect(config).toBeNull();
     });
 
-    it("should return null for invalid YAML", async () => {
-      await mkdir(join(testDir, ".ralph"), { recursive: true });
-      await writeFile(
-        join(testDir, ".ralph", "config.yml"),
-        "invalid: yaml: content:\n  - broken"
-      );
+    it('should return null for invalid YAML', async () => {
+      await mkdir(join(testDir, '.ralph'), { recursive: true });
+      await writeFile(join(testDir, '.ralph', 'config.yml'), 'invalid: yaml: content:\n  - broken');
 
       const config = await readRalphConfig(testDir);
       expect(config).toBeNull();
     });
 
-    it("should return null for missing harness field", async () => {
-      await mkdir(join(testDir, ".ralph"), { recursive: true });
-      await writeFile(join(testDir, ".ralph", "config.yml"), "other: value\n");
+    it('should return null for missing harness field', async () => {
+      await mkdir(join(testDir, '.ralph'), { recursive: true });
+      await writeFile(join(testDir, '.ralph', 'config.yml'), 'other: value\n');
 
       const config = await readRalphConfig(testDir);
       expect(config).toBeNull();
     });
 
-    it("should return null for invalid harness value", async () => {
-      await mkdir(join(testDir, ".ralph"), { recursive: true });
-      await writeFile(
-        join(testDir, ".ralph", "config.yml"),
-        "harness: invalid-harness\n"
-      );
+    it('should return null for invalid harness value', async () => {
+      await mkdir(join(testDir, '.ralph'), { recursive: true });
+      await writeFile(join(testDir, '.ralph', 'config.yml'), 'harness: invalid-harness\n');
 
       const config = await readRalphConfig(testDir);
       expect(config).toBeNull();
     });
   });
 
-  describe("readWhimConfig", () => {
-    it("should read valid whim config", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+  describe('readWhimConfig', () => {
+    it('should read valid whim config', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
       await writeFile(
-        join(testDir, ".whim", "config.yml"),
+        join(testDir, '.whim', 'config.yml'),
         `type: web
 verification:
   enabled: true
@@ -101,7 +90,7 @@ verification:
 
       const config = await readWhimConfig(testDir);
       expect(config).toEqual({
-        type: "web",
+        type: 'web',
         verification: {
           enabled: true,
           browser: true,
@@ -110,19 +99,19 @@ verification:
       });
     });
 
-    it("should accept all valid project types", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+    it('should accept all valid project types', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
 
-      const types: Array<"web" | "api" | "cli" | "library" | "monorepo"> = [
-        "web",
-        "api",
-        "cli",
-        "library",
-        "monorepo",
+      const types: Array<'web' | 'api' | 'cli' | 'library' | 'monorepo'> = [
+        'web',
+        'api',
+        'cli',
+        'library',
+        'monorepo',
       ];
       for (const type of types) {
         await writeFile(
-          join(testDir, ".whim", "config.yml"),
+          join(testDir, '.whim', 'config.yml'),
           `type: ${type}
 verification:
   enabled: true
@@ -133,10 +122,10 @@ verification:
       }
     });
 
-    it("should read monorepo config with packages", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+    it('should read monorepo config with packages', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
       await writeFile(
-        join(testDir, ".whim", "config.yml"),
+        join(testDir, '.whim', 'config.yml'),
         `type: monorepo
 verification:
   enabled: true
@@ -158,14 +147,14 @@ packages:
 
       const config = await readWhimConfig(testDir);
       expect(config).toEqual({
-        type: "monorepo",
+        type: 'monorepo',
         verification: {
           enabled: true,
         },
         packages: [
           {
-            path: "apps/web",
-            type: "web",
+            path: 'apps/web',
+            type: 'web',
             verification: {
               enabled: true,
               browser: true,
@@ -173,8 +162,8 @@ packages:
             },
           },
           {
-            path: "apps/api",
-            type: "api",
+            path: 'apps/api',
+            type: 'api',
             verification: {
               enabled: true,
               api: true,
@@ -190,21 +179,18 @@ packages:
       expect(config).toBeNull();
     });
 
-    it("should return null for invalid YAML", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
-      await writeFile(
-        join(testDir, ".whim", "config.yml"),
-        "invalid: yaml: content:\n  - broken"
-      );
+    it('should return null for invalid YAML', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
+      await writeFile(join(testDir, '.whim', 'config.yml'), 'invalid: yaml: content:\n  - broken');
 
       const config = await readWhimConfig(testDir);
       expect(config).toBeNull();
     });
 
-    it("should return null for missing type field", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+    it('should return null for missing type field', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
       await writeFile(
-        join(testDir, ".whim", "config.yml"),
+        join(testDir, '.whim', 'config.yml'),
         `verification:
   enabled: true
 `
@@ -214,10 +200,10 @@ packages:
       expect(config).toBeNull();
     });
 
-    it("should return null for invalid type value", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+    it('should return null for invalid type value', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
       await writeFile(
-        join(testDir, ".whim", "config.yml"),
+        join(testDir, '.whim', 'config.yml'),
         `type: invalid-type
 verification:
   enabled: true
@@ -228,18 +214,18 @@ verification:
       expect(config).toBeNull();
     });
 
-    it("should return null for missing verification field", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
-      await writeFile(join(testDir, ".whim", "config.yml"), `type: web\n`);
+    it('should return null for missing verification field', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
+      await writeFile(join(testDir, '.whim', 'config.yml'), `type: web\n`);
 
       const config = await readWhimConfig(testDir);
       expect(config).toBeNull();
     });
 
-    it("should return null for non-boolean enabled field", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+    it('should return null for non-boolean enabled field', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
       await writeFile(
-        join(testDir, ".whim", "config.yml"),
+        join(testDir, '.whim', 'config.yml'),
         `type: web
 verification:
   enabled: "yes"
@@ -250,10 +236,10 @@ verification:
       expect(config).toBeNull();
     });
 
-    it("should handle optional verification fields", async () => {
-      await mkdir(join(testDir, ".whim"), { recursive: true });
+    it('should handle optional verification fields', async () => {
+      await mkdir(join(testDir, '.whim'), { recursive: true });
       await writeFile(
-        join(testDir, ".whim", "config.yml"),
+        join(testDir, '.whim', 'config.yml'),
         `type: api
 verification:
   enabled: false
@@ -262,7 +248,7 @@ verification:
 
       const config = await readWhimConfig(testDir);
       expect(config).toEqual({
-        type: "api",
+        type: 'api',
         verification: {
           enabled: false,
           browser: undefined,
@@ -273,16 +259,16 @@ verification:
     });
   });
 
-  describe("Default configs", () => {
-    it("should return default ralph config", () => {
+  describe('Default configs', () => {
+    it('should return default ralph config', () => {
       const config = getDefaultRalphConfig();
-      expect(config).toEqual({ harness: "claude-code" });
+      expect(config).toEqual({ harness: 'claude-code' });
     });
 
-    it("should return default whim config", () => {
+    it('should return default whim config', () => {
       const config = getDefaultWhimConfig();
       expect(config).toEqual({
-        type: "library",
+        type: 'library',
         verification: {
           enabled: true,
           unit: true,

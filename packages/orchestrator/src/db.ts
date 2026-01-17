@@ -49,13 +49,6 @@ function rowToCamelCase<T>(row: Record<string, unknown>): T {
 }
 
 /**
- * Convert camelCase to snake_case for database columns
- */
-function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-}
-
-/**
  * Database row types from PostgreSQL
  */
 interface WorkItemRow {

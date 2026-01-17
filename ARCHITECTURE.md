@@ -47,10 +47,6 @@ Whim is an autonomous AI development system that transforms GitHub issues into p
 - Spawns Ralph (Claude Code in autonomous mode)
 - Reports progress via heartbeats, creates PR on completion
 
-### Dashboard (`packages/dashboard`)
-- Next.js monitoring UI
-- Shows queue status, worker activity, metrics
-
 ## Data Flow
 
 1. **Issue Detection**: Intake polls GitHub, finds labeled issues
@@ -94,6 +90,41 @@ Whim is an autonomous AI development system that transforms GitHub issues into p
 - `X-API-Key` header or `Authorization: Bearer <key>`
 - Health endpoint exempt (for load balancers)
 - Worker endpoints exempt (use WORKER_ID)
+
+### Docker Socket Proxy
+
+The orchestrator needs Docker access to spawn worker containers. Instead of mounting the Docker socket directly (which grants root-equivalent host access), we use a **Docker Socket Proxy**.
+
+**How it works**:
+```
+Orchestrator ──TCP:2375──► Docker Socket Proxy ──socket──► Docker Daemon
+                          (whitelisted API only)
+```
+
+**Security benefits**:
+1. **API whitelisting** - Only container operations allowed (create, start, stop, logs)
+2. **Read-only socket** - Proxy mounts socket as read-only
+3. **No direct access** - Orchestrator cannot exec into containers, manage volumes, etc.
+4. **Network isolation** - Proxy only accessible within `whim-network`
+
+**Blocked operations** (denied by proxy):
+- `exec` - Cannot run commands in existing containers
+- `volumes` - Cannot mount host paths
+- `networks` - Cannot create/modify networks
+- `build` - Cannot build images
+- `system` - Cannot access system info
+- `swarm`, `secrets`, `configs` - Cluster operations blocked
+
+**Configuration** (docker-compose.yml):
+```yaml
+docker-proxy:
+  image: tecnativa/docker-socket-proxy
+  environment:
+    CONTAINERS: 1  # Allow container operations
+    IMAGES: 1      # Allow image listing
+    POST: 1        # Allow POST requests
+    # All else denied by default
+```
 
 ### Container Security
 - Resource limits: 4GB memory, 2 CPU cores, 256 PIDs
@@ -151,7 +182,7 @@ packages/
 │       └── setup.ts      # Repo setup
 ├── intake/           # GitHub poller
 ├── shared/           # Shared types
-└── dashboard/        # Monitoring UI
+└── cli/              # Command-line interface
 ```
 
 ## API Endpoints

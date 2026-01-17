@@ -30,3 +30,19 @@ jobs:
 
       - name: Test
         run: bun run test
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build worker image
+        run: docker build -t whim-worker -f packages/worker/Dockerfile .
+
+      - name: Build orchestrator image
+        run: docker build -t whim-orchestrator -f packages/orchestrator/Dockerfile .
+
+      - name: Build intake image
+        run: docker build -t whim-intake -f packages/intake/Dockerfile .

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, spyOn, mock } from "bun:test";
+import { describe, expect, it, beforeEach, spyOn } from "bun:test";
 import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import { EventEmitter } from "node:events";
@@ -14,7 +14,7 @@ spyOn(fs, "readFileSync").mockImplementation(((path: string, encoding?: string) 
   if (typeof path === "string" && path.endsWith("SPEC.md")) {
     return mockSpecContent;
   }
-  return originalReadFileSync(path, encoding as any);
+  return originalReadFileSync(path, encoding as BufferEncoding);
 }) as typeof fs.readFileSync);
 
 // Import after mocking
@@ -24,10 +24,10 @@ import { RalphSpecGenerator, type GenerateMetadata } from "./spec-gen.js";
  * Mock ChildProcess for testing
  */
 class MockChildProcess extends EventEmitter {
-  stdout = new EventEmitter() as any;
-  stderr = new EventEmitter() as any;
-  stdin = null as any;
-  stdio = [null, this.stdout, this.stderr, null, null] as any;
+  stdout = new EventEmitter() as NodeJS.ReadableStream;
+  stderr = new EventEmitter() as NodeJS.ReadableStream;
+  stdin = null as unknown as NodeJS.WritableStream;
+  stdio = [null, this.stdout, this.stderr, null, null] as unknown as cp.StdioNull[];
   killed = false;
   pid = 12345;
   exitCode = null;
@@ -89,7 +89,7 @@ describe("RalphSpecGenerator", () => {
 
   beforeEach(() => {
     mockProc = new MockChildProcess();
-    spyOn(cp, "spawn").mockImplementation(() => mockProc as any);
+    spyOn(cp, "spawn").mockReturnValue(mockProc as unknown as cp.ChildProcessWithoutNullStreams);
     mockSpecContent = ""; // Reset spec content
 
     generator = new RalphSpecGenerator({
@@ -283,11 +283,12 @@ describe("RalphSpecGenerator", () => {
 
       // Check spawn was called
       expect(cp.spawn).toHaveBeenCalled();
-      const calls = (cp.spawn as any).mock.calls;
+      const calls = (cp.spawn as unknown as { mock: { calls: unknown[][] } }).mock.calls;
 
       expect(calls).toBeDefined();
+      expect(calls.length).toBeGreaterThan(0);
       // Get the last call (there may be multiple from previous tests)
-      const lastCall = calls[calls.length - 1];
+      const lastCall = calls[calls.length - 1]!;
       expect(lastCall[0]).toBe("ralphie");
 
       // Check args - workDir now includes a UUID subdirectory for isolation

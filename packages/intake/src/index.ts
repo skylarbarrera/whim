@@ -234,7 +234,7 @@ async function main(): Promise<void> {
 
   // Set up recurring poll with overlap guard
   let polling = false;
-  setInterval(async () => {
+  const pollIntervalId = setInterval(async () => {
     if (polling) {
       console.log("Previous poll still running, skipping this interval");
       return;
@@ -248,6 +248,16 @@ async function main(): Promise<void> {
       polling = false;
     }
   }, config.pollInterval);
+
+  // Graceful shutdown handler
+  const shutdown = (signal: string) => {
+    console.log(`Received ${signal}, shutting down gracefully...`);
+    clearInterval(pollIntervalId);
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   console.log("Intake service running");
 }

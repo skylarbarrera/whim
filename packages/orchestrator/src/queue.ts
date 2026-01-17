@@ -15,16 +15,6 @@ import type {
 } from "@whim/shared";
 
 /**
- * Priority order for SQL sorting (higher number = higher priority)
- */
-const PRIORITY_ORDER: Record<Priority, number> = {
-  low: 1,
-  medium: 2,
-  high: 3,
-  critical: 4,
-};
-
-/**
  * Queue Manager for work items
  * Handles adding, retrieving, and managing work items in the queue
  */

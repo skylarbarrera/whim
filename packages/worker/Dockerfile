@@ -52,9 +52,6 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Install test runners for validation (jest, vitest, typescript)
-RUN npm install -g jest ts-jest typescript @types/jest @types/node vitest
-
 # Install Bun for runtime
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"

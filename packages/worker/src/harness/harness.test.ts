@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { getHarness, claudeHarness, codexHarness } from './index.js';
-import type { HarnessName, HarnessEvent, HarnessResult } from './types.js';
+import type { HarnessEvent, HarnessResult } from './types.js';
 
 describe('Harness', () => {
   describe('getHarness', () => {

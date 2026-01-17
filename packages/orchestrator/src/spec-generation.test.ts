@@ -22,7 +22,7 @@ describe("SpecGenerationManager", () => {
     manager = new SpecGenerationManager(mockDb);
 
     // Mock the generator's generate method
-    mockGenerate = mock((description: string, metadata?: any) => {
+    mockGenerate = mock((_description: string, metadata?: { source?: string; sourceRef?: string }) => {
       return Promise.resolve({
         title: "Test Title",
         spec: "# Test Spec\n\nTest content",
@@ -36,7 +36,7 @@ describe("SpecGenerationManager", () => {
     });
 
     // Replace the generator's generate method
-    (manager as any).generator.generate = mockGenerate;
+    (manager as unknown as { generator: { generate: typeof mockGenerate } }).generator.generate = mockGenerate;
   });
 
   afterEach(() => {
@@ -249,7 +249,7 @@ describe("SpecGenerationManager", () => {
 
       // Fail twice, succeed on third attempt
       let callCount = 0;
-      mockGenerate = mock(() => {
+      mockGenerate = mock((): Promise<{ title: string; spec: string; branch: string; metadata: { generatedAt: string } }> => {
         callCount++;
         if (callCount < 3) {
           return Promise.reject(new Error("Temporary failure"));
@@ -261,7 +261,7 @@ describe("SpecGenerationManager", () => {
           metadata: { generatedAt: new Date().toISOString() },
         });
       });
-      (manager as any).generator.generate = mockGenerate;
+      (manager as unknown as { generator: { generate: typeof mockGenerate } }).generator.generate = mockGenerate;
 
       manager.start(workItem);
 
@@ -272,7 +272,7 @@ describe("SpecGenerationManager", () => {
 
       // Check that the work item was updated successfully
       const successCalls = (mockDb.execute as ReturnType<typeof mock>).mock.calls.filter(
-        (call: any[]) => call[0].includes("status = 'queued'")
+        (call: unknown[]) => (call[0] as string).includes("status = 'queued'")
       );
       expect(successCalls.length).toBeGreaterThan(0);
     });
@@ -307,7 +307,7 @@ describe("SpecGenerationManager", () => {
 
       // Always fail
       mockGenerate = mock(() => Promise.reject(new Error("Persistent failure")));
-      (manager as any).generator.generate = mockGenerate;
+      (manager as unknown as { generator: { generate: typeof mockGenerate } }).generator.generate = mockGenerate;
 
       manager.start(workItem);
 
@@ -318,7 +318,7 @@ describe("SpecGenerationManager", () => {
 
       // Check that the work item was marked as failed
       const failCalls = (mockDb.execute as ReturnType<typeof mock>).mock.calls.filter(
-        (call: any[]) => call[0].includes("status = 'failed'")
+        (call: unknown[]) => (call[0] as string).includes("status = 'failed'")
       );
       expect(failCalls.length).toBeGreaterThan(0);
 

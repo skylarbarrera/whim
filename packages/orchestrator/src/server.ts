@@ -420,7 +420,14 @@ export function createServer(deps: ServerDependencies): express.Application {
         return;
       }
 
-      await deps.workers.fail(req.params.id, req.body.error, req.body.iteration);
+      await deps.workers.fail(
+        req.params.id,
+        req.body.error,
+        req.body.iteration,
+        req.body.stack,
+        req.body.category,
+        req.body.context
+      );
       res.json({ success: true });
     })
   );

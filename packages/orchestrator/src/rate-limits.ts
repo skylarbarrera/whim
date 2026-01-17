@@ -36,10 +36,9 @@ export interface RateLimitStatus {
 
 /**
  * Redis key names for rate limiting
- * Note: activeWorkers is deprecated - prefer DB-based count via getActiveWorkerCount callback
+ * Note: Active worker count comes from DB (source of truth), not Redis
  */
 const KEYS = {
-  activeWorkers: "rate:active_workers", // Deprecated: kept for backward compatibility
   lastSpawn: "rate:last_spawn",
   dailyIterations: "rate:daily_iterations",
   dailyResetDate: "rate:daily_reset_date",
@@ -110,25 +109,19 @@ export class RateLimiter {
 
   /**
    * Record a worker spawn
-   * Increments active worker count and updates last spawn timestamp
+   * Updates last spawn timestamp (active count tracked in DB)
    */
   async recordSpawn(): Promise<void> {
-    await Promise.all([
-      this.redis.incr(KEYS.activeWorkers),
-      this.redis.set(KEYS.lastSpawn, Date.now().toString()),
-    ]);
+    await this.redis.set(KEYS.lastSpawn, Date.now().toString());
   }
 
   /**
    * Record worker completion
-   * Decrements active worker count (never below 0)
+   * No-op: active count is tracked in DB via workers table status
    */
   async recordWorkerDone(): Promise<void> {
-    const count = await this.redis.decr(KEYS.activeWorkers);
-    // Ensure we don't go negative
-    if (count < 0) {
-      await this.redis.set(KEYS.activeWorkers, "0");
-    }
+    // Active worker count is derived from DB (workers with status 'starting' or 'running')
+    // No Redis counter to decrement
   }
 
   /**
@@ -180,17 +173,15 @@ export class RateLimiter {
   }
 
   /**
-   * Get the current active worker count
-   * Prefers DB-based count (accurate) over Redis counter (can drift)
+   * Get the current active worker count from DB (source of truth)
    */
   private async getActiveWorkerCount(): Promise<number> {
-    // Use DB-based count if available (source of truth, no drift)
     if (this.getActiveWorkerCountFn) {
       return this.getActiveWorkerCountFn();
     }
-    // Fallback to Redis counter (may drift if workers crash)
-    const value = await this.redis.get(KEYS.activeWorkers);
-    return value ? parseInt(value, 10) : 0;
+    // If no DB function provided, return 0 (should not happen in production)
+    console.warn("RateLimiter: No getActiveWorkerCount function provided, returning 0");
+    return 0;
   }
 
   /**

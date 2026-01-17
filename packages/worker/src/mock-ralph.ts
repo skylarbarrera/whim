@@ -44,7 +44,7 @@ export async function runMockRalph(
   options: MockRalphOptions = {}
 ): Promise<RalphResult> {
   const {
-    toolDelay = 100,
+    toolDelay: _toolDelay = 100,
     toolCount = 10,
     shouldSucceed = true,
     errorMessage = "Mock error",

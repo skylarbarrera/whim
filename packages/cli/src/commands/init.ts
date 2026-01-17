@@ -1,5 +1,5 @@
 import { execSync, spawnSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import * as readline from 'readline';
 
@@ -66,7 +66,11 @@ export function detectTestFramework(cwd: string): TestFramework {
   return null;
 }
 
-export function detectProjectType(cwd: string): { type: ProjectType; isMonorepo: boolean; packages?: { path: string; type: ProjectType }[] } {
+export function detectProjectType(cwd: string): {
+  type: ProjectType;
+  isMonorepo: boolean;
+  packages?: { path: string; type: ProjectType }[];
+} {
   // Check for monorepo signals first
   const pkgPath = join(cwd, 'package.json');
   let pkg: Record<string, unknown> = {};
@@ -94,7 +98,7 @@ export function detectProjectType(cwd: string): { type: ProjectType; isMonorepo:
       const dirPath = join(cwd, dir);
       if (existsSync(dirPath)) {
         try {
-          const entries = require('fs').readdirSync(dirPath, { withFileTypes: true });
+          const entries = readdirSync(dirPath, { withFileTypes: true });
           for (const entry of entries) {
             if (entry.isDirectory()) {
               const subPath = join(dir, entry.name);
@@ -128,12 +132,25 @@ function detectSingleProjectType(cwd: string): ProjectType {
       const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
 
       // Web frameworks
-      if (allDeps.react || allDeps.vue || allDeps.svelte || allDeps['@angular/core'] || allDeps.next || allDeps.nuxt) {
+      if (
+        allDeps.react ||
+        allDeps.vue ||
+        allDeps.svelte ||
+        allDeps['@angular/core'] ||
+        allDeps.next ||
+        allDeps.nuxt
+      ) {
         return 'web';
       }
 
       // API frameworks
-      if (allDeps.express || allDeps.fastify || allDeps.hono || allDeps.koa || allDeps['@nestjs/core']) {
+      if (
+        allDeps.express ||
+        allDeps.fastify ||
+        allDeps.hono ||
+        allDeps.koa ||
+        allDeps['@nestjs/core']
+      ) {
         return 'api';
       }
 
@@ -221,7 +238,12 @@ function getInstallCommand(pm: PackageManager, deps: string[], dev: boolean): st
   }
 }
 
-function installDependencies(cwd: string, pm: PackageManager, deps: string[], dev: boolean): boolean {
+function installDependencies(
+  cwd: string,
+  pm: PackageManager,
+  deps: string[],
+  dev: boolean
+): boolean {
   if (deps.length === 0) return true;
 
   const cmd = getInstallCommand(pm, deps, dev);
@@ -233,7 +255,7 @@ function installDependencies(cwd: string, pm: PackageManager, deps: string[], de
   }
 }
 
-function installSkills(cwd: string, harness: HarnessType): string[] {
+function installSkills(cwd: string, _harness: HarnessType): string[] {
   const installed: string[] = [];
 
   // Install Ralph skills

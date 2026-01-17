@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { runVerificationWorker } from "./verification-worker.js";
-import type { OrchestratorClient } from "./client.js";
 
 describe("Verification Worker", () => {
   let mockFetch: ReturnType<typeof spyOn>;
@@ -129,7 +128,7 @@ describe("Verification Worker", () => {
         repo: "owner/repo",
         branch: "feat/test",
         prNumber: 42,
-      } as any;
+      } as unknown;
 
       expect(isVerificationReady(validItem)).toBe(true);
     });
@@ -142,7 +141,7 @@ describe("Verification Worker", () => {
         repo: "owner/repo",
         branch: null,
         prNumber: 42,
-      } as any;
+      } as unknown;
 
       expect(isVerificationReady(invalidItem)).toBe(false);
     });
@@ -155,7 +154,7 @@ describe("Verification Worker", () => {
         repo: "owner/repo",
         branch: "feat/test",
         prNumber: null,
-      } as any;
+      } as unknown;
 
       expect(isVerificationReady(invalidItem)).toBe(false);
     });

@@ -20,7 +20,6 @@ fi
 POSTGRES_PORT="${POSTGRES_PORT:-5433}"
 REDIS_PORT="${REDIS_PORT:-6380}"
 ORCHESTRATOR_PORT="${ORCHESTRATOR_PORT:-3002}"
-DASHBOARD_PORT="${DASHBOARD_PORT:-3003}"
 
 # Colors
 RED='\033[0;31m'
@@ -86,11 +85,11 @@ if [[ "$MODE" == "watch" ]] && ! printf '%s\n' "2.22.0" "$COMPOSE_VERSION" | sor
     MODE="up"
 fi
 
-# Check .env exists
-if [ ! -f "docker/.env" ]; then
-    warn "No docker/.env file found. Creating from template..."
-    cp .env.example docker/.env
-    warn "Edit docker/.env with your GITHUB_TOKEN and ANTHROPIC_API_KEY"
+# Check .env exists (setup.sh creates it in project root)
+if [ ! -f ".env" ]; then
+    warn "No .env file found. Run ./scripts/setup.sh first, or:"
+    warn "  cp .env.example .env"
+    warn "  Edit .env with your GITHUB_TOKEN and ANTHROPIC_API_KEY"
     exit 1
 fi
 
@@ -102,7 +101,6 @@ success "Worker image built"
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Orchestrator:  http://localhost:${ORCHESTRATOR_PORT}${NC}"
-echo -e "${GREEN}  Dashboard:     http://localhost:${DASHBOARD_PORT}${NC}"
 echo -e "${GREEN}  PostgreSQL:    localhost:${POSTGRES_PORT}${NC}"
 echo -e "${GREEN}  Redis:         localhost:${REDIS_PORT}${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
