@@ -21,6 +21,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.0",
     "@whim/harness": "workspace:*",
     "@whim/shared": "workspace:*",
     "js-yaml": "^4.1.1"

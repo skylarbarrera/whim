@@ -4,6 +4,8 @@
  * Emits the same events as real Ralph but with configurable delays and outcomes
  */
 
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import type { OrchestratorClient } from "./client.js";
 import type { RalphResult, RalphMetrics, RalphEvent } from "./ralph.js";
 

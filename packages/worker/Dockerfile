@@ -8,6 +8,7 @@ WORKDIR /app
 # Copy package files for dependency resolution
 COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/harness/package.json ./packages/harness/
 COPY packages/worker/package.json ./packages/worker/
 
 # Install dependencies
@@ -15,11 +16,15 @@ RUN bun install
 
 # Copy source code
 COPY packages/shared ./packages/shared
+COPY packages/harness ./packages/harness
 COPY packages/worker ./packages/worker
 COPY tsconfig.json ./
 
-# Build shared and worker packages
+# Build shared, harness, and worker packages
 WORKDIR /app/packages/shared
+RUN bun run build
+
+WORKDIR /app/packages/harness
 RUN bun run build
 
 WORKDIR /app/packages/worker
@@ -76,6 +81,10 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy shared package (overwrite workspace link with actual build)
 COPY --from=builder /app/packages/shared/dist ./node_modules/@whim/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./node_modules/@whim/shared/
+
+# Copy harness package
+COPY --from=builder /app/packages/harness/dist ./node_modules/@whim/harness/dist
+COPY --from=builder /app/packages/harness/package.json ./node_modules/@whim/harness/
 
 # Copy Claude configuration to worker user's home
 COPY --chown=worker:worker packages/worker/.claude /home/worker/.claude

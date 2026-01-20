@@ -135,8 +135,8 @@ function handleSDKMessage(message: SDKMessage, onEvent: (event: HarnessEvent) =>
               name: block.name,
               input: JSON.stringify(block.input),
             });
-          } else if (block.type === "thinking") {
-            onEvent({ type: "thinking", text: block.thinking });
+          } else if ((block as { type: string }).type === "thinking") {
+            onEvent({ type: "thinking", text: (block as { thinking: string }).thinking });
           }
         }
       }

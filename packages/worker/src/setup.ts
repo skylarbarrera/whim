@@ -189,9 +189,11 @@ export async function setupWorkspace(
 
   // Ralphie v1.1+ expects specs in specs/active/<name>.md
   // Generate spec name from branch (e.g., "ai/github-issue-42-add-auth" -> "add-auth")
+  // Sanitize to remove slashes and make filesystem-safe
   const specName = workItem.branch
-    .replace(/^ai\//, '')
+    .replace(/^(ai|whim)\//, '') // Remove common prefixes
     .replace(/^[a-z]+-[a-z0-9-]+-/, '') // Remove source prefix like "github-issue-42-"
+    .replace(/\//g, '-') // Replace any remaining slashes with dashes
     .substring(0, 50) || 'task';
   const specsActiveDir = join(repoDir, "specs", "active");
   await mkdir(specsActiveDir, { recursive: true });
@@ -208,7 +210,8 @@ export async function setupWorkspace(
   const initResult = await exec("ralphie", ralphInitArgs, { cwd: repoDir });
   if (initResult.code !== 0) {
     logSetupCommandResult("ralphie init", "ralphie", ralphInitArgs, initResult);
-    console.warn("[SETUP] Ralphie init failed but continuing (may not be fatal)");
+    console.warn("[SETUP] Ralphie init failed, creating files manually");
+    await createRalphieFilesManually(repoDir, specPath);
   }
 
   // Inject Whim-specific learnings instructions into the repo
@@ -320,6 +323,46 @@ Learnings are extracted after your run and stored for future tasks on this repo.
   const fallbackPath = join(aiDir, "WHIM_LEARNINGS.md");
   await writeFile(fallbackPath, `# Whim Learnings Instructions${learningsInstructions}`, "utf-8");
   console.log("[SETUP] Created .ai/WHIM_LEARNINGS.md with learnings instructions");
+}
+
+/**
+ * Create ralphie files manually when ralphie init fails
+ * This is a fallback for when the templates directory is not found
+ */
+async function createRalphieFilesManually(repoDir: string, specPath: string): Promise<void> {
+  // Create .claude/ralphie.md with basic instructions
+  const claudeDir = join(repoDir, ".claude");
+  await mkdir(claudeDir, { recursive: true });
+
+  const ralphieMd = `# Ralphie - AI Coding Assistant
+
+You are working on completing tasks defined in spec files under \`specs/active/\`.
+
+## Workflow
+
+1. Read the spec file to understand the task
+2. Implement the required changes
+3. Run tests to verify your work
+4. Update the spec file to mark tasks as complete
+
+## Guidelines
+
+- Make small, incremental changes
+- Test frequently
+- Commit your work after completing significant milestones
+- Ask for help if you get stuck
+`;
+  await writeFile(join(claudeDir, "ralphie.md"), ralphieMd, "utf-8");
+  console.log("[SETUP] Created .claude/ralphie.md manually");
+
+  // Create .ai/ralphie directory with basic files
+  const aiRalphieDir = join(repoDir, ".ai", "ralphie");
+  await mkdir(aiRalphieDir, { recursive: true });
+
+  // Create config.json pointing to the spec
+  const config = { specPath: specPath };
+  await writeFile(join(aiRalphieDir, "config.json"), JSON.stringify(config, null, 2), "utf-8");
+  console.log("[SETUP] Created .ai/ralphie/ directory structure");
 }
 
 /**
