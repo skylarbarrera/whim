@@ -166,8 +166,9 @@ export class RalphSpecGenerator {
               const event = JSON.parse(line) as RalphSpecEvent;
               events.push(event);
               console.log(`[RalphSpecGen] Event: ${event.event}`);
-            } catch {
-              // Not JSON, ignore
+            } catch (error) {
+              // Not JSON, ignore - expected for non-JSON lines
+              console.debug(`[RalphSpecGen] Non-JSON line: ${error instanceof Error ? error.message : String(error)}`);
             }
           }
         }

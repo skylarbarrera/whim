@@ -80,7 +80,8 @@ export function parseRalphEvent(line: string): RalphEvent | null {
       return event as RalphEvent;
     }
     return null;
-  } catch {
+  } catch (error) {
+    console.debug(`[RALPH] Failed to parse event line: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -143,6 +144,26 @@ export async function runRalph(
     shell: false,
     env: process.env,
   });
+
+  // Cleanup handler to kill child process if worker crashes
+  const cleanup = () => {
+    if (proc && !proc.killed) {
+      console.log('[RALPH] Worker terminating, killing ralphie process...');
+      proc.kill('SIGTERM');
+    }
+  };
+
+  // Register cleanup handlers
+  process.on('SIGTERM', cleanup);
+  process.on('SIGINT', cleanup);
+  process.on('exit', cleanup);
+
+  // Helper to remove cleanup handlers
+  const removeCleanupHandlers = () => {
+    process.removeListener('SIGTERM', cleanup);
+    process.removeListener('SIGINT', cleanup);
+    process.removeListener('exit', cleanup);
+  };
 
   const processLine = async (line: string): Promise<void> => {
     options.onOutput?.(line);
@@ -273,6 +294,9 @@ export async function runRalph(
         error = `Process exited with code ${code}`;
       }
 
+      // Clean up signal handlers before resolving
+      removeCleanupHandlers();
+
       resolve({
         success,
         error,
@@ -282,6 +306,8 @@ export async function runRalph(
     });
 
     proc.on('error', (err) => {
+      // Clean up signal handlers before rejecting
+      removeCleanupHandlers();
       reject(err);
     });
   });

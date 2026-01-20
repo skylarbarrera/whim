@@ -27,9 +27,10 @@ export function loadConfig(): CliConfig {
         config.apiUrl = value;
       }
     }
-  } catch {
+  } catch (error) {
     // Config file doesn't exist or can't be read - that's OK
     // User can rely on defaults or CLI flags
+    console.debug(`[CONFIG] Config file not loaded: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return config;

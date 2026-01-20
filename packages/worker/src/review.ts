@@ -40,8 +40,9 @@ export function generateDiff(repoDir: string): string {
         });
 
         return diff;
-      } catch {
-        // Try next ref
+      } catch (error) {
+        // Try next ref, log for debugging
+        console.debug(`[REVIEW] Ref ${ref} failed: ${error instanceof Error ? error.message : String(error)}`);
         continue;
       }
     }
@@ -84,14 +85,14 @@ export function readSpec(repoDir: string): string {
     }
   }
 
-  // Fall back to SPEC.md for backward compatibility
-  const legacySpecPath = join(repoDir, "SPEC.md");
-  if (!existsSync(legacySpecPath)) {
+  // Fall back to SPEC.md in repository root
+  const rootSpecPath = join(repoDir, "SPEC.md");
+  if (!existsSync(rootSpecPath)) {
     throw new Error("SPEC.md not found in repository root or specs/active/");
   }
 
   try {
-    return readFileSync(legacySpecPath, "utf-8");
+    return readFileSync(rootSpecPath, "utf-8");
   } catch (error) {
     throw new Error(
       `Failed to read SPEC.md: ${error instanceof Error ? error.message : String(error)}`

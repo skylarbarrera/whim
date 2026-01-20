@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { claudeHarness, codexHarness } from './index.js';
 import { opencodeHarness, getHarness } from '@whim/harness';
-import type { HarnessEvent } from './types.js';
+import type { HarnessEvent } from '@whim/harness';
 import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';

@@ -62,8 +62,9 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyResult> {
             exitCode: result.passed ? 0 : 1,
           });
           return;
-        } catch {
+        } catch (error) {
           // Failed to parse result JSON
+          console.debug(`[VERIFY] Failed to parse VERIFY:RESULT JSON: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
 

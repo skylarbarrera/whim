@@ -26,7 +26,6 @@
     "@whim/shared": "workspace:*",
     "ink": "^5.0.0",
     "react": "^18.3.0",
-    "chalk": "^5.4.0",
     "commander": "^12.1.0"
   },
   "devDependencies": {

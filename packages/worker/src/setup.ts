@@ -42,10 +42,13 @@ export interface PRResult {
   error?: PRError;
 }
 
+// Git operations timeout (5 minutes)
+const GIT_TIMEOUT_MS = 5 * 60 * 1000;
+
 function exec(
   command: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; timeout?: number } = {}
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
@@ -56,6 +59,21 @@ function exec(
 
     let stdout = "";
     let stderr = "";
+    let killed = false;
+
+    // Set up timeout if specified
+    const timeoutId = options.timeout
+      ? setTimeout(() => {
+          killed = true;
+          proc.kill("SIGTERM");
+          // Force kill after 10 seconds if SIGTERM doesn't work
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill("SIGKILL");
+            }
+          }, 10000);
+        }, options.timeout)
+      : null;
 
     proc.stdout.on("data", (data) => {
       stdout += data.toString();
@@ -66,10 +84,16 @@ function exec(
     });
 
     proc.on("close", (code) => {
-      resolve({ stdout, stderr, code: code ?? 0 });
+      if (timeoutId) clearTimeout(timeoutId);
+      if (killed) {
+        resolve({ stdout, stderr, code: -1 }); // Indicate timeout with -1
+      } else {
+        resolve({ stdout, stderr, code: code ?? 0 });
+      }
     });
 
     proc.on("error", (err) => {
+      if (timeoutId) clearTimeout(timeoutId);
       reject(err);
     });
   });
@@ -79,7 +103,9 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
-  } catch {
+  } catch (error) {
+    // File doesn't exist or not accessible - this is expected behavior
+    console.debug(`[SETUP] Path not accessible: ${path} - ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -168,12 +194,15 @@ export async function setupWorkspace(
   const repoUrl = `https://x-access-token:${config.githubToken}@github.com/${workItem.repo}.git`;
   // Note: We don't log the full URL since it contains the token
   const cloneArgs = ["clone", "--depth", "1", repoUrl, repoDir];
-  const cloneResult = await exec("git", cloneArgs);
+  const cloneResult = await exec("git", cloneArgs, { timeout: GIT_TIMEOUT_MS });
 
   if (cloneResult.code !== 0) {
     // Log with sanitized URL (don't expose token)
     const safeArgs = ["clone", "--depth", "1", `https://***@github.com/${workItem.repo}.git`, repoDir];
     logSetupCommandResult("git clone", "git", safeArgs, cloneResult);
+    if (cloneResult.code === -1) {
+      throw new Error(`Git clone timed out after ${GIT_TIMEOUT_MS / 1000}s`);
+    }
     throw new Error(`Failed to clone repo: ${cloneResult.stderr}`);
   }
 
@@ -834,8 +863,8 @@ export async function archiveSpec(repoDir: string): Promise<string | null> {
   try {
     // Check if active dir exists
     await access(activeDir);
-  } catch {
-    console.log("[ARCHIVE] No specs/active/ directory found");
+  } catch (error) {
+    console.log(`[ARCHIVE] No specs/active/ directory found: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 

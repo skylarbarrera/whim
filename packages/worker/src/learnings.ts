@@ -6,7 +6,8 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
-  } catch {
+  } catch (error) {
+    console.debug(`[LEARNINGS] Path not accessible: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }

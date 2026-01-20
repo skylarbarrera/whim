@@ -329,6 +329,32 @@ export class QueueManager {
   }
 
   /**
+   * Reset items stuck in 'assigned' status for too long
+   *
+   * This can happen if a worker claims an item but crashes before starting work.
+   * Items stuck in 'assigned' for more than the threshold are reset to 'queued'.
+   *
+   * @param thresholdMinutes - Minutes after which an assigned item is considered stuck (default: 5)
+   * @returns Number of items reset
+   */
+  async resetStuckAssignedItems(thresholdMinutes: number = 5): Promise<number> {
+    const result = await this.db.query<WorkItem>(
+      `UPDATE work_items
+       SET status = 'queued', worker_id = NULL, updated_at = NOW()
+       WHERE status = 'assigned'
+       AND updated_at < NOW() - INTERVAL '1 minute' * $1
+       RETURNING *`,
+      [thresholdMinutes]
+    );
+
+    if (result.length > 0) {
+      console.warn(`[QUEUE] Reset ${result.length} stuck assigned items (threshold: ${thresholdMinutes}min)`);
+    }
+
+    return result.length;
+  }
+
+  /**
    * Get verification work item linked to an execution item
    * Returns null if no verification item exists
    */
@@ -384,12 +410,12 @@ export class QueueManager {
     if (spec) {
       // Look for first task title like "### T001: Add hello function"
       const taskMatch = spec.match(/###\s+T\d+:\s*(.+)/);
-      if (taskMatch) {
+      if (taskMatch?.[1]) {
         return this.createSlug(taskMatch[1]);
       }
       // Look for first H1/H2 header
       const headerMatch = spec.match(/^#{1,2}\s+(.+)/m);
-      if (headerMatch) {
+      if (headerMatch?.[1]) {
         return this.createSlug(headerMatch[1]);
       }
     }

@@ -37,8 +37,8 @@ export function validateEnvironment(): WorkerEnvironment {
   let workItem: WorkItem;
   try {
     workItem = JSON.parse(workItemJson);
-  } catch {
-    throw new Error("WORK_ITEM must be valid JSON");
+  } catch (error) {
+    throw new Error(`WORK_ITEM must be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   const githubToken = process.env.GITHUB_TOKEN;

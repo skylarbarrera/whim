@@ -40,7 +40,8 @@ export async function hasTestScript(repoDir: string): Promise<boolean> {
     const content = await readFile(packageJsonPath, "utf-8");
     const pkg = JSON.parse(content);
     return !!(pkg.scripts?.test && pkg.scripts.test !== 'echo "Error: no test specified" && exit 1');
-  } catch {
+  } catch (error) {
+    console.debug(`[TESTING] Could not read package.json: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -210,6 +211,10 @@ export async function runTests(
 
     proc.on("error", (err) => {
       clearTimeout(timeoutHandle);
+      // Ensure process is killed if it somehow started
+      if (!proc.killed) {
+        proc.kill("SIGTERM");
+      }
       resolve({
         status: "error",
         testsRun: 0,

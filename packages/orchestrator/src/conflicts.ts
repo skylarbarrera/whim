@@ -148,7 +148,7 @@ export class ConflictDetector {
   }
 
   /**
-   * Get the worker holding a lock on a specific file.
+   * Get the file lock for a specific file.
    *
    * @param repo - The repository to check
    * @param filePath - The file to check

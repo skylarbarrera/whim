@@ -1,3 +1,7 @@
+import type { ReviewFindings } from "@whim/shared";
+
+export { type ReviewFindings } from "@whim/shared";
+
 export const REVIEW_SYSTEM_PROMPT = `You are a code reviewer for AI-generated pull requests.
 Your role is to analyze implementation diffs against specification documents and provide structured feedback.
 
@@ -114,24 +118,4 @@ export function formatReviewComment(
   }
 
   return comment;
-}
-
-export interface ReviewFindings {
-  specAlignment: {
-    score: "aligned" | "partial" | "misaligned";
-    summary: string;
-    gaps: string[];
-    extras: string[];
-  };
-  codeQuality: {
-    score: "good" | "acceptable" | "needs-work";
-    summary: string;
-    concerns: Array<{
-      file: string;
-      line?: number;
-      issue: string;
-      suggestion: string;
-    }>;
-  };
-  overallSummary: string;
 }

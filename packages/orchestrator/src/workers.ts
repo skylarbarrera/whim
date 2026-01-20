@@ -590,6 +590,50 @@ export class WorkerManager {
   }
 
   /**
+   * Detect and reset orphaned work items
+   *
+   * Finds work items stuck in 'in_progress' for too long with no assigned worker.
+   * This can happen if container creation fails and rollback also fails.
+   *
+   * @param thresholdHours - Hours after which an item is considered orphaned (default: 2)
+   * @returns Number of items reset
+   */
+  async resetOrphanedItems(thresholdHours: number = 2): Promise<number> {
+    const orphanedItems = await this.db.query<WorkItem>(
+      `SELECT * FROM work_items
+       WHERE status = 'in_progress'
+       AND updated_at < NOW() - INTERVAL '1 hour' * $1
+       AND (worker_id IS NULL OR worker_id NOT IN (
+         SELECT id FROM workers WHERE status IN ('starting', 'running')
+       ))`,
+      [thresholdHours]
+    );
+
+    let resetCount = 0;
+    for (const item of orphanedItems) {
+      console.warn(`[HEALTH] Resetting orphaned work item: ${item.id} (stuck since ${item.updatedAt})`);
+      try {
+        // Reset to queued status so it can be picked up again
+        await this.db.execute(
+          `UPDATE work_items
+           SET status = 'queued', worker_id = NULL, error = 'Reset: orphaned item', updated_at = NOW()
+           WHERE id = $1`,
+          [item.id]
+        );
+        resetCount++;
+      } catch (error) {
+        console.error(`[HEALTH] Failed to reset orphaned item ${item.id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    if (resetCount > 0) {
+      console.log(`[HEALTH] Reset ${resetCount} orphaned work items`);
+    }
+
+    return resetCount;
+  }
+
+  /**
    * Kill a worker container
    *
    * Stops the Docker container and updates worker status.
@@ -617,8 +661,9 @@ export class WorkerManager {
             tail: 50,  // Last 50 lines
           });
           console.log(`[Worker ${workerId}] Last logs before kill:\n${logs.toString()}`);
-        } catch {
+        } catch (error) {
           // Log capture is best-effort
+          console.debug(`[Worker ${workerId}] Failed to capture logs: ${error instanceof Error ? error.message : String(error)}`);
         }
         await container.stop({ t: 10 }); // 10 second grace period
       } catch (err) {

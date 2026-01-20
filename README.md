@@ -416,7 +416,7 @@ Detects:
 - AI harness (claude-code, codex, opencode)
 
 Creates:
-- `.ralph/config.yml` - Harness preference
+- `.ralphie/config.yml` - Harness preference
 - `.whim/config.yml` - Project type and verification settings
 
 Installs:

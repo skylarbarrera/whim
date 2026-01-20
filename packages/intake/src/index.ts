@@ -207,8 +207,9 @@ async function poll(
     try {
       await processIssue(github, orchestratorUrl, issue);
       processed++;
-    } catch {
-      // Error already logged, continue to next issue
+    } catch (error) {
+      // Error already logged in processIssue, continue to next issue
+      console.debug(`[INTAKE] Issue processing failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

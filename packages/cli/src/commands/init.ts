@@ -59,8 +59,8 @@ export function detectTestFramework(cwd: string): TestFramework {
       const scripts = pkg.scripts || {};
       if (scripts.test?.includes('bun test')) return 'bun';
     }
-  } catch {
-    // Invalid package.json
+  } catch (error) {
+    console.warn(`[INIT] Invalid package.json: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return null;
@@ -78,8 +78,8 @@ export function detectProjectType(cwd: string): {
   if (existsSync(pkgPath)) {
     try {
       pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-    } catch {
-      // Invalid package.json
+    } catch (error) {
+      console.warn(`[INIT] Invalid package.json at ${pkgPath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -106,8 +106,8 @@ export function detectProjectType(cwd: string): {
               packages.push({ path: subPath, type: subType });
             }
           }
-        } catch {
-          // Can't read directory
+        } catch (error) {
+          console.debug(`[INIT] Can't read directory ${dirPath}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }
@@ -158,8 +158,8 @@ function detectSingleProjectType(cwd: string): ProjectType {
       if (pkg.bin || allDeps.commander || allDeps.yargs || allDeps.meow) {
         return 'cli';
       }
-    } catch {
-      // Invalid package.json
+    } catch (error) {
+      console.debug(`[INIT] Invalid package.json: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -175,8 +175,8 @@ export function detectHarnesses(): HarnessType[] {
     if (claudeResult.status === 0 && claudeResult.stdout.trim()) {
       harnesses.push('claude-code');
     }
-  } catch {
-    // claude not found
+  } catch (error) {
+    console.debug(`[INIT] Claude not found: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
@@ -184,8 +184,8 @@ export function detectHarnesses(): HarnessType[] {
     if (codexResult.status === 0 && codexResult.stdout.trim()) {
       harnesses.push('codex');
     }
-  } catch {
-    // codex not found
+  } catch (error) {
+    console.debug(`[INIT] Codex not found: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
@@ -193,8 +193,8 @@ export function detectHarnesses(): HarnessType[] {
     if (opencodeResult.status === 0 && opencodeResult.stdout.trim()) {
       harnesses.push('opencode');
     }
-  } catch {
-    // opencode not found
+  } catch (error) {
+    console.debug(`[INIT] OpenCode not found: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return harnesses;
@@ -250,7 +250,8 @@ function installDependencies(
   try {
     execSync(cmd, { cwd, stdio: 'inherit' });
     return true;
-  } catch {
+  } catch (error) {
+    console.warn(`[INIT] Failed to install dependencies: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -262,8 +263,8 @@ function installSkills(cwd: string, _harness: HarnessType): string[] {
   try {
     execSync('npx add-skill skylarbarrera/ralphie -y', { cwd, stdio: 'inherit' });
     installed.push('ralphie');
-  } catch {
-    console.warn('Warning: Failed to install Ralphie skills');
+  } catch (error) {
+    console.warn(`[INIT] Failed to install Ralphie skills: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Install Whim verify skill
@@ -271,8 +272,8 @@ function installSkills(cwd: string, _harness: HarnessType): string[] {
   try {
     execSync('npx add-skill whim-ai/whim --skill verify -y', { cwd, stdio: 'inherit' });
     installed.push('verify');
-  } catch {
-    console.warn('Warning: Failed to install Whim verify skill');
+  } catch (error) {
+    console.warn(`[INIT] Failed to install Whim verify skill: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return installed;
@@ -419,7 +420,8 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
       // Install browsers
       try {
         execSync('npx playwright install', { cwd, stdio: 'inherit' });
-      } catch {
+      } catch (error) {
+        console.warn(`[INIT] Playwright browser install failed: ${error instanceof Error ? error.message : String(error)}`);
         warnings.push('Failed to install Playwright browsers');
       }
     } else {

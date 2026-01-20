@@ -78,33 +78,40 @@ export class RateLimiter {
    * - At max worker capacity
    * - Within cooldown period from last spawn
    * - Daily iteration budget exhausted
+   * - Redis is unavailable (fail closed for safety)
    */
   async canSpawnWorker(): Promise<boolean> {
-    // Check daily reset first
-    await this.checkDailyReset();
+    try {
+      // Check daily reset first
+      await this.checkDailyReset();
 
-    // Check active worker count
-    const activeWorkers = await this.getActiveWorkerCount();
-    if (activeWorkers >= this.config.maxWorkers) {
-      return false;
-    }
-
-    // Check cooldown
-    const lastSpawn = await this.getLastSpawn();
-    if (lastSpawn) {
-      const elapsed = (Date.now() - lastSpawn.getTime()) / 1000;
-      if (elapsed < this.config.cooldownSeconds) {
+      // Check active worker count
+      const activeWorkers = await this.getActiveWorkerCount();
+      if (activeWorkers >= this.config.maxWorkers) {
         return false;
       }
-    }
 
-    // Check daily budget
-    const iterationsToday = await this.getIterationsToday();
-    if (iterationsToday >= this.config.dailyBudget) {
+      // Check cooldown
+      const lastSpawn = await this.getLastSpawn();
+      if (lastSpawn) {
+        const elapsed = (Date.now() - lastSpawn.getTime()) / 1000;
+        if (elapsed < this.config.cooldownSeconds) {
+          return false;
+        }
+      }
+
+      // Check daily budget
+      const iterationsToday = await this.getIterationsToday();
+      if (iterationsToday >= this.config.dailyBudget) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      // Fail closed: don't allow spawns if Redis is unavailable
+      console.error(`[RATE_LIMIT] Redis unavailable, failing closed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
-
-    return true;
   }
 
   /**
@@ -112,7 +119,12 @@ export class RateLimiter {
    * Updates last spawn timestamp (active count tracked in DB)
    */
   async recordSpawn(): Promise<void> {
-    await this.redis.set(KEYS.lastSpawn, Date.now().toString());
+    try {
+      await this.redis.set(KEYS.lastSpawn, Date.now().toString());
+    } catch (error) {
+      // Log but don't throw - spawn recording is best-effort
+      console.error(`[RATE_LIMIT] Failed to record spawn: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -128,12 +140,18 @@ export class RateLimiter {
    * Record an iteration for daily budget tracking
    */
   async recordIteration(): Promise<void> {
-    await this.checkDailyReset();
-    await this.redis.incr(KEYS.dailyIterations);
+    try {
+      await this.checkDailyReset();
+      await this.redis.incr(KEYS.dailyIterations);
+    } catch (error) {
+      // Log but don't throw - iteration recording is best-effort
+      console.error(`[RATE_LIMIT] Failed to record iteration: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
    * Check and reset daily limits if it's a new day
+   * Throws on Redis failure - caller should handle
    */
   async checkDailyReset(): Promise<void> {
     const today = getTodayString();
@@ -150,26 +168,41 @@ export class RateLimiter {
 
   /**
    * Get current rate limit status
+   * Returns safe defaults if Redis is unavailable
    */
   async getStatus(): Promise<RateLimitStatus> {
-    await this.checkDailyReset();
+    try {
+      await this.checkDailyReset();
 
-    const [activeWorkers, iterationsToday, lastSpawn, canSpawn] = await Promise.all([
-      this.getActiveWorkerCount(),
-      this.getIterationsToday(),
-      this.getLastSpawn(),
-      this.canSpawnWorker(),
-    ]);
+      const [activeWorkers, iterationsToday, lastSpawn, canSpawn] = await Promise.all([
+        this.getActiveWorkerCount(),
+        this.getIterationsToday(),
+        this.getLastSpawn(),
+        this.canSpawnWorker(),
+      ]);
 
-    return {
-      iterationsToday,
-      dailyBudget: this.config.dailyBudget,
-      lastSpawn,
-      cooldownSeconds: this.config.cooldownSeconds,
-      activeWorkers,
-      maxWorkers: this.config.maxWorkers,
-      canSpawn,
-    };
+      return {
+        iterationsToday,
+        dailyBudget: this.config.dailyBudget,
+        lastSpawn,
+        cooldownSeconds: this.config.cooldownSeconds,
+        activeWorkers,
+        maxWorkers: this.config.maxWorkers,
+        canSpawn,
+      };
+    } catch (error) {
+      // Return safe defaults if Redis is unavailable
+      console.error(`[RATE_LIMIT] Failed to get status: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        iterationsToday: this.config.dailyBudget, // Assume budget exhausted
+        dailyBudget: this.config.dailyBudget,
+        lastSpawn: null,
+        cooldownSeconds: this.config.cooldownSeconds,
+        activeWorkers: this.config.maxWorkers, // Assume at capacity
+        maxWorkers: this.config.maxWorkers,
+        canSpawn: false, // Fail closed
+      };
+    }
   }
 
   /**

@@ -113,8 +113,8 @@ If tests fail or code is broken: passed = false
         tokensOut: result.usage?.outputTokens,
         costUsd: result.costUsd
       };
-    } catch {
-      console.warn('Failed to parse VERIFY:RESULT JSON, treating as passed based on harness success');
+    } catch (error) {
+      console.warn(`Failed to parse VERIFY:RESULT JSON: ${error instanceof Error ? error.message : String(error)}, treating as passed based on harness success`);
     }
   }
 
