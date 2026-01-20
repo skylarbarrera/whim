@@ -282,30 +282,16 @@ async function injectLearningsInstructions(repoDir: string): Promise<void> {
 
 ## Whim Learnings System
 
-When you discover something useful during implementation, write it to \`.ai/new-learnings.md\`.
+If you encounter something non-obvious that would help future workers, write it to \`.ai/new-learnings.md\`:
 
-**What to capture:**
-- Patterns that worked well
-- Gotchas or pitfalls to avoid
-- Architectural decisions and rationale
-- Debugging insights
-
-**Format:**
 \`\`\`markdown
 ## Learning: Brief title
 
-Description of what you learned and why it matters.
+What you learned and why it matters.
 \`\`\`
 
-**Example:**
-\`\`\`markdown
-## Learning: API validation pattern
-
-Always validate request bodies at the controller level before passing to services.
-The Zod schema approach in this codebase catches errors early with good messages.
-\`\`\`
-
-Learnings are extracted after your run and stored for future tasks on this repo.
+Good learnings: repo-specific gotchas, failed approaches, non-obvious patterns.
+Skip generic insights - only capture things specific to this codebase.
 `;
 
   // Try to append to .claude/ralphie.md first

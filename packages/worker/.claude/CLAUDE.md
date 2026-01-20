@@ -141,4 +141,14 @@ If you can't verify integration (server not running, etc.), note this in your co
 ## Learnings
 
 Check `.ai/learnings.md` for lessons from past tasks on this repo.
-Write new learnings to `.ai/new-learnings.md` when you discover something useful.
+
+If you encounter something non-obvious that would help future workers, write it to `.ai/new-learnings.md`:
+
+```markdown
+## Learning: Brief title
+
+What you learned and why it matters.
+```
+
+Good learnings: repo-specific gotchas, failed approaches, non-obvious patterns.
+Skip generic insights the AI would already know.
