@@ -46,7 +46,7 @@ bun.lockb
 .claude/tsc-cache/
 .claude/cache/
 .claude/skills/
-.claude/ralph.md
+.claude/ralphie.md
 .claude/settings.local.json
 
 # Internal development files
