@@ -1,0 +1,39 @@
+# Whim configuration
+type: monorepo
+
+verification:
+  enabled: true
+
+packages:
+  - path: packages/cli
+    type: cli
+    verification:
+      enabled: true
+      unit: true
+  - path: packages/harness
+    type: library
+    verification:
+      enabled: true
+      unit: true
+  - path: packages/intake
+    type: api
+    verification:
+      enabled: true
+      api: true
+      unit: true
+  - path: packages/orchestrator
+    type: api
+    verification:
+      enabled: true
+      api: true
+      unit: true
+  - path: packages/shared
+    type: library
+    verification:
+      enabled: true
+      unit: true
+  - path: packages/worker
+    type: library
+    verification:
+      enabled: true
+      unit: true
