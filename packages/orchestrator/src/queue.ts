@@ -35,7 +35,7 @@ export class QueueManager {
     // If spec: status='queued', branch=default or provided
     const hasDescription = !!input.description;
     const status: WorkItemStatus = hasDescription ? "generating" : "queued";
-    const branch = hasDescription ? null : (input.branch ?? `whim/${id.slice(0, 8)}`);
+    const branch = hasDescription ? null : (input.branch ?? this.generateBranchName(input.repo, input.spec, id));
     const spec = hasDescription ? null : input.spec ?? null;
     const description = input.description ?? null;
 
@@ -375,5 +375,35 @@ export class QueueManager {
       prUrl: (row.pr_url as string) ?? null,
       metadata: (row.metadata as Record<string, unknown>) ?? {},
     };
+  }
+
+  /**
+   * Generate a branch name from spec context
+   */
+  private generateBranchName(_repo: string, spec: string | undefined, _id: string): string {
+    if (spec) {
+      // Look for first task title like "### T001: Add hello function"
+      const taskMatch = spec.match(/###\s+T\d+:\s*(.+)/);
+      if (taskMatch) {
+        return this.createSlug(taskMatch[1]);
+      }
+      // Look for first H1/H2 header
+      const headerMatch = spec.match(/^#{1,2}\s+(.+)/m);
+      if (headerMatch) {
+        return this.createSlug(headerMatch[1]);
+      }
+    }
+    return 'task';
+  }
+
+  /**
+   * Create a URL-safe slug from a title
+   */
+  private createSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric with dashes
+      .replace(/^-+|-+$/g, '')      // Trim leading/trailing dashes
+      .slice(0, 30);                 // Limit length
   }
 }

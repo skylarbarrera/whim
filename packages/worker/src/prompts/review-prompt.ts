@@ -49,7 +49,7 @@ export function formatReviewComment(
 ): string {
   const { specAlignment, codeQuality, overallSummary } = findings;
 
-  let comment = `## 🤖 AI Review\n\n`;
+  let comment = `## Whim Code Review\n\n`;
   comment += `${overallSummary}\n\n`;
 
   // Spec Alignment
