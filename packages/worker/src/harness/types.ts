@@ -71,4 +71,4 @@ export interface Harness {
   ): Promise<HarnessResult>;
 }
 
-export type HarnessName = 'claude' | 'codex';
+export type HarnessName = 'claude' | 'codex' | 'opencode';

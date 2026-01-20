@@ -1,5 +1,5 @@
 import { OrchestratorClient } from './client.js';
-import { setupWorkspace, createPullRequest, verifyGitAuth } from './setup.js';
+import { setupWorkspace, createPullRequest, verifyGitAuth, archiveSpec } from './setup.js';
 import {
   loadLearnings,
   saveLearnings,
@@ -259,6 +259,9 @@ async function main(): Promise<void> {
       if (prResult.status === 'success') {
         console.log(`Pull request created: ${prResult.prUrl}`);
         prUrl = prResult.prUrl;
+
+        // Archive spec from active to completed (ralphie v1.1 convention)
+        await archiveSpec(repoDir);
       } else if (prResult.status === 'no_changes') {
         console.log('No pull request created (no changes to push)');
       } else {

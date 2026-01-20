@@ -22,6 +22,7 @@ export interface GeneratedSpec {
 export interface RalphSpecGeneratorConfig {
   timeoutMs?: number;
   workDir?: string;
+  harness?: 'claude' | 'codex' | 'opencode';
 }
 
 /**
@@ -60,10 +61,12 @@ export interface RalphSpecResult {
 export class RalphSpecGenerator {
   private timeoutMs: number;
   private workDir: string;
+  private harness?: 'claude' | 'codex' | 'opencode';
 
   constructor(config: RalphSpecGeneratorConfig = {}) {
     this.timeoutMs = config.timeoutMs ?? 300000; // 5 minutes default
     this.workDir = config.workDir ?? "/tmp/spec";
+    this.harness = config.harness;
   }
 
   /**
@@ -117,8 +120,15 @@ export class RalphSpecGenerator {
         String(Math.floor(this.timeoutMs / 1000)),
         "--cwd",
         workDir,
-        description,
       ];
+
+      // Add harness flag if configured
+      if (this.harness) {
+        args.push("--harness", this.harness);
+      }
+
+      // Description must be last positional argument
+      args.push(description);
 
       console.log(`[RalphSpecGen] Running: ralphie ${args.join(" ")}`);
 
@@ -179,8 +189,9 @@ export class RalphSpecGenerator {
         );
 
         if (completeEvent) {
-          // Read the generated SPEC.md file
-          const specPath = `${workDir}/SPEC.md`;
+          // Read the generated spec file from the path in the event
+          // Ralphie v1.1+ writes specs to specs/active/<name>.md
+          const specPath = completeEvent.specPath || `${workDir}/SPEC.md`;
           try {
             const spec = readFileSync(specPath, "utf-8");
 

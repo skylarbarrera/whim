@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile, access, cp } from "node:fs/promises";
+import { mkdir, writeFile, access, cp, readdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { formatReviewComment, type ReviewFindings } from "./prompts/review-prompt.js";
 import type { ExecutionReadyWorkItem } from "./types.js";
@@ -187,7 +187,15 @@ export async function setupWorkspace(
 
   await configureGit(repoDir);
 
-  const specPath = join(repoDir, "SPEC.md");
+  // Ralphie v1.1+ expects specs in specs/active/<name>.md
+  // Generate spec name from branch (e.g., "ai/github-issue-42-add-auth" -> "add-auth")
+  const specName = workItem.branch
+    .replace(/^ai\//, '')
+    .replace(/^[a-z]+-[a-z0-9-]+-/, '') // Remove source prefix like "github-issue-42-"
+    .substring(0, 50) || 'task';
+  const specsActiveDir = join(repoDir, "specs", "active");
+  await mkdir(specsActiveDir, { recursive: true });
+  const specPath = join(specsActiveDir, `${specName}.md`);
   await writeFile(specPath, workItem.spec, "utf-8");
 
   if (config.claudeConfigDir) {
@@ -195,12 +203,12 @@ export async function setupWorkspace(
     await copyClaudeConfig(config.claudeConfigDir, destClaudeDir);
   }
 
-  // Initialize Ralph (creates .claude/ralph.md and .ai/ralph/)
+  // Initialize Ralphie (creates .claude/ralph.md and .ai/ralph/)
   const ralphInitArgs = ["init"];
-  const initResult = await exec("ralph", ralphInitArgs, { cwd: repoDir });
+  const initResult = await exec("ralphie", ralphInitArgs, { cwd: repoDir });
   if (initResult.code !== 0) {
-    logSetupCommandResult("ralph init", "ralph", ralphInitArgs, initResult);
-    console.warn("[SETUP] Ralph init failed but continuing (may not be fatal)");
+    logSetupCommandResult("ralphie init", "ralphie", ralphInitArgs, initResult);
+    console.warn("[SETUP] Ralphie init failed but continuing (may not be fatal)");
   }
 
   // Commit the initial setup so Ralph doesn't complain about uncommitted changes
@@ -726,4 +734,60 @@ export async function createPullRequest(
     step: PRStep.CREATE_PR,
     prUrl,
   };
+}
+
+/**
+ * Archive spec from specs/active/ to specs/completed/
+ * Called after successful completion to follow ralphie v1.1 conventions.
+ *
+ * @param repoDir - Repository directory
+ * @returns The archived spec path, or null if no spec found
+ */
+export async function archiveSpec(repoDir: string): Promise<string | null> {
+  const activeDir = join(repoDir, "specs", "active");
+  const completedDir = join(repoDir, "specs", "completed");
+
+  try {
+    // Check if active dir exists
+    await access(activeDir);
+  } catch {
+    console.log("[ARCHIVE] No specs/active/ directory found");
+    return null;
+  }
+
+  try {
+    // Find spec file in active directory
+    const files = await readdir(activeDir);
+    const specFiles = files.filter((f) => f.endsWith(".md") && !f.startsWith("."));
+
+    if (specFiles.length === 0) {
+      console.log("[ARCHIVE] No spec files found in specs/active/");
+      return null;
+    }
+
+    if (specFiles.length > 1) {
+      console.warn(`[ARCHIVE] Multiple specs found, archiving first: ${specFiles[0]}`);
+    }
+
+    const specFile = specFiles[0]!;
+    const sourcePath = join(activeDir, specFile);
+
+    // Create completed directory if it doesn't exist
+    await mkdir(completedDir, { recursive: true });
+
+    // Generate timestamped filename for archive
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const baseName = specFile.replace(/\.md$/, "");
+    const archivedName = `${baseName}-${timestamp}.md`;
+    const destPath = join(completedDir, archivedName);
+
+    // Move spec to completed
+    await rename(sourcePath, destPath);
+    console.log(`[ARCHIVE] Moved ${specFile} to specs/completed/${archivedName}`);
+
+    return destPath;
+  } catch (error) {
+    console.error("[ARCHIVE] Failed to archive spec:", error);
+    return null;
+  }
 }

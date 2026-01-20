@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   REVIEW_SYSTEM_PROMPT,
@@ -55,17 +55,43 @@ export function generateDiff(repoDir: string): string {
 }
 
 /**
- * Read SPEC.md from repository root
+ * Read spec from repository.
+ * Ralphie v1.1+ stores specs in specs/active/<name>.md
+ * Falls back to SPEC.md for backward compatibility.
  */
 export function readSpec(repoDir: string): string {
-  const specPath = join(repoDir, "SPEC.md");
+  // Try specs/active/ first (Ralphie v1.1+ location)
+  const specsActiveDir = join(repoDir, "specs", "active");
+  if (existsSync(specsActiveDir)) {
+    const files = readdirSync(specsActiveDir).filter(
+      (f) => f.endsWith(".md") && !f.startsWith(".")
+    );
+    if (files.length === 1 && files[0]) {
+      const specPath = join(specsActiveDir, files[0]);
+      try {
+        return readFileSync(specPath, "utf-8");
+      } catch (error) {
+        throw new Error(
+          `Failed to read spec: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+    if (files.length > 1 && files[0]) {
+      // Multiple specs - use the first one but warn
+      console.warn(`[REVIEW] Multiple specs found in specs/active/, using ${files[0]}`);
+      const specPath = join(specsActiveDir, files[0]);
+      return readFileSync(specPath, "utf-8");
+    }
+  }
 
-  if (!existsSync(specPath)) {
-    throw new Error("SPEC.md not found in repository root");
+  // Fall back to SPEC.md for backward compatibility
+  const legacySpecPath = join(repoDir, "SPEC.md");
+  if (!existsSync(legacySpecPath)) {
+    throw new Error("SPEC.md not found in repository root or specs/active/");
   }
 
   try {
-    return readFileSync(specPath, "utf-8");
+    return readFileSync(legacySpecPath, "utf-8");
   } catch (error) {
     throw new Error(
       `Failed to read SPEC.md: ${error instanceof Error ? error.message : String(error)}`

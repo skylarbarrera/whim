@@ -258,12 +258,12 @@ function installDependencies(
 function installSkills(cwd: string, _harness: HarnessType): string[] {
   const installed: string[] = [];
 
-  // Install Ralph skills
+  // Install Ralphie skills
   try {
-    execSync('npx add-skill skylarbarrera/ralph -y', { cwd, stdio: 'inherit' });
-    installed.push('ralph');
+    execSync('npx add-skill skylarbarrera/ralphie -y', { cwd, stdio: 'inherit' });
+    installed.push('ralphie');
   } catch {
-    console.warn('Warning: Failed to install Ralph skills');
+    console.warn('Warning: Failed to install Ralphie skills');
   }
 
   // Install Whim verify skill
@@ -280,7 +280,7 @@ function installSkills(cwd: string, _harness: HarnessType): string[] {
 
 // Config generation
 function generateRalphConfig(harness: HarnessType): string {
-  return `# Ralph configuration
+  return `# Ralphie configuration
 harness: ${harness}
 `;
 }
@@ -439,7 +439,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
 
   if (selectedHarness) {
     const ralphConfig = generateRalphConfig(selectedHarness);
-    const ralphPath = writeConfig(cwd, '.ralph', 'config.yml', ralphConfig);
+    const ralphPath = writeConfig(cwd, '.ralphie', 'config.yml', ralphConfig);
     configsCreated.push(ralphPath);
     console.log(`  Created ${ralphPath}`);
   }

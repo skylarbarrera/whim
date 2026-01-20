@@ -138,7 +138,7 @@ export async function runRalph(
     args.push('--harness', options.harness);
   }
 
-  const proc = spawn('ralph', args, {
+  const proc = spawn('ralphie', args, {
     cwd: repoDir,
     shell: false,
     env: process.env,

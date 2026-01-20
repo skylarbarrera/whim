@@ -3,7 +3,7 @@ import { join } from 'path';
 import yaml from 'js-yaml';
 import type { RalphConfig, WhimConfig, HarnessType, ProjectType } from '@whim/shared';
 
-/** Raw YAML config shape for .ralph/config.yml */
+/** Raw YAML config shape for .ralphie/config.yml */
 interface RawRalphConfig {
   harness?: string;
 }
@@ -31,23 +31,23 @@ interface RawWhimConfig {
 }
 
 /**
- * Reads and parses .ralph/config.yml from the target repository.
+ * Reads and parses .ralphie/config.yml from the target repository.
  * Returns null if file doesn't exist or is invalid.
  */
 export async function readRalphConfig(repoPath: string): Promise<RalphConfig | null> {
   try {
-    const configPath = join(repoPath, '.ralph', 'config.yml');
+    const configPath = join(repoPath, '.ralphie', 'config.yml');
     const content = await readFile(configPath, 'utf-8');
     const config = yaml.load(content) as RawRalphConfig | null;
 
     // Validate structure
     if (!config || typeof config !== 'object') {
-      console.warn('[config] Invalid .ralph/config.yml: not an object');
+      console.warn('[config] Invalid .ralphie/config.yml: not an object');
       return null;
     }
 
     if (!config.harness) {
-      console.warn('[config] Invalid .ralph/config.yml: missing harness field');
+      console.warn('[config] Invalid .ralphie/config.yml: missing harness field');
       return null;
     }
 
@@ -64,10 +64,10 @@ export async function readRalphConfig(repoPath: string): Promise<RalphConfig | n
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.log('[config] No .ralph/config.yml found, using defaults');
+      console.log('[config] No .ralphie/config.yml found, using defaults');
       return null;
     }
-    console.error('[config] Error reading .ralph/config.yml:', error);
+    console.error('[config] Error reading .ralphie/config.yml:', error);
     return null;
   }
 }

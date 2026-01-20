@@ -22,16 +22,16 @@ describe('Config Reader', () => {
   });
 
   describe('readRalphConfig', () => {
-    it('should read valid ralph config', async () => {
-      await mkdir(join(testDir, '.ralph'), { recursive: true });
-      await writeFile(join(testDir, '.ralph', 'config.yml'), 'harness: claude-code\n');
+    it('should read valid ralphie config', async () => {
+      await mkdir(join(testDir, '.ralphie'), { recursive: true });
+      await writeFile(join(testDir, '.ralphie', 'config.yml'), 'harness: claude-code\n');
 
       const config = await readRalphConfig(testDir);
       expect(config).toEqual({ harness: 'claude-code' });
     });
 
     it('should accept all valid harness types', async () => {
-      await mkdir(join(testDir, '.ralph'), { recursive: true });
+      await mkdir(join(testDir, '.ralphie'), { recursive: true });
 
       const harnesses: Array<'claude-code' | 'codex' | 'opencode'> = [
         'claude-code',
@@ -39,7 +39,7 @@ describe('Config Reader', () => {
         'opencode',
       ];
       for (const harness of harnesses) {
-        await writeFile(join(testDir, '.ralph', 'config.yml'), `harness: ${harness}\n`);
+        await writeFile(join(testDir, '.ralphie', 'config.yml'), `harness: ${harness}\n`);
         const config = await readRalphConfig(testDir);
         expect(config).toEqual({ harness: harness as HarnessType });
       }
@@ -51,24 +51,24 @@ describe('Config Reader', () => {
     });
 
     it('should return null for invalid YAML', async () => {
-      await mkdir(join(testDir, '.ralph'), { recursive: true });
-      await writeFile(join(testDir, '.ralph', 'config.yml'), 'invalid: yaml: content:\n  - broken');
+      await mkdir(join(testDir, '.ralphie'), { recursive: true });
+      await writeFile(join(testDir, '.ralphie', 'config.yml'), 'invalid: yaml: content:\n  - broken');
 
       const config = await readRalphConfig(testDir);
       expect(config).toBeNull();
     });
 
     it('should return null for missing harness field', async () => {
-      await mkdir(join(testDir, '.ralph'), { recursive: true });
-      await writeFile(join(testDir, '.ralph', 'config.yml'), 'other: value\n');
+      await mkdir(join(testDir, '.ralphie'), { recursive: true });
+      await writeFile(join(testDir, '.ralphie', 'config.yml'), 'other: value\n');
 
       const config = await readRalphConfig(testDir);
       expect(config).toBeNull();
     });
 
     it('should return null for invalid harness value', async () => {
-      await mkdir(join(testDir, '.ralph'), { recursive: true });
-      await writeFile(join(testDir, '.ralph', 'config.yml'), 'harness: invalid-harness\n');
+      await mkdir(join(testDir, '.ralphie'), { recursive: true });
+      await writeFile(join(testDir, '.ralphie', 'config.yml'), 'harness: invalid-harness\n');
 
       const config = await readRalphConfig(testDir);
       expect(config).toBeNull();

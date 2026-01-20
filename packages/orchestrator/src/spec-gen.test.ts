@@ -304,5 +304,28 @@ describe("RalphSpecGenerator", () => {
       mockProc.simulateSuccess();
       await promise;
     });
+
+    it("should pass harness flag when configured", async () => {
+      const generatorWithHarness = new RalphSpecGenerator({
+        timeoutMs: 1000,
+        workDir: "/tmp/test",
+        harness: "codex",
+      });
+
+      const description = "Build with codex";
+      const promise = generatorWithHarness.generate(description);
+
+      const calls = (cp.spawn as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const lastCall = calls[calls.length - 1]!;
+
+      const args = lastCall[1] as string[];
+      expect(args).toContain("--harness");
+      expect(args).toContain("codex");
+      // Description should be last
+      expect(args[args.length - 1]).toBe(description);
+
+      mockProc.simulateSuccess();
+      await promise;
+    });
   });
 });

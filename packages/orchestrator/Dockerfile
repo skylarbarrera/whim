@@ -37,8 +37,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 # Create non-root user for running Claude Code (required for --dangerously-skip-permissions)
 RUN groupadd -r whim && useradd -r -g whim -m whim
 
-# Install Ralphie CLI and Claude Code globally
-RUN bun install -g ralphie @anthropic-ai/claude-code && \
+# Install Ralphie CLI (v1.1 for V2 spec format) and Claude Code globally
+RUN bun install -g ralphie@^1.1.0 @anthropic-ai/claude-code && \
     chmod -R 755 /root && \
     chmod 755 /usr/local/bin/ralphie /usr/local/bin/claude
 

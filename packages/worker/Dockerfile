@@ -56,8 +56,8 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
-# Install Ralphie from npm
-RUN npm install -g ralphie
+# Install Ralphie from npm (v1.1 for V2 spec format support)
+RUN npm install -g ralphie@^1.1.0
 
 # Create non-root user for security (Claude blocks --dangerously-skip-permissions for root)
 RUN useradd -m -s /bin/bash worker
