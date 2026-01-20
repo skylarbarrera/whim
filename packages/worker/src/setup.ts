@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile, access, cp, readdir, rename } from "node:fs/promises";
+import { mkdir, writeFile, readFile, access, cp, readdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { formatReviewComment, type ReviewFindings } from "./prompts/review-prompt.js";
 import type { ExecutionReadyWorkItem } from "./types.js";
@@ -203,13 +203,16 @@ export async function setupWorkspace(
     await copyClaudeConfig(config.claudeConfigDir, destClaudeDir);
   }
 
-  // Initialize Ralphie (creates .claude/ralph.md and .ai/ralph/)
+  // Initialize Ralphie (creates .claude/ralphie.md and specs/)
   const ralphInitArgs = ["init"];
   const initResult = await exec("ralphie", ralphInitArgs, { cwd: repoDir });
   if (initResult.code !== 0) {
     logSetupCommandResult("ralphie init", "ralphie", ralphInitArgs, initResult);
     console.warn("[SETUP] Ralphie init failed but continuing (may not be fatal)");
   }
+
+  // Inject Whim-specific learnings instructions into the repo
+  await injectLearningsInstructions(repoDir);
 
   // Commit the initial setup so Ralph doesn't complain about uncommitted changes
   const addArgs = ["add", "-A"];
@@ -265,6 +268,58 @@ async function copyClaudeConfig(
       await cp(sourcePath, destPath);
     }
   }
+}
+
+/**
+ * Inject Whim-specific learnings instructions into the target repo.
+ * Appends to .claude/ralphie.md if it exists, otherwise creates .ai/WHIM_LEARNINGS.md
+ */
+async function injectLearningsInstructions(repoDir: string): Promise<void> {
+  const learningsInstructions = `
+
+## Whim Learnings System
+
+When you discover something useful during implementation, write it to \`.ai/new-learnings.md\`.
+
+**What to capture:**
+- Patterns that worked well
+- Gotchas or pitfalls to avoid
+- Architectural decisions and rationale
+- Debugging insights
+
+**Format:**
+\`\`\`markdown
+## Learning: Brief title
+
+Description of what you learned and why it matters.
+\`\`\`
+
+**Example:**
+\`\`\`markdown
+## Learning: API validation pattern
+
+Always validate request bodies at the controller level before passing to services.
+The Zod schema approach in this codebase catches errors early with good messages.
+\`\`\`
+
+Learnings are extracted after your run and stored for future tasks on this repo.
+`;
+
+  // Try to append to .claude/ralphie.md first
+  const ralphieMdPath = join(repoDir, ".claude", "ralphie.md");
+  if (await fileExists(ralphieMdPath)) {
+    const existing = await readFile(ralphieMdPath, "utf-8");
+    await writeFile(ralphieMdPath, existing + learningsInstructions, "utf-8");
+    console.log("[SETUP] Appended learnings instructions to .claude/ralphie.md");
+    return;
+  }
+
+  // Fallback: create .ai/WHIM_LEARNINGS.md
+  const aiDir = join(repoDir, ".ai");
+  await mkdir(aiDir, { recursive: true });
+  const fallbackPath = join(aiDir, "WHIM_LEARNINGS.md");
+  await writeFile(fallbackPath, `# Whim Learnings Instructions${learningsInstructions}`, "utf-8");
+  console.log("[SETUP] Created .ai/WHIM_LEARNINGS.md with learnings instructions");
 }
 
 /**

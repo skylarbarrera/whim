@@ -392,6 +392,23 @@ export class WorkerManager {
       );
     }
 
+    // Record learnings if provided
+    if (data.learnings && data.learnings.length > 0 && worker.workItemId) {
+      for (const learning of data.learnings) {
+        try {
+          await this.db.execute(
+            `INSERT INTO learnings (repo, spec, content, work_item_id)
+             VALUES ($1, $2, $3, $4)`,
+            [workItem.repo, learning.spec, learning.content, worker.workItemId]
+          );
+        } catch (error) {
+          // Log but don't fail if learning save fails
+          console.error(`Failed to save learning for worker ${workerId}:`, error);
+        }
+      }
+      console.log(`Saved ${data.learnings.length} learnings for worker ${workerId}`);
+    }
+
     // Record worker done with rate limiter
     await this.rateLimiter.recordWorkerDone();
   }

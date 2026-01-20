@@ -380,7 +380,6 @@ describe.skipIf(!runIntegration)('OpenCode Harness', () => {
     }, 120000);
   });
 });
-});
 
 // Quick smoke test that just verifies SDK imports work
 describe('SDK Import Verification', () => {
