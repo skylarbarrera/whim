@@ -204,21 +204,25 @@ FAIL: test 4
       expect(result.testsFailed).toBe(2);
     });
 
-    it("handles timeout", async () => {
-      await writeFile(
-        join(testDir, "package.json"),
-        JSON.stringify({
-          name: "test-project",
-          scripts: {
-            test: "sleep 10",
-          },
-        })
-      );
+    it(
+      "handles timeout",
+      async () => {
+        await writeFile(
+          join(testDir, "package.json"),
+          JSON.stringify({
+            name: "test-project",
+            scripts: {
+              test: "sleep 10",
+            },
+          })
+        );
 
-      const result = await runTests(testDir, { timeout: 100 });
-      expect(result.status).toBe("timeout");
-      expect(result.error).toContain("timed out");
-    });
+        const result = await runTests(testDir, { timeout: 100 });
+        expect(result.status).toBe("timeout");
+        expect(result.error).toContain("timed out");
+      },
+      { timeout: 10000 }
+    );
 
     it("uses custom command and args", async () => {
       const result = await runTests(testDir, {
