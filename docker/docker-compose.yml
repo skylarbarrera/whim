@@ -31,9 +31,9 @@ services:
     container_name: whim-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: whim
-      POSTGRES_PASSWORD: whim
-      POSTGRES_DB: whim
+      POSTGRES_USER: ${POSTGRES_USER:-whim}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-whim}
+      POSTGRES_DB: ${POSTGRES_DB:-whim}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ../migrations:/docker-entrypoint-initdb.d:ro
@@ -76,7 +76,7 @@ services:
       docker-proxy:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://whim:whim@postgres:5432/whim
+      DATABASE_URL: postgres://${POSTGRES_USER:-whim}:${POSTGRES_PASSWORD:-whim}@postgres:5432/${POSTGRES_DB:-whim}
       REDIS_URL: redis://redis:6379
       # Connect to Docker via socket proxy (not direct socket)
       DOCKER_HOST: tcp://docker-proxy:2375

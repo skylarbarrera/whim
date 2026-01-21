@@ -720,8 +720,7 @@ async function createGitHubPR(
 ): Promise<PRResult> {
   console.log("[PR] Step 5/5: Creating pull request...");
 
-  const tokenLength = githubToken?.length || 0;
-  const tokenMask = tokenLength > 0 ? `${githubToken.substring(0, 4)}...(${tokenLength} chars)` : "(empty)";
+  const tokenMask = githubToken?.length > 0 ? `${githubToken.substring(0, 4)}...` : "(empty)";
   console.log(`[PR] Using GitHub token: ${tokenMask}`);
 
   const { title, body } = buildPRBody(workItem);
