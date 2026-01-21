@@ -40,6 +40,7 @@ export interface GitHubIssue {
   repo: string;
   owner: string;
   url: string;
+  author: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +111,7 @@ export class GitHubAdapter {
             repo,
             owner,
             url: issue.html_url,
+            author: issue.user?.login ?? "unknown",
             createdAt: issue.created_at,
             updatedAt: issue.updated_at,
           });

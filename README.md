@@ -286,6 +286,7 @@ curl -X POST http://localhost:3002/api/work \
 | `STALE_THRESHOLD` | `300` | Seconds before worker marked stale |
 | `INTAKE_LABEL` | `whim` | GitHub label to watch |
 | `POLL_INTERVAL` | `60000` | GitHub poll interval (ms) |
+| `ALLOWED_USERS` | required | Comma-separated GitHub usernames authorized to trigger work |
 | `VERIFICATION_ENABLED` | `true` | Global default for verification |
 | `SPEC_MAX_ATTEMPTS` | `3` | Max spec generation retries |
 | `HARNESS` | `claude` | AI harness for workers: `claude` or `codex` |
@@ -376,9 +377,21 @@ When multiple workers run simultaneously, Redis-based file locking prevents conf
 
 ## Security
 
+- **User Allowlist** - Only GitHub users in `ALLOWED_USERS` can trigger work items. Unauthorized issues are silently skipped.
 - **Docker Socket Proxy** - Orchestrator connects via [tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) instead of mounting the socket directly. Only container operations allowed; `exec`, `volumes`, `build` blocked.
 - **Container Isolation** - Workers run with 4GB memory, 2 CPU cores, 256 PID limit
 - **Input Validation** - Parameterized queries, request size limits, repo format validation
+
+### User Authorization
+
+The intake service validates issue authors against the allowlist before processing:
+
+```bash
+# Configure allowed users (case-insensitive)
+ALLOWED_USERS=your-github-username,teammate1,teammate2
+```
+
+Issues from unauthorized users are silently skipped (no comment, no label). This prevents information disclosure and reduces API costs.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md#security-model) for details.
 

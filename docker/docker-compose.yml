@@ -121,6 +121,7 @@ services:
       ORCHESTRATOR_URL: http://whim-orchestrator:3000
       INTAKE_LABEL: ${INTAKE_LABEL:-ai-whim}
       POLL_INTERVAL: ${POLL_INTERVAL:-60000}
+      ALLOWED_USERS: ${ALLOWED_USERS}
 
 volumes:
   postgres_data:

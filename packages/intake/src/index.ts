@@ -7,6 +7,7 @@ interface IntakeConfig {
   orchestratorUrl: string;
   intakeLabel: string;
   pollInterval: number;
+  allowedUsers: string[];
 }
 
 function loadConfig(): IntakeConfig {
@@ -16,6 +17,27 @@ function loadConfig(): IntakeConfig {
   const reposEnv = process.env.REPOS;
   if (!reposEnv) throw new Error("REPOS required (comma-separated owner/repo)");
 
+  const allowedUsersEnv = process.env.ALLOWED_USERS;
+  if (!allowedUsersEnv) throw new Error("ALLOWED_USERS required (comma-separated GitHub usernames)");
+
+  // Parse and validate allowed users
+  const allowedUsers = allowedUsersEnv
+    .split(",")
+    .map((u) => u.trim().toLowerCase())
+    .filter((u) => u.length > 0);
+
+  if (allowedUsers.length === 0) {
+    throw new Error("ALLOWED_USERS must contain at least one valid username");
+  }
+
+  // Validate GitHub username format (alphanumeric and hyphens, 1-39 chars)
+  const usernamePattern = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
+  for (const user of allowedUsers) {
+    if (!usernamePattern.test(user)) {
+      throw new Error(`Invalid GitHub username in ALLOWED_USERS: "${user}"`);
+    }
+  }
+
   return {
     githubToken,
     repos: reposEnv.split(",").map((r) => r.trim()),
@@ -23,6 +45,7 @@ function loadConfig(): IntakeConfig {
       process.env.ORCHESTRATOR_URL ?? "http://orchestrator:3000",
     intakeLabel: process.env.INTAKE_LABEL ?? "whim",
     pollInterval: parseInt(process.env.POLL_INTERVAL ?? "60000", 10),
+    allowedUsers,
   };
 }
 
@@ -150,14 +173,28 @@ async function pollWorkItemStatus(
   }
 }
 
+/**
+ * Check if a user is authorized to trigger work items
+ */
+function isAuthorized(author: string, allowedUsers: string[]): boolean {
+  return allowedUsers.includes(author.toLowerCase());
+}
+
 async function processIssue(
   github: GitHubAdapter,
   orchestratorUrl: string,
-  issue: GitHubIssue
+  issue: GitHubIssue,
+  allowedUsers: string[]
 ): Promise<void> {
   console.log(
-    `Processing issue #${issue.number}: ${issue.title} (${issue.owner}/${issue.repo})`
+    `Processing issue #${issue.number}: ${issue.title} (${issue.owner}/${issue.repo}) by @${issue.author}`
   );
+
+  // Check authorization - silently skip unauthorized users
+  if (!isAuthorized(issue.author, allowedUsers)) {
+    console.log(`[INTAKE] Unauthorized user @${issue.author} - skipping issue #${issue.number}`);
+    return;
+  }
 
   try {
     // Mark as processing to prevent duplicate pickup
@@ -196,7 +233,8 @@ async function processIssue(
 
 async function poll(
   github: GitHubAdapter,
-  orchestratorUrl: string
+  orchestratorUrl: string,
+  allowedUsers: string[]
 ): Promise<number> {
   console.log("Polling for issues...");
   const issues = await github.poll();
@@ -205,7 +243,7 @@ async function poll(
   let processed = 0;
   for (const issue of issues) {
     try {
-      await processIssue(github, orchestratorUrl, issue);
+      await processIssue(github, orchestratorUrl, issue, allowedUsers);
       processed++;
     } catch (error) {
       // Error already logged in processIssue, continue to next issue
@@ -223,6 +261,7 @@ async function main(): Promise<void> {
   console.log(`Watching repos: ${config.repos.join(", ")}`);
   console.log(`Intake label: ${config.intakeLabel}`);
   console.log(`Poll interval: ${config.pollInterval}ms`);
+  console.log(`Allowed users: ${config.allowedUsers.join(", ")}`);
 
   const github = new GitHubAdapter({
     token: config.githubToken,
@@ -231,7 +270,7 @@ async function main(): Promise<void> {
   });
 
   // Initial poll
-  await poll(github, config.orchestratorUrl);
+  await poll(github, config.orchestratorUrl, config.allowedUsers);
 
   // Set up recurring poll with overlap guard
   let polling = false;
@@ -242,7 +281,7 @@ async function main(): Promise<void> {
     }
     polling = true;
     try {
-      await poll(github, config.orchestratorUrl);
+      await poll(github, config.orchestratorUrl, config.allowedUsers);
     } catch (error) {
       console.error("Poll failed:", error);
     } finally {
