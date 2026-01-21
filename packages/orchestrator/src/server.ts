@@ -49,7 +49,9 @@ const MAX_SPEC_LENGTH = 100_000;  // 100KB
 const MAX_DESCRIPTION_LENGTH = 50_000;  // 50KB
 const MAX_SOURCE_LENGTH = 50;
 const MAX_SOURCE_REF_LENGTH = 200;
+const MAX_ITERATIONS_LIMIT = 200;
 const REPO_PATTERN = /^[a-zA-Z0-9][-a-zA-Z0-9]*\/[a-zA-Z0-9._-]+$/;
+const BRANCH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9/_.-]*$/;
 
 function isValidAddWorkItemRequest(body: unknown): body is AddWorkItemRequest {
   if (typeof body !== "object" || body === null) return false;
@@ -71,15 +73,21 @@ function isValidAddWorkItemRequest(body: unknown): body is AddWorkItemRequest {
   // Description validation: if provided, check length
   if (hasDescription && (obj.description as string).length > MAX_DESCRIPTION_LENGTH) return false;
 
-  // Branch validation: optional, length
+  // Branch validation: optional, length, format
   if (obj.branch !== undefined && typeof obj.branch !== "string") return false;
-  if (typeof obj.branch === "string" && obj.branch.length > MAX_BRANCH_LENGTH) return false;
+  if (typeof obj.branch === "string") {
+    if (obj.branch.length > MAX_BRANCH_LENGTH) return false;
+    if (!BRANCH_PATTERN.test(obj.branch)) return false;
+  }
 
   // Priority validation
   if (obj.priority !== undefined && !["low", "medium", "high", "critical"].includes(obj.priority as string)) return false;
 
-  // Max iterations validation
-  if (obj.maxIterations !== undefined && (typeof obj.maxIterations !== "number" || obj.maxIterations < 1)) return false;
+  // Max iterations validation (1-200)
+  if (obj.maxIterations !== undefined) {
+    if (typeof obj.maxIterations !== "number") return false;
+    if (obj.maxIterations < 1 || obj.maxIterations > MAX_ITERATIONS_LIMIT) return false;
+  }
 
   // Source validation: optional, length
   if (obj.source !== undefined && (typeof obj.source !== "string" || obj.source.length > MAX_SOURCE_LENGTH)) return false;

@@ -20,6 +20,20 @@ import {
 import { runVerificationWorker } from './verification-worker.js';
 import { validateEnvironment } from './shared-worker.js';
 import type { HarnessName } from '@whim/harness';
+import type { WorkerErrorCategory } from '@whim/shared';
+
+/**
+ * Categorize an error message for analytics
+ */
+function categorizeError(error: string): WorkerErrorCategory {
+  const lower = error.toLowerCase();
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'TIMEOUT';
+  if (lower.includes('econnrefused') || lower.includes('network') || lower.includes('fetch failed')) return 'NETWORK_ERROR';
+  if (lower.includes('enospc') || lower.includes('out of memory') || lower.includes('oom')) return 'RESOURCE_ERROR';
+  if (lower.includes('auth') || lower.includes('permission') || lower.includes('401') || lower.includes('403')) return 'VALIDATION_ERROR';
+  if (lower.includes('git')) return 'EXECUTION_ERROR';
+  return 'EXECUTION_ERROR';
+}
 
 /**
  * Get harness from HARNESS env var (overrides config file)
@@ -110,7 +124,7 @@ async function main(): Promise<void> {
   const authResult = await verifyGitAuth(repoDir, config.githubToken);
   if (!authResult.success) {
     console.error('Git auth verification failed:', authResult.error);
-    await client.fail(`Git auth failed: ${authResult.error}`, 0);
+    await client.fail(`Git auth failed: ${authResult.error}`, 0, { category: 'VALIDATION_ERROR' });
     console.log('Failure reported to orchestrator');
     return;
   }
@@ -312,7 +326,8 @@ async function main(): Promise<void> {
     console.log('Completion reported to orchestrator');
   } else {
     console.error('Ralph failed:', result.error);
-    await client.fail(result.error ?? 'Unknown error', result.iteration);
+    const errorMsg = result.error ?? 'Unknown error';
+    await client.fail(errorMsg, result.iteration, { category: categorizeError(errorMsg) });
     console.log('Failure reported to orchestrator');
   }
 

@@ -6,6 +6,19 @@ import {
   checkoutBranch,
 } from "./shared-worker.js";
 import { getHarness, type HarnessName, type HarnessEvent } from "./harness/index.js";
+import type { WorkerErrorCategory } from '@whim/shared';
+
+/**
+ * Categorize an error message for analytics
+ */
+function categorizeError(error: string): WorkerErrorCategory {
+  const lower = error.toLowerCase();
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'TIMEOUT';
+  if (lower.includes('econnrefused') || lower.includes('network') || lower.includes('fetch failed')) return 'NETWORK_ERROR';
+  if (lower.includes('enospc') || lower.includes('out of memory') || lower.includes('oom')) return 'RESOURCE_ERROR';
+  if (lower.includes('auth') || lower.includes('permission') || lower.includes('401') || lower.includes('403')) return 'VALIDATION_ERROR';
+  return 'EXECUTION_ERROR';
+}
 
 interface VerificationWorkerConfig {
   orchestratorUrl: string;
@@ -36,7 +49,9 @@ function getVerificationConfig(): VerificationWorkerConfig {
 
   // Get harness from environment (default to claude)
   const harnessEnv = process.env.HARNESS?.toLowerCase();
-  const harness: HarnessName = harnessEnv === 'codex' ? 'codex' : 'claude';
+  const harness: HarnessName =
+    harnessEnv === 'codex' ? 'codex' :
+    harnessEnv === 'opencode' ? 'opencode' : 'claude';
 
   return {
     orchestratorUrl: env.orchestratorUrl,
@@ -171,7 +186,7 @@ export async function runVerificationWorker(): Promise<void> {
   } catch (error) {
     console.error("Verification worker error:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await client.fail(errorMessage, 0);
+    await client.fail(errorMessage, 0, { category: categorizeError(errorMessage) });
     console.log("Failure reported to orchestrator");
     throw error;
   }

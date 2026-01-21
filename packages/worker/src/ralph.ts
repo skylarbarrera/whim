@@ -1,5 +1,19 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { OrchestratorClient } from './client.js';
+import type { WorkerErrorCategory } from '@whim/shared';
+
+/**
+ * Categorize an error message for analytics
+ */
+function categorizeError(error: string): WorkerErrorCategory {
+  const lower = error.toLowerCase();
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'TIMEOUT';
+  if (lower.includes('econnrefused') || lower.includes('network') || lower.includes('fetch failed')) return 'NETWORK_ERROR';
+  if (lower.includes('enospc') || lower.includes('out of memory') || lower.includes('oom')) return 'RESOURCE_ERROR';
+  if (lower.includes('auth') || lower.includes('permission') || lower.includes('401') || lower.includes('403')) return 'VALIDATION_ERROR';
+  if (lower.includes('stuck')) return 'EXECUTION_ERROR';
+  return 'EXECUTION_ERROR';
+}
 
 /**
  * Push current branch to origin (for incremental push after commits)
@@ -248,7 +262,7 @@ export async function runRalph(
       case 'failed': {
         success = false;
         error = (event.error as string) ?? 'Unknown error';
-        await client.fail(error, iteration);
+        await client.fail(error, iteration, { category: categorizeError(error) });
         break;
       }
     }

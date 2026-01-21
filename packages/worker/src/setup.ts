@@ -564,15 +564,10 @@ function createPRError(
   };
 }
 
-export async function createPullRequest(
-  repoDir: string,
-  workItem: ExecutionReadyWorkItem,
-  githubToken: string,
-  reviewFindings?: ReviewFindings
-): Promise<PRResult> {
-  console.log("[PR] Starting PR creation for branch:", workItem.branch);
-
-  // Step 1: Stage any uncommitted changes (Ralph may have left some)
+/**
+ * Stage all changes in the repository
+ */
+async function stageChanges(repoDir: string): Promise<PRResult | null> {
   console.log("[PR] Step 1/5: Staging changes...");
   const addArgs = ["add", "-A"];
   const addResult = await exec("git", addArgs, { cwd: repoDir });
@@ -585,15 +580,19 @@ export async function createPullRequest(
     };
   }
   console.log("[PR] Step 1/5: Staging complete");
+  return null;
+}
 
-  // Step 2: Check for uncommitted changes and commit if present
+/**
+ * Commit staged changes if any exist
+ */
+async function commitChanges(repoDir: string, branch: string): Promise<PRResult | null> {
   console.log("[PR] Step 2/5: Checking for uncommitted changes...");
-  const statusResult = await exec("git", ["status", "--porcelain"], {
-    cwd: repoDir,
-  });
+  const statusResult = await exec("git", ["status", "--porcelain"], { cwd: repoDir });
+
   if (statusResult.stdout.trim() !== "") {
     console.log("[PR] Found uncommitted changes, committing...");
-    const commitArgs = ["commit", "-m", `feat: ${workItem.branch}\n\nImplemented by Whim`];
+    const commitArgs = ["commit", "-m", `feat: ${branch}\n\nImplemented by Whim`];
     const commitResult = await exec("git", commitArgs, { cwd: repoDir });
 
     if (commitResult.code !== 0) {
@@ -608,19 +607,19 @@ export async function createPullRequest(
   } else {
     console.log("[PR] Step 2/5: No uncommitted changes (Ralph already committed)");
   }
+  return null;
+}
 
-  // Step 3: Check for unpushed commits
+/**
+ * Count unpushed commits compared to remote
+ */
+async function countUnpushedCommits(repoDir: string, branch: string): Promise<number> {
   console.log("[PR] Step 3/5: Checking for unpushed commits...");
-  // Use origin/HEAD if available, otherwise try origin/main or origin/master
   let unpushedCount = 0;
   const refs = ["origin/HEAD", "origin/main", "origin/master"];
 
   for (const ref of refs) {
-    const unpushedResult = await exec(
-      "git",
-      ["rev-list", "--count", `${ref}..HEAD`],
-      { cwd: repoDir }
-    );
+    const unpushedResult = await exec("git", ["rev-list", "--count", `${ref}..HEAD`], { cwd: repoDir });
     if (unpushedResult.code === 0) {
       unpushedCount = parseInt(unpushedResult.stdout.trim(), 10) || 0;
       console.log(`[PR] Found ${unpushedCount} unpushed commits (vs ${ref})`);
@@ -628,21 +627,13 @@ export async function createPullRequest(
     }
   }
 
-  // Also check git log to show what commits exist
-  const logResult = await exec(
-    "git",
-    ["log", "--oneline", "-5"],
-    { cwd: repoDir }
-  );
+  // Log recent commits for debugging
+  const logResult = await exec("git", ["log", "--oneline", "-5"], { cwd: repoDir });
   console.log("[PR] Recent commits:\n" + logResult.stdout);
 
+  // Check if branch exists on remote if no unpushed commits found
   if (unpushedCount === 0) {
-    // Fallback: check if branch exists on remote
-    const branchCheckResult = await exec(
-      "git",
-      ["ls-remote", "--heads", "origin", workItem.branch],
-      { cwd: repoDir }
-    );
+    const branchCheckResult = await exec("git", ["ls-remote", "--heads", "origin", branch], { cwd: repoDir });
     if (branchCheckResult.stdout.trim() !== "") {
       console.log("[PR] Branch already exists on remote, checking for PR...");
     } else {
@@ -651,18 +642,15 @@ export async function createPullRequest(
     }
   }
 
-  if (unpushedCount === 0) {
-    console.log("[PR] Step 3/5: No commits to push");
-    return {
-      status: "no_changes",
-      step: PRStep.CHECK_UNPUSHED,
-    };
-  }
-  console.log("[PR] Step 3/5: Found commits to push");
+  return unpushedCount;
+}
 
-  // Step 4: Push to remote (with retry for transient failures)
-  console.log(`[PR] Step 4/5: Pushing ${unpushedCount} commits to origin/${workItem.branch}...`);
-  const pushArgs = ["push", "-u", "origin", workItem.branch];
+/**
+ * Push commits to remote
+ */
+async function pushToRemote(repoDir: string, branch: string, unpushedCount: number): Promise<PRResult | null> {
+  console.log(`[PR] Step 4/5: Pushing ${unpushedCount} commits to origin/${branch}...`);
+  const pushArgs = ["push", "-u", "origin", branch];
   const pushResult = await execWithRetry("git", pushArgs, { cwd: repoDir });
 
   if (pushResult.code !== 0) {
@@ -674,28 +662,19 @@ export async function createPullRequest(
     };
   }
   console.log("[PR] Step 4/5: Push successful");
+  return null;
+}
 
-  // Step 5: Create PR
-  console.log("[PR] Step 5/5: Creating pull request...");
-
-  // Log token presence (masked for security)
-  const tokenLength = githubToken?.length || 0;
-  const tokenMask = tokenLength > 0
-    ? `${githubToken.substring(0, 4)}...(${tokenLength} chars)`
-    : "(empty)";
-  console.log(`[PR] Using GitHub token: ${tokenMask}`);
-
-  // Extract issue metadata for PR body
+/**
+ * Build PR body content
+ */
+function buildPRBody(workItem: ExecutionReadyWorkItem): { title: string; body: string } {
   const issueNumber = workItem.metadata?.issueNumber as number | undefined;
   const issueTitle = workItem.metadata?.issueTitle as string | undefined;
 
-  // Build PR title - include issue title if available
-  const prTitle = issueTitle
-    ? `[Whim] ${issueTitle}`
-    : `[Whim] ${workItem.branch}`;
+  const title = issueTitle ? `[Whim] ${issueTitle}` : `[Whim] ${workItem.branch}`;
 
-  // Build comprehensive PR body
-  const prBodyParts: string[] = [
+  const bodyParts: string[] = [
     "## Summary",
     "",
     `This PR was automatically generated by Whim to address ${issueNumber ? `issue #${issueNumber}` : "a work item"}.`,
@@ -703,61 +682,54 @@ export async function createPullRequest(
   ];
 
   if (issueTitle) {
-    prBodyParts.push(`**Issue:** ${issueTitle}`, "");
+    bodyParts.push(`**Issue:** ${issueTitle}`, "");
   }
 
-  prBodyParts.push(
-    "## Changes",
-    "",
-    "See commit history for detailed changes.",
-    "",
-  );
+  bodyParts.push("## Changes", "", "See commit history for detailed changes.", "");
 
-  // Add closing reference if we have an issue number
   if (issueNumber) {
-    prBodyParts.push(
-      "---",
-      "",
-      `Closes #${issueNumber}`,
-      "",
-    );
+    bodyParts.push("---", "", `Closes #${issueNumber}`, "");
   }
 
-  prBodyParts.push(
-    "---",
-    `*Work Item ID: ${workItem.id}*`,
-  );
+  bodyParts.push("---", `*Work Item ID: ${workItem.id}*`);
 
-  const prBody = prBodyParts.join("\n");
+  return { title, body: bodyParts.join("\n") };
+}
 
-  const prArgs = [
-    "pr",
-    "create",
-    "--title",
-    prTitle,
-    "--body",
-    prBody,
-    "--head",
-    workItem.branch,
-  ];
-
-  // Pass both GH_TOKEN and GITHUB_TOKEN for maximum compatibility
-  // gh CLI checks GH_TOKEN first, then GITHUB_TOKEN
-  // Also preserve GH_HOST if set (for GitHub Enterprise)
-  const ghEnv: NodeJS.ProcessEnv = {
+/**
+ * Get GitHub CLI environment variables
+ */
+function getGitHubEnv(githubToken: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
     GH_TOKEN: githubToken,
     GITHUB_TOKEN: githubToken,
   };
   if (process.env.GH_HOST) {
-    ghEnv.GH_HOST = process.env.GH_HOST;
+    env.GH_HOST = process.env.GH_HOST;
   }
+  return env;
+}
+
+/**
+ * Create the pull request via gh CLI
+ */
+async function createGitHubPR(
+  repoDir: string,
+  workItem: ExecutionReadyWorkItem,
+  githubToken: string
+): Promise<PRResult> {
+  console.log("[PR] Step 5/5: Creating pull request...");
+
+  const tokenLength = githubToken?.length || 0;
+  const tokenMask = tokenLength > 0 ? `${githubToken.substring(0, 4)}...(${tokenLength} chars)` : "(empty)";
+  console.log(`[PR] Using GitHub token: ${tokenMask}`);
+
+  const { title, body } = buildPRBody(workItem);
+  const prArgs = ["pr", "create", "--title", title, "--body", body, "--head", workItem.branch];
+  const ghEnv = getGitHubEnv(githubToken);
 
   console.log("[PR] Running: gh", prArgs.join(" "));
-  // Use retry for PR creation (GitHub API can have transient failures)
-  const prResult = await execWithRetry("gh", prArgs, {
-    cwd: repoDir,
-    env: ghEnv,
-  });
+  const prResult = await execWithRetry("gh", prArgs, { cwd: repoDir, env: ghEnv });
 
   if (prResult.code !== 0) {
     logCommandFailure(PRStep.CREATE_PR, "gh", prArgs, prResult);
@@ -770,83 +742,109 @@ export async function createPullRequest(
 
   const prUrl = prResult.stdout.trim();
   console.log("[PR] Step 5/5: Created PR:", prUrl);
+  return { status: "success", step: PRStep.CREATE_PR, prUrl };
+}
 
-  // Post-PR: Update issue if we have issue metadata
-  if (issueNumber) {
-    const [owner, repo] = workItem.repo.split("/");
-    if (owner && repo) {
-      // Add comment to issue with PR link
-      console.log(`[PR] Posting comment to issue #${issueNumber}...`);
-      const commentBody = `🤖 **Whim Update**\n\nA pull request has been created to address this issue:\n\n➡️ ${prUrl}\n\nThe PR will automatically close this issue when merged.`;
-      const commentArgs = [
-        "issue",
-        "comment",
-        String(issueNumber),
-        "--body",
-        commentBody,
-        "--repo",
-        workItem.repo,
-      ];
-      const commentResult = await exec("gh", commentArgs, {
-        cwd: repoDir,
-        env: ghEnv,
-      });
-      if (commentResult.code !== 0) {
-        console.warn(`[PR] Failed to comment on issue #${issueNumber}:`, commentResult.stderr);
-      } else {
-        console.log(`[PR] Posted comment to issue #${issueNumber}`);
-      }
+/**
+ * Post-PR actions: update issue with comment and labels
+ */
+async function updateIssueAfterPR(
+  repoDir: string,
+  workItem: ExecutionReadyWorkItem,
+  prUrl: string,
+  githubToken: string
+): Promise<void> {
+  const issueNumber = workItem.metadata?.issueNumber as number | undefined;
+  if (!issueNumber) return;
 
-      // Update issue labels: remove processing, add pr-ready
-      console.log(`[PR] Updating labels on issue #${issueNumber}...`);
-      const labelArgs = [
-        "issue",
-        "edit",
-        String(issueNumber),
-        "--remove-label", "ai-processing",
-        "--add-label", "ai-pr-ready",
-        "--repo",
-        workItem.repo,
-      ];
-      const labelResult = await exec("gh", labelArgs, {
-        cwd: repoDir,
-        env: ghEnv,
-      });
-      if (labelResult.code !== 0) {
-        console.warn(`[PR] Failed to update labels on issue #${issueNumber}:`, labelResult.stderr);
-      } else {
-        console.log(`[PR] Updated labels on issue #${issueNumber}`);
-      }
-    }
+  const [owner, repo] = workItem.repo.split("/");
+  if (!owner || !repo) return;
+
+  const ghEnv = getGitHubEnv(githubToken);
+
+  // Post comment to issue
+  console.log(`[PR] Posting comment to issue #${issueNumber}...`);
+  const commentBody = `🤖 **Whim Update**\n\nA pull request has been created to address this issue:\n\n➡️ ${prUrl}\n\nThe PR will automatically close this issue when merged.`;
+  const commentArgs = ["issue", "comment", String(issueNumber), "--body", commentBody, "--repo", workItem.repo];
+  const commentResult = await exec("gh", commentArgs, { cwd: repoDir, env: ghEnv });
+  if (commentResult.code !== 0) {
+    console.warn(`[PR] Failed to comment on issue #${issueNumber}:`, commentResult.stderr);
+  } else {
+    console.log(`[PR] Posted comment to issue #${issueNumber}`);
   }
 
-  // Post AI review comment if available
-  if (reviewFindings && prUrl) {
-    console.log("[PR] Posting AI review comment...");
-    const reviewComment = formatReviewComment(reviewFindings);
-    const reviewArgs = [
-      "pr",
-      "comment",
-      prUrl,
-      "--body",
-      reviewComment,
-    ];
-    const reviewResult = await exec("gh", reviewArgs, {
-      cwd: repoDir,
-      env: ghEnv,
-    });
-    if (reviewResult.code !== 0) {
-      console.warn("[PR] Failed to post AI review comment:", reviewResult.stderr);
-    } else {
-      console.log("[PR] Posted AI review comment");
-    }
+  // Update labels
+  console.log(`[PR] Updating labels on issue #${issueNumber}...`);
+  const labelArgs = ["issue", "edit", String(issueNumber), "--remove-label", "ai-processing", "--add-label", "ai-pr-ready", "--repo", workItem.repo];
+  const labelResult = await exec("gh", labelArgs, { cwd: repoDir, env: ghEnv });
+  if (labelResult.code !== 0) {
+    console.warn(`[PR] Failed to update labels on issue #${issueNumber}:`, labelResult.stderr);
+  } else {
+    console.log(`[PR] Updated labels on issue #${issueNumber}`);
+  }
+}
+
+/**
+ * Post AI review comment on the PR
+ */
+async function postReviewComment(
+  repoDir: string,
+  prUrl: string,
+  reviewFindings: ReviewFindings,
+  githubToken: string
+): Promise<void> {
+  console.log("[PR] Posting AI review comment...");
+  const reviewComment = formatReviewComment(reviewFindings);
+  const reviewArgs = ["pr", "comment", prUrl, "--body", reviewComment];
+  const ghEnv = getGitHubEnv(githubToken);
+
+  const reviewResult = await exec("gh", reviewArgs, { cwd: repoDir, env: ghEnv });
+  if (reviewResult.code !== 0) {
+    console.warn("[PR] Failed to post AI review comment:", reviewResult.stderr);
+  } else {
+    console.log("[PR] Posted AI review comment");
+  }
+}
+
+export async function createPullRequest(
+  repoDir: string,
+  workItem: ExecutionReadyWorkItem,
+  githubToken: string,
+  reviewFindings?: ReviewFindings
+): Promise<PRResult> {
+  console.log("[PR] Starting PR creation for branch:", workItem.branch);
+
+  // Step 1: Stage changes
+  const stageError = await stageChanges(repoDir);
+  if (stageError) return stageError;
+
+  // Step 2: Commit if needed
+  const commitError = await commitChanges(repoDir, workItem.branch);
+  if (commitError) return commitError;
+
+  // Step 3: Check for unpushed commits
+  const unpushedCount = await countUnpushedCommits(repoDir, workItem.branch);
+  if (unpushedCount === 0) {
+    console.log("[PR] Step 3/5: No commits to push");
+    return { status: "no_changes", step: PRStep.CHECK_UNPUSHED };
+  }
+  console.log("[PR] Step 3/5: Found commits to push");
+
+  // Step 4: Push to remote
+  const pushError = await pushToRemote(repoDir, workItem.branch, unpushedCount);
+  if (pushError) return pushError;
+
+  // Step 5: Create PR
+  const prResult = await createGitHubPR(repoDir, workItem, githubToken);
+  if (prResult.status !== "success" || !prResult.prUrl) return prResult;
+
+  // Post-PR actions (non-blocking)
+  await updateIssueAfterPR(repoDir, workItem, prResult.prUrl, githubToken);
+  if (reviewFindings) {
+    await postReviewComment(repoDir, prResult.prUrl, reviewFindings, githubToken);
   }
 
-  return {
-    status: "success",
-    step: PRStep.CREATE_PR,
-    prUrl,
-  };
+  return prResult;
 }
 
 /**
