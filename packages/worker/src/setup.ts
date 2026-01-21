@@ -1,0 +1,903 @@
+import { spawn } from "node:child_process";
+import { mkdir, writeFile, readFile, access, cp, readdir, rename } from "node:fs/promises";
+import { join } from "node:path";
+import { formatReviewComment, type ReviewFindings } from "./prompts/review-prompt.js";
+import type { ExecutionReadyWorkItem } from "./types.js";
+
+export interface WorkspaceConfig {
+  workDir: string;
+  githubToken: string;
+  claudeConfigDir?: string;
+}
+
+/**
+ * Steps in the PR creation flow for error tracking
+ */
+export enum PRStep {
+  STAGE = "stage",
+  COMMIT = "commit",
+  CHECK_UNPUSHED = "check_unpushed",
+  PUSH = "push",
+  CREATE_PR = "create_pr",
+}
+
+/**
+ * Detailed error information from a failed PR step
+ */
+export interface PRError {
+  step: PRStep;
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * Result of PR creation attempt with detailed status
+ */
+export interface PRResult {
+  status: "success" | "no_changes" | "error";
+  step: PRStep;
+  prUrl?: string;
+  error?: PRError;
+}
+
+// Git operations timeout (5 minutes)
+const GIT_TIMEOUT_MS = 5 * 60 * 1000;
+
+function exec(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; timeout?: number } = {}
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(command, args, {
+      cwd: options.cwd,
+      env: { ...process.env, ...options.env },
+      shell: false,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let killed = false;
+
+    // Set up timeout if specified
+    const timeoutId = options.timeout
+      ? setTimeout(() => {
+          killed = true;
+          proc.kill("SIGTERM");
+          // Force kill after 10 seconds if SIGTERM doesn't work
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill("SIGKILL");
+            }
+          }, 10000);
+        }, options.timeout)
+      : null;
+
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", (code) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (killed) {
+        resolve({ stdout, stderr, code: -1 }); // Indicate timeout with -1
+      } else {
+        resolve({ stdout, stderr, code: code ?? 0 });
+      }
+    });
+
+    proc.on("error", (err) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      reject(err);
+    });
+  });
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    // File doesn't exist or not accessible - this is expected behavior
+    console.debug(`[SETUP] Path not accessible: ${path} - ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+}
+
+/**
+ * Result of git authentication verification
+ */
+export interface GitAuthResult {
+  success: boolean;
+  error?: string;
+  scopes?: string[];
+}
+
+/**
+ * Verify git push access BEFORE starting work.
+ * Creates a test branch, pushes it, then cleans up.
+ * This catches auth issues (like missing workflow scope) early.
+ */
+export async function verifyGitAuth(
+  repoDir: string,
+  _githubToken: string
+): Promise<GitAuthResult> {
+  const testBranch = `whim-auth-test-${Date.now()}`;
+
+  console.log("[AUTH] Verifying git push access...");
+
+  // Step 1: Create test branch
+  const branchResult = await exec("git", ["checkout", "-b", testBranch], { cwd: repoDir });
+  if (branchResult.code !== 0) {
+    return { success: false, error: `Failed to create test branch: ${branchResult.stderr}` };
+  }
+
+  // Step 2: Create empty commit (no workflow files to avoid scope issues)
+  const commitResult = await exec(
+    "git",
+    ["commit", "--allow-empty", "-m", "test: verify git push access"],
+    { cwd: repoDir }
+  );
+  if (commitResult.code !== 0) {
+    // Clean up
+    await exec("git", ["checkout", "-"], { cwd: repoDir });
+    await exec("git", ["branch", "-D", testBranch], { cwd: repoDir });
+    return { success: false, error: `Failed to create test commit: ${commitResult.stderr}` };
+  }
+
+  // Step 3: Try to push
+  const pushResult = await exec("git", ["push", "-u", "origin", testBranch], { cwd: repoDir });
+
+  // Step 4: Clean up - switch back and delete branches regardless of push result
+  await exec("git", ["checkout", "-"], { cwd: repoDir });
+  await exec("git", ["branch", "-D", testBranch], { cwd: repoDir });
+
+  if (pushResult.code !== 0) {
+    // Check for specific scope errors
+    const stderr = pushResult.stderr.toLowerCase();
+    if (stderr.includes("workflow") && stderr.includes("scope")) {
+      return {
+        success: false,
+        error: "Token missing 'workflow' scope - cannot push workflow files. Re-auth with: gh auth login --scopes workflow"
+      };
+    }
+    if (stderr.includes("permission") || stderr.includes("denied") || stderr.includes("403")) {
+      return {
+        success: false,
+        error: `Push access denied. Ensure token has 'repo' scope. Error: ${pushResult.stderr}`
+      };
+    }
+    return { success: false, error: `Push failed: ${pushResult.stderr}` };
+  }
+
+  // Step 5: Delete remote test branch
+  await exec("git", ["push", "origin", "--delete", testBranch], { cwd: repoDir });
+
+  console.log("[AUTH] Git push access verified successfully");
+  return { success: true };
+}
+
+export async function setupWorkspace(
+  workItem: ExecutionReadyWorkItem,
+  config: WorkspaceConfig
+): Promise<string> {
+  const repoDir = join(config.workDir, "repo");
+
+  await mkdir(config.workDir, { recursive: true });
+
+  const repoUrl = `https://x-access-token:${config.githubToken}@github.com/${workItem.repo}.git`;
+  // Note: We don't log the full URL since it contains the token
+  const cloneArgs = ["clone", "--depth", "1", repoUrl, repoDir];
+  const cloneResult = await exec("git", cloneArgs, { timeout: GIT_TIMEOUT_MS });
+
+  if (cloneResult.code !== 0) {
+    // Log with sanitized URL (don't expose token)
+    const safeArgs = ["clone", "--depth", "1", `https://***@github.com/${workItem.repo}.git`, repoDir];
+    logSetupCommandResult("git clone", "git", safeArgs, cloneResult);
+    if (cloneResult.code === -1) {
+      throw new Error(`Git clone timed out after ${GIT_TIMEOUT_MS / 1000}s`);
+    }
+    throw new Error(`Failed to clone repo: ${cloneResult.stderr}`);
+  }
+
+  const checkoutArgs = ["checkout", "-b", workItem.branch];
+  const checkoutResult = await exec("git", checkoutArgs, { cwd: repoDir });
+
+  if (checkoutResult.code !== 0) {
+    logSetupCommandResult("git checkout", "git", checkoutArgs, checkoutResult);
+    throw new Error(`Failed to create branch: ${checkoutResult.stderr}`);
+  }
+
+  await configureGit(repoDir);
+
+  // Ralphie v1.1+ expects specs in specs/active/<name>.md
+  // Generate spec name from branch (e.g., "ai/github-issue-42-add-auth" -> "add-auth")
+  // Sanitize to remove slashes and make filesystem-safe
+  const specName = workItem.branch
+    .replace(/^(ai|whim)\//, '') // Remove common prefixes
+    .replace(/^[a-z]+-[a-z0-9-]+-/, '') // Remove source prefix like "github-issue-42-"
+    .replace(/\//g, '-') // Replace any remaining slashes with dashes
+    .substring(0, 50) || 'task';
+  const specsActiveDir = join(repoDir, "specs", "active");
+  await mkdir(specsActiveDir, { recursive: true });
+  const specPath = join(specsActiveDir, `${specName}.md`);
+  await writeFile(specPath, workItem.spec, "utf-8");
+
+  if (config.claudeConfigDir) {
+    const destClaudeDir = join(repoDir, ".claude");
+    await copyClaudeConfig(config.claudeConfigDir, destClaudeDir);
+  }
+
+  // Initialize Ralphie (creates .claude/ralphie.md and specs/)
+  const ralphInitArgs = ["init"];
+  const initResult = await exec("ralphie", ralphInitArgs, { cwd: repoDir });
+  if (initResult.code !== 0) {
+    logSetupCommandResult("ralphie init", "ralphie", ralphInitArgs, initResult);
+    console.warn("[SETUP] Ralphie init failed, creating files manually");
+    await createRalphieFilesManually(repoDir, specPath);
+  }
+
+  // Inject Whim-specific learnings instructions into the repo
+  await injectLearningsInstructions(repoDir);
+
+  // Commit the initial setup so Ralph doesn't complain about uncommitted changes
+  const addArgs = ["add", "-A"];
+  const addResult = await exec("git", addArgs, { cwd: repoDir });
+  if (addResult.code !== 0) {
+    logSetupCommandResult("git add (initial)", "git", addArgs, addResult);
+    throw new Error(`Failed to stage initial files: ${addResult.stderr}`);
+  }
+
+  const commitArgs = ["commit", "-m", "chore: initialize workspace for Whim"];
+  const commitResult = await exec("git", commitArgs, { cwd: repoDir });
+  if (commitResult.code !== 0) {
+    logSetupCommandResult("git commit (initial)", "git", commitArgs, commitResult);
+    throw new Error(`Failed to commit initial setup: ${commitResult.stderr}`);
+  }
+
+  return repoDir;
+}
+
+async function configureGit(repoDir: string): Promise<void> {
+  const emailArgs = ["config", "user.email", "whim@ai.local"];
+  const emailResult = await exec("git", emailArgs, { cwd: repoDir });
+  if (emailResult.code !== 0) {
+    logSetupCommandResult("git config user.email", "git", emailArgs, emailResult);
+    throw new Error(`Failed to configure git email: ${emailResult.stderr}`);
+  }
+
+  const nameArgs = ["config", "user.name", "Whim Worker"];
+  const nameResult = await exec("git", nameArgs, { cwd: repoDir });
+  if (nameResult.code !== 0) {
+    logSetupCommandResult("git config user.name", "git", nameArgs, nameResult);
+    throw new Error(`Failed to configure git name: ${nameResult.stderr}`);
+  }
+}
+
+async function copyClaudeConfig(
+  sourceDir: string,
+  destDir: string
+): Promise<void> {
+  if (!(await fileExists(sourceDir))) {
+    return;
+  }
+
+  await mkdir(destDir, { recursive: true });
+
+  const filesToCopy = ["CLAUDE.md", "mcp.json", "settings.json"];
+
+  for (const file of filesToCopy) {
+    const sourcePath = join(sourceDir, file);
+    const destPath = join(destDir, file);
+
+    if (await fileExists(sourcePath)) {
+      await cp(sourcePath, destPath);
+    }
+  }
+}
+
+/**
+ * Inject Whim-specific learnings instructions into the target repo.
+ * Appends to .claude/ralphie.md if it exists, otherwise creates .ai/WHIM_LEARNINGS.md
+ */
+async function injectLearningsInstructions(repoDir: string): Promise<void> {
+  const learningsInstructions = `
+
+## Whim Learnings System
+
+If you encounter something non-obvious that would help future workers, write it to \`.ai/new-learnings.md\`:
+
+\`\`\`markdown
+## Learning: Brief title
+
+What you learned and why it matters.
+\`\`\`
+
+Good learnings: repo-specific gotchas, failed approaches, non-obvious patterns.
+Skip generic insights - only capture things specific to this codebase.
+`;
+
+  // Try to append to .claude/ralphie.md first
+  const ralphieMdPath = join(repoDir, ".claude", "ralphie.md");
+  if (await fileExists(ralphieMdPath)) {
+    const existing = await readFile(ralphieMdPath, "utf-8");
+    await writeFile(ralphieMdPath, existing + learningsInstructions, "utf-8");
+    console.log("[SETUP] Appended learnings instructions to .claude/ralphie.md");
+    return;
+  }
+
+  // Fallback: create .ai/WHIM_LEARNINGS.md
+  const aiDir = join(repoDir, ".ai");
+  await mkdir(aiDir, { recursive: true });
+  const fallbackPath = join(aiDir, "WHIM_LEARNINGS.md");
+  await writeFile(fallbackPath, `# Whim Learnings Instructions${learningsInstructions}`, "utf-8");
+  console.log("[SETUP] Created .ai/WHIM_LEARNINGS.md with learnings instructions");
+}
+
+/**
+ * Create ralphie files manually when ralphie init fails
+ * This is a fallback for when the templates directory is not found
+ */
+async function createRalphieFilesManually(repoDir: string, specPath: string): Promise<void> {
+  // Create .claude/ralphie.md with basic instructions
+  const claudeDir = join(repoDir, ".claude");
+  await mkdir(claudeDir, { recursive: true });
+
+  const ralphieMd = `# Ralphie - AI Coding Assistant
+
+You are working on completing tasks defined in spec files under \`specs/active/\`.
+
+## Workflow
+
+1. Read the spec file to understand the task
+2. Implement the required changes
+3. Run tests to verify your work
+4. Update the spec file to mark tasks as complete
+
+## Guidelines
+
+- Make small, incremental changes
+- Test frequently
+- Commit your work after completing significant milestones
+- Ask for help if you get stuck
+`;
+  await writeFile(join(claudeDir, "ralphie.md"), ralphieMd, "utf-8");
+  console.log("[SETUP] Created .claude/ralphie.md manually");
+
+  // Create .ai/ralphie directory with basic files
+  const aiRalphieDir = join(repoDir, ".ai", "ralphie");
+  await mkdir(aiRalphieDir, { recursive: true });
+
+  // Create config.json pointing to the spec
+  const config = { specPath: specPath };
+  await writeFile(join(aiRalphieDir, "config.json"), JSON.stringify(config, null, 2), "utf-8");
+  console.log("[SETUP] Created .ai/ralphie/ directory structure");
+}
+
+/**
+ * Log detailed command failure information for PR steps
+ */
+function logCommandFailure(
+  step: PRStep,
+  command: string,
+  args: string[],
+  result: { stdout: string; stderr: string; code: number }
+): void {
+  const fullCommand = `${command} ${args.join(" ")}`;
+  console.error(`[PR] Step ${step} FAILED`);
+  console.error(`[PR]   Command: ${fullCommand}`);
+  console.error(`[PR]   Exit code: ${result.code}`);
+  if (result.stdout.trim()) {
+    console.error(`[PR]   stdout: ${result.stdout.trim()}`);
+  }
+  if (result.stderr.trim()) {
+    console.error(`[PR]   stderr: ${result.stderr.trim()}`);
+  }
+}
+
+/**
+ * Log command result for setup steps (non-PR commands)
+ * Used for debugging failed setup operations
+ */
+function logSetupCommandResult(
+  context: string,
+  command: string,
+  args: string[],
+  result: { stdout: string; stderr: string; code: number }
+): void {
+  const fullCommand = `${command} ${args.join(" ")}`;
+  console.error(`[SETUP] ${context} FAILED`);
+  console.error(`[SETUP]   Command: ${fullCommand}`);
+  console.error(`[SETUP]   Exit code: ${result.code}`);
+  if (result.stdout.trim()) {
+    console.error(`[SETUP]   stdout: ${result.stdout.trim()}`);
+  }
+  if (result.stderr.trim()) {
+    console.error(`[SETUP]   stderr: ${result.stderr.trim()}`);
+  }
+}
+
+/**
+ * Retry configuration for network operations
+ */
+interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+};
+
+/**
+ * Check if a command result indicates a transient/retryable error
+ * Common patterns:
+ * - Network errors (connection reset, timeout)
+ * - Server errors (5xx HTTP status)
+ * - Rate limiting (429)
+ */
+export function isRetryableError(result: { stdout: string; stderr: string; code: number }): boolean {
+  const output = (result.stdout + result.stderr).toLowerCase();
+
+  // Network connectivity issues
+  if (output.includes("connection reset") ||
+      output.includes("connection refused") ||
+      output.includes("connection timed out") ||
+      output.includes("network is unreachable") ||
+      output.includes("temporary failure") ||
+      output.includes("could not resolve host") ||
+      output.includes("ssl connect error") ||
+      output.includes("unable to access")) {
+    return true;
+  }
+
+  // Server-side errors (5xx)
+  if (output.includes("500") ||
+      output.includes("502") ||
+      output.includes("503") ||
+      output.includes("504") ||
+      output.includes("internal server error") ||
+      output.includes("service unavailable") ||
+      output.includes("bad gateway")) {
+    return true;
+  }
+
+  // Rate limiting
+  if (output.includes("rate limit") ||
+      output.includes("429") ||
+      output.includes("too many requests")) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Sleep for a specified duration with exponential backoff + jitter
+ */
+function sleep(attempt: number, config: RetryConfig): Promise<void> {
+  // Exponential backoff: base * 2^attempt
+  const exponentialDelay = config.baseDelayMs * Math.pow(2, attempt);
+  // Add jitter: ±25% randomness
+  const jitter = exponentialDelay * (0.75 + Math.random() * 0.5);
+  // Cap at max delay
+  const delay = Math.min(jitter, config.maxDelayMs);
+
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+/**
+ * Execute a command with retry logic for transient failures
+ */
+async function execWithRetry(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  config: RetryConfig = DEFAULT_RETRY_CONFIG
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  let lastResult: { stdout: string; stderr: string; code: number } | null = null;
+
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    if (attempt > 0) {
+      console.log(`[RETRY] Attempt ${attempt + 1}/${config.maxRetries + 1} for: ${command} ${args.join(" ")}`);
+      await sleep(attempt - 1, config);
+    }
+
+    lastResult = await exec(command, args, options);
+
+    // Success - return immediately
+    if (lastResult.code === 0) {
+      if (attempt > 0) {
+        console.log(`[RETRY] Succeeded on attempt ${attempt + 1}`);
+      }
+      return lastResult;
+    }
+
+    // Check if this is a retryable error
+    if (!isRetryableError(lastResult)) {
+      // Not retryable, return immediately
+      if (attempt > 0) {
+        console.log(`[RETRY] Non-retryable error, giving up after ${attempt + 1} attempts`);
+      }
+      return lastResult;
+    }
+
+    // Log retry attempt
+    console.log(`[RETRY] Transient error detected, will retry...`);
+    console.log(`[RETRY]   Exit code: ${lastResult.code}`);
+    if (lastResult.stderr.trim()) {
+      // Truncate to first 200 chars for logging
+      const stderrPreview = lastResult.stderr.trim().slice(0, 200);
+      console.log(`[RETRY]   stderr: ${stderrPreview}${lastResult.stderr.length > 200 ? "..." : ""}`);
+    }
+  }
+
+  // All retries exhausted
+  console.log(`[RETRY] All ${config.maxRetries + 1} attempts failed`);
+  return lastResult!;
+}
+
+/**
+ * Create a PRError from a command result
+ */
+function createPRError(
+  step: PRStep,
+  command: string,
+  args: string[],
+  result: { stdout: string; stderr: string; code: number }
+): PRError {
+  return {
+    step,
+    command: `${command} ${args.join(" ")}`,
+    exitCode: result.code,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+}
+
+/**
+ * Stage all changes in the repository
+ */
+async function stageChanges(repoDir: string): Promise<PRResult | null> {
+  console.log("[PR] Step 1/5: Staging changes...");
+  const addArgs = ["add", "-A"];
+  const addResult = await exec("git", addArgs, { cwd: repoDir });
+  if (addResult.code !== 0) {
+    logCommandFailure(PRStep.STAGE, "git", addArgs, addResult);
+    return {
+      status: "error",
+      step: PRStep.STAGE,
+      error: createPRError(PRStep.STAGE, "git", addArgs, addResult),
+    };
+  }
+  console.log("[PR] Step 1/5: Staging complete");
+  return null;
+}
+
+/**
+ * Commit staged changes if any exist
+ */
+async function commitChanges(repoDir: string, branch: string): Promise<PRResult | null> {
+  console.log("[PR] Step 2/5: Checking for uncommitted changes...");
+  const statusResult = await exec("git", ["status", "--porcelain"], { cwd: repoDir });
+
+  if (statusResult.stdout.trim() !== "") {
+    console.log("[PR] Found uncommitted changes, committing...");
+    const commitArgs = ["commit", "-m", `feat: ${branch}\n\nImplemented by Whim`];
+    const commitResult = await exec("git", commitArgs, { cwd: repoDir });
+
+    if (commitResult.code !== 0) {
+      logCommandFailure(PRStep.COMMIT, "git", commitArgs, commitResult);
+      return {
+        status: "error",
+        step: PRStep.COMMIT,
+        error: createPRError(PRStep.COMMIT, "git", commitArgs, commitResult),
+      };
+    }
+    console.log("[PR] Step 2/5: Committed successfully");
+  } else {
+    console.log("[PR] Step 2/5: No uncommitted changes (Ralph already committed)");
+  }
+  return null;
+}
+
+/**
+ * Count unpushed commits compared to remote
+ */
+async function countUnpushedCommits(repoDir: string, branch: string): Promise<number> {
+  console.log("[PR] Step 3/5: Checking for unpushed commits...");
+  let unpushedCount = 0;
+  const refs = ["origin/HEAD", "origin/main", "origin/master"];
+
+  for (const ref of refs) {
+    const unpushedResult = await exec("git", ["rev-list", "--count", `${ref}..HEAD`], { cwd: repoDir });
+    if (unpushedResult.code === 0) {
+      unpushedCount = parseInt(unpushedResult.stdout.trim(), 10) || 0;
+      console.log(`[PR] Found ${unpushedCount} unpushed commits (vs ${ref})`);
+      break;
+    }
+  }
+
+  // Log recent commits for debugging
+  const logResult = await exec("git", ["log", "--oneline", "-5"], { cwd: repoDir });
+  console.log("[PR] Recent commits:\n" + logResult.stdout);
+
+  // Check if branch exists on remote if no unpushed commits found
+  if (unpushedCount === 0) {
+    const branchCheckResult = await exec("git", ["ls-remote", "--heads", "origin", branch], { cwd: repoDir });
+    if (branchCheckResult.stdout.trim() !== "") {
+      console.log("[PR] Branch already exists on remote, checking for PR...");
+    } else {
+      console.log("[PR] Branch not on remote, will attempt push anyway");
+      unpushedCount = 1; // Force push attempt for new branches
+    }
+  }
+
+  return unpushedCount;
+}
+
+/**
+ * Push commits to remote
+ */
+async function pushToRemote(repoDir: string, branch: string, unpushedCount: number): Promise<PRResult | null> {
+  console.log(`[PR] Step 4/5: Pushing ${unpushedCount} commits to origin/${branch}...`);
+  const pushArgs = ["push", "-u", "origin", branch];
+  const pushResult = await execWithRetry("git", pushArgs, { cwd: repoDir });
+
+  if (pushResult.code !== 0) {
+    logCommandFailure(PRStep.PUSH, "git", pushArgs, pushResult);
+    return {
+      status: "error",
+      step: PRStep.PUSH,
+      error: createPRError(PRStep.PUSH, "git", pushArgs, pushResult),
+    };
+  }
+  console.log("[PR] Step 4/5: Push successful");
+  return null;
+}
+
+/**
+ * Build PR body content
+ */
+function buildPRBody(workItem: ExecutionReadyWorkItem): { title: string; body: string } {
+  const issueNumber = workItem.metadata?.issueNumber as number | undefined;
+  const issueTitle = workItem.metadata?.issueTitle as string | undefined;
+
+  const title = issueTitle ? `[Whim] ${issueTitle}` : `[Whim] ${workItem.branch}`;
+
+  const bodyParts: string[] = [
+    "## Summary",
+    "",
+    `This PR was automatically generated by Whim to address ${issueNumber ? `issue #${issueNumber}` : "a work item"}.`,
+    "",
+  ];
+
+  if (issueTitle) {
+    bodyParts.push(`**Issue:** ${issueTitle}`, "");
+  }
+
+  bodyParts.push("## Changes", "", "See commit history for detailed changes.", "");
+
+  if (issueNumber) {
+    bodyParts.push("---", "", `Closes #${issueNumber}`, "");
+  }
+
+  bodyParts.push("---", `*Work Item ID: ${workItem.id}*`);
+
+  return { title, body: bodyParts.join("\n") };
+}
+
+/**
+ * Get GitHub CLI environment variables
+ */
+function getGitHubEnv(githubToken: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    GH_TOKEN: githubToken,
+    GITHUB_TOKEN: githubToken,
+  };
+  if (process.env.GH_HOST) {
+    env.GH_HOST = process.env.GH_HOST;
+  }
+  return env;
+}
+
+/**
+ * Create the pull request via gh CLI
+ */
+async function createGitHubPR(
+  repoDir: string,
+  workItem: ExecutionReadyWorkItem,
+  githubToken: string
+): Promise<PRResult> {
+  console.log("[PR] Step 5/5: Creating pull request...");
+
+  const tokenMask = githubToken?.length > 0 ? `${githubToken.substring(0, 4)}...` : "(empty)";
+  console.log(`[PR] Using GitHub token: ${tokenMask}`);
+
+  const { title, body } = buildPRBody(workItem);
+  const prArgs = ["pr", "create", "--title", title, "--body", body, "--head", workItem.branch];
+  const ghEnv = getGitHubEnv(githubToken);
+
+  console.log("[PR] Running: gh", prArgs.join(" "));
+  const prResult = await execWithRetry("gh", prArgs, { cwd: repoDir, env: ghEnv });
+
+  if (prResult.code !== 0) {
+    logCommandFailure(PRStep.CREATE_PR, "gh", prArgs, prResult);
+    return {
+      status: "error",
+      step: PRStep.CREATE_PR,
+      error: createPRError(PRStep.CREATE_PR, "gh", prArgs, prResult),
+    };
+  }
+
+  const prUrl = prResult.stdout.trim();
+  console.log("[PR] Step 5/5: Created PR:", prUrl);
+  return { status: "success", step: PRStep.CREATE_PR, prUrl };
+}
+
+/**
+ * Post-PR actions: update issue with comment and labels
+ */
+async function updateIssueAfterPR(
+  repoDir: string,
+  workItem: ExecutionReadyWorkItem,
+  prUrl: string,
+  githubToken: string
+): Promise<void> {
+  const issueNumber = workItem.metadata?.issueNumber as number | undefined;
+  if (!issueNumber) return;
+
+  const [owner, repo] = workItem.repo.split("/");
+  if (!owner || !repo) return;
+
+  const ghEnv = getGitHubEnv(githubToken);
+
+  // Post comment to issue
+  console.log(`[PR] Posting comment to issue #${issueNumber}...`);
+  const commentBody = `🤖 **Whim Update**\n\nA pull request has been created to address this issue:\n\n➡️ ${prUrl}\n\nThe PR will automatically close this issue when merged.`;
+  const commentArgs = ["issue", "comment", String(issueNumber), "--body", commentBody, "--repo", workItem.repo];
+  const commentResult = await exec("gh", commentArgs, { cwd: repoDir, env: ghEnv });
+  if (commentResult.code !== 0) {
+    console.warn(`[PR] Failed to comment on issue #${issueNumber}:`, commentResult.stderr);
+  } else {
+    console.log(`[PR] Posted comment to issue #${issueNumber}`);
+  }
+
+  // Update labels
+  console.log(`[PR] Updating labels on issue #${issueNumber}...`);
+  const labelArgs = ["issue", "edit", String(issueNumber), "--remove-label", "ai-processing", "--add-label", "ai-pr-ready", "--repo", workItem.repo];
+  const labelResult = await exec("gh", labelArgs, { cwd: repoDir, env: ghEnv });
+  if (labelResult.code !== 0) {
+    console.warn(`[PR] Failed to update labels on issue #${issueNumber}:`, labelResult.stderr);
+  } else {
+    console.log(`[PR] Updated labels on issue #${issueNumber}`);
+  }
+}
+
+/**
+ * Post AI review comment on the PR
+ */
+async function postReviewComment(
+  repoDir: string,
+  prUrl: string,
+  reviewFindings: ReviewFindings,
+  githubToken: string
+): Promise<void> {
+  console.log("[PR] Posting AI review comment...");
+  const reviewComment = formatReviewComment(reviewFindings);
+  const reviewArgs = ["pr", "comment", prUrl, "--body", reviewComment];
+  const ghEnv = getGitHubEnv(githubToken);
+
+  const reviewResult = await exec("gh", reviewArgs, { cwd: repoDir, env: ghEnv });
+  if (reviewResult.code !== 0) {
+    console.warn("[PR] Failed to post AI review comment:", reviewResult.stderr);
+  } else {
+    console.log("[PR] Posted AI review comment");
+  }
+}
+
+export async function createPullRequest(
+  repoDir: string,
+  workItem: ExecutionReadyWorkItem,
+  githubToken: string,
+  reviewFindings?: ReviewFindings
+): Promise<PRResult> {
+  console.log("[PR] Starting PR creation for branch:", workItem.branch);
+
+  // Step 1: Stage changes
+  const stageError = await stageChanges(repoDir);
+  if (stageError) return stageError;
+
+  // Step 2: Commit if needed
+  const commitError = await commitChanges(repoDir, workItem.branch);
+  if (commitError) return commitError;
+
+  // Step 3: Check for unpushed commits
+  const unpushedCount = await countUnpushedCommits(repoDir, workItem.branch);
+  if (unpushedCount === 0) {
+    console.log("[PR] Step 3/5: No commits to push");
+    return { status: "no_changes", step: PRStep.CHECK_UNPUSHED };
+  }
+  console.log("[PR] Step 3/5: Found commits to push");
+
+  // Step 4: Push to remote
+  const pushError = await pushToRemote(repoDir, workItem.branch, unpushedCount);
+  if (pushError) return pushError;
+
+  // Step 5: Create PR
+  const prResult = await createGitHubPR(repoDir, workItem, githubToken);
+  if (prResult.status !== "success" || !prResult.prUrl) return prResult;
+
+  // Post-PR actions (non-blocking)
+  await updateIssueAfterPR(repoDir, workItem, prResult.prUrl, githubToken);
+  if (reviewFindings) {
+    await postReviewComment(repoDir, prResult.prUrl, reviewFindings, githubToken);
+  }
+
+  return prResult;
+}
+
+/**
+ * Archive spec from specs/active/ to specs/completed/
+ * Called after successful completion to follow ralphie v1.1 conventions.
+ *
+ * @param repoDir - Repository directory
+ * @returns The archived spec path, or null if no spec found
+ */
+export async function archiveSpec(repoDir: string): Promise<string | null> {
+  const activeDir = join(repoDir, "specs", "active");
+  const completedDir = join(repoDir, "specs", "completed");
+
+  try {
+    // Check if active dir exists
+    await access(activeDir);
+  } catch (error) {
+    console.log(`[ARCHIVE] No specs/active/ directory found: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+
+  try {
+    // Find spec file in active directory
+    const files = await readdir(activeDir);
+    const specFiles = files.filter((f) => f.endsWith(".md") && !f.startsWith("."));
+
+    if (specFiles.length === 0) {
+      console.log("[ARCHIVE] No spec files found in specs/active/");
+      return null;
+    }
+
+    if (specFiles.length > 1) {
+      console.warn(`[ARCHIVE] Multiple specs found, archiving first: ${specFiles[0]}`);
+    }
+
+    const specFile = specFiles[0]!;
+    const sourcePath = join(activeDir, specFile);
+
+    // Create completed directory if it doesn't exist
+    await mkdir(completedDir, { recursive: true });
+
+    // Generate timestamped filename for archive
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const baseName = specFile.replace(/\.md$/, "");
+    const archivedName = `${baseName}-${timestamp}.md`;
+    const destPath = join(completedDir, archivedName);
+
+    // Move spec to completed
+    await rename(sourcePath, destPath);
+    console.log(`[ARCHIVE] Moved ${specFile} to specs/completed/${archivedName}`);
+
+    return destPath;
+  } catch (error) {
+    console.error("[ARCHIVE] Failed to archive spec:", error);
+    return null;
+  }
+}

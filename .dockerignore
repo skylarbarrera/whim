@@ -1,0 +1,69 @@
+# Dependencies (installed fresh in container)
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment/Secrets (NEVER include in image)
+.env
+.env.*
+docker/.env
+*.pem
+credentials.json
+
+# Git
+.git/
+.gitignore
+
+# Build artifacts (rebuilt in container)
+dist/
+build/
+.next/
+*.egg-info/
+*.tsbuildinfo
+
+# Turbo/Bun cache
+.turbo/
+bun.lockb
+
+# Claude Code
+.claude/
+
+# Documentation (not needed in runtime image)
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production image)
+**/*.test.ts
+**/*.spec.ts
+**/test/
+**/tests/
+**/__tests__/
+
+# Development files
+STATE.txt
+plan.txt
+.ai/
+thoughts/
+SPEC*.md
+RALPH.md
+
+# Docker files (avoid recursive copy)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# GitHub
+.github/

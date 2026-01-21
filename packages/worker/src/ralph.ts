@@ -1,0 +1,328 @@
+import { spawn, type ChildProcess } from 'node:child_process';
+import type { OrchestratorClient } from './client.js';
+import type { WorkerErrorCategory } from '@whim/shared';
+
+/**
+ * Categorize an error message for analytics
+ */
+function categorizeError(error: string): WorkerErrorCategory {
+  const lower = error.toLowerCase();
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'TIMEOUT';
+  if (lower.includes('econnrefused') || lower.includes('network') || lower.includes('fetch failed')) return 'NETWORK_ERROR';
+  if (lower.includes('enospc') || lower.includes('out of memory') || lower.includes('oom')) return 'RESOURCE_ERROR';
+  if (lower.includes('auth') || lower.includes('permission') || lower.includes('401') || lower.includes('403')) return 'VALIDATION_ERROR';
+  if (lower.includes('stuck')) return 'EXECUTION_ERROR';
+  return 'EXECUTION_ERROR';
+}
+
+/**
+ * Push current branch to origin (for incremental push after commits)
+ */
+async function pushBranch(
+  repoDir: string,
+  branch: string
+): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn('git', ['push', '-u', 'origin', branch], {
+      cwd: repoDir,
+      shell: false,
+    });
+
+    let stderr = '';
+    proc.stderr?.on('data', (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true });
+      } else {
+        resolve({ success: false, error: stderr || `Exit code ${code}` });
+      }
+    });
+
+    proc.on('error', (err) => {
+      resolve({ success: false, error: err.message });
+    });
+  });
+}
+
+/**
+ * Ralph headless event types (JSON from stdout)
+ */
+export type RalphEventType =
+  | 'started'
+  | 'iteration'
+  | 'tool'
+  | 'commit'
+  | 'task_complete'
+  | 'iteration_done'
+  | 'stuck'
+  | 'complete'
+  | 'failed';
+
+export interface RalphEvent {
+  event: RalphEventType;
+  [key: string]: unknown;
+}
+
+export interface RalphMetrics {
+  tokensIn: number;
+  tokensOut: number;
+  duration: number;
+  filesModified: number;
+  testsRun: number;
+  testsPassed: number;
+  testsFailed: number;
+  testStatus?: 'passed' | 'failed' | 'timeout' | 'skipped' | 'error';
+}
+
+export interface RalphResult {
+  success: boolean;
+  error?: string;
+  metrics: RalphMetrics;
+  iteration: number;
+}
+
+/**
+ * Parse a JSON event line from Ralph's headless output
+ */
+export function parseRalphEvent(line: string): RalphEvent | null {
+  try {
+    const event = JSON.parse(line);
+    if (event && typeof event.event === 'string') {
+      return event as RalphEvent;
+    }
+    return null;
+  } catch (error) {
+    console.debug(`[RALPH] Failed to parse event line: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Run Ralph in headless mode
+ */
+export async function runRalph(
+  repoDir: string,
+  client: OrchestratorClient,
+  options: {
+    maxIterations?: number;
+    stuckThreshold?: number;
+    timeoutIdle?: number; // Idle timeout in seconds (default 300)
+    harness?: 'claude' | 'codex' | 'opencode'; // AI harness to use
+    onEvent?: (event: RalphEvent) => void;
+    onOutput?: (line: string) => void;
+    incrementalPush?: { enabled: boolean; branch: string };
+  } = {}
+): Promise<RalphResult> {
+  const metrics: RalphMetrics = {
+    tokensIn: 0,
+    tokensOut: 0,
+    duration: 0,
+    filesModified: 0,
+    testsRun: 0,
+    testsPassed: 0,
+    testsFailed: 0,
+    testStatus: undefined,
+  };
+
+  let iteration = 0;
+  let success = false;
+  let error: string | undefined;
+
+  const startTime = Date.now();
+
+  // Spawn Ralph in headless mode
+  const args = ['run', '--headless', '--all'];
+
+  if (options.maxIterations) {
+    args.push('-n', String(options.maxIterations));
+  }
+
+  if (options.stuckThreshold) {
+    args.push('--stuck-threshold', String(options.stuckThreshold));
+  }
+
+  // Set idle timeout (default 5 minutes - builds can take a while)
+  const idleTimeout = options.timeoutIdle ?? 300;
+  args.push('--timeout-idle', String(idleTimeout));
+
+  // Set AI harness (claude or codex)
+  if (options.harness) {
+    args.push('--harness', options.harness);
+  }
+
+  const proc = spawn('ralphie', args, {
+    cwd: repoDir,
+    shell: false,
+    env: process.env,
+  });
+
+  // Cleanup handler to kill child process if worker crashes
+  const cleanup = () => {
+    if (proc && !proc.killed) {
+      console.log('[RALPH] Worker terminating, killing ralphie process...');
+      proc.kill('SIGTERM');
+    }
+  };
+
+  // Register cleanup handlers
+  process.on('SIGTERM', cleanup);
+  process.on('SIGINT', cleanup);
+  process.on('exit', cleanup);
+
+  // Helper to remove cleanup handlers
+  const removeCleanupHandlers = () => {
+    process.removeListener('SIGTERM', cleanup);
+    process.removeListener('SIGINT', cleanup);
+    process.removeListener('exit', cleanup);
+  };
+
+  const processLine = async (line: string): Promise<void> => {
+    options.onOutput?.(line);
+
+    const event = parseRalphEvent(line);
+    if (!event) {
+      return;
+    }
+
+    options.onEvent?.(event);
+
+    switch (event.event) {
+      case 'started': {
+        console.log(`Ralph started: ${event.tasks} tasks`);
+        break;
+      }
+
+      case 'iteration': {
+        iteration = (event.n as number) ?? iteration + 1;
+        await client.heartbeat(iteration, 'running', {
+          in: metrics.tokensIn,
+          out: metrics.tokensOut,
+        });
+        break;
+      }
+
+      case 'tool': {
+        // Send heartbeat on every tool call to prevent stale detection
+        await client.heartbeat(iteration, 'running', {
+          in: metrics.tokensIn,
+          out: metrics.tokensOut,
+        });
+        if (event.type === 'write' && event.path) {
+          metrics.filesModified++;
+          await client.lockFile([event.path as string]);
+        }
+        break;
+      }
+
+      case 'commit': {
+        // Push after each commit if incremental push is enabled
+        if (options.incrementalPush?.enabled) {
+          const hash = (event.hash as string) ?? 'unknown';
+          const message = (event.message as string) ?? '';
+          console.log(`[PUSH] Pushing commit ${hash}: ${message.slice(0, 50)}`);
+
+          const pushResult = await pushBranch(repoDir, options.incrementalPush.branch);
+          if (pushResult.success) {
+            console.log(`[PUSH] Commit ${hash} pushed successfully`);
+          } else {
+            console.error(`[PUSH] Failed to push commit ${hash}: ${pushResult.error}`);
+            // Don't fail the whole run - log the error and continue
+            // The final PR creation will retry pushing
+          }
+        }
+        break;
+      }
+
+      case 'iteration_done': {
+        const stats = event.stats as Record<string, number> | undefined;
+        if (stats) {
+          metrics.tokensIn += stats.tokensIn ?? 0;
+          metrics.tokensOut += stats.tokensOut ?? 0;
+        }
+        break;
+      }
+
+      case 'stuck': {
+        const reason = (event.reason as string) ?? 'Unknown reason';
+        const attempts = (event.iterations_without_progress as number) ?? 1;
+        await client.stuck(reason, attempts);
+        break;
+      }
+
+      case 'complete': {
+        success = true;
+        metrics.testsRun = (event.tests_run as number) ?? 0;
+        metrics.testsPassed = (event.tests_passed as number) ?? 0;
+        break;
+      }
+
+      case 'failed': {
+        success = false;
+        error = (event.error as string) ?? 'Unknown error';
+        await client.fail(error, iteration, { category: categorizeError(error) });
+        break;
+      }
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    let stdoutBuffer = '';
+
+    proc.stdout.on('data', (data: Buffer) => {
+      stdoutBuffer += data.toString();
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        processLine(line).catch(console.error);
+      }
+    });
+
+    proc.stderr.on('data', (data: Buffer) => {
+      const lines = data.toString().split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          options.onOutput?.(`[stderr] ${line}`);
+        }
+      }
+    });
+
+    proc.on('close', (code) => {
+      if (stdoutBuffer) {
+        processLine(stdoutBuffer).catch(console.error);
+      }
+
+      metrics.duration = Date.now() - startTime;
+
+      // Ralph exit codes: 0=complete, 1=stuck, 2=max iterations, 3=error
+      if (code === 0) {
+        success = true;
+      } else if (code === 1) {
+        error = error ?? 'Stuck: no progress';
+      } else if (code === 2) {
+        error = error ?? 'Max iterations reached';
+      } else if (!success && !error) {
+        error = `Process exited with code ${code}`;
+      }
+
+      // Clean up signal handlers before resolving
+      removeCleanupHandlers();
+
+      resolve({
+        success,
+        error,
+        metrics,
+        iteration,
+      });
+    });
+
+    proc.on('error', (err) => {
+      // Clean up signal handlers before rejecting
+      removeCleanupHandlers();
+      reject(err);
+    });
+  });
+}

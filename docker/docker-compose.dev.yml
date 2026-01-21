@@ -1,0 +1,37 @@
+# Development overrides with hot-reload
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml watch
+
+services:
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: packages/orchestrator/Dockerfile
+      target: builder
+    command: bun --watch src/index.ts
+    volumes:
+      - ../packages/orchestrator/src:/app/src
+      - ../packages/shared:/app/packages/shared
+    develop:
+      watch:
+        - action: sync
+          path: ../packages/orchestrator/src
+          target: /app/src
+        - action: rebuild
+          path: ../packages/orchestrator/package.json
+
+  intake:
+    build:
+      context: ..
+      dockerfile: packages/intake/Dockerfile
+      target: builder
+    command: bun --watch src/index.ts
+    volumes:
+      - ../packages/intake/src:/app/src
+    develop:
+      watch:
+        - action: sync
+          path: ../packages/intake/src
+          target: /app/src
+        - action: rebuild
+          path: ../packages/intake/package.json
+
