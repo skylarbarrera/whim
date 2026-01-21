@@ -45,7 +45,7 @@ WORKDIR /app/packages/intake
 
 # Environment variables (no defaults for secrets)
 ENV ORCHESTRATOR_URL=http://whim-orchestrator:3000
-ENV INTAKE_LABEL=ai-whim
+ENV INTAKE_LABEL=whim
 ENV POLL_INTERVAL=60000
 
 # Run the intake service

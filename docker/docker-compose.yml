@@ -119,7 +119,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       REPOS: ${REPOS}
       ORCHESTRATOR_URL: http://whim-orchestrator:3000
-      INTAKE_LABEL: ${INTAKE_LABEL:-ai-whim}
+      INTAKE_LABEL: ${INTAKE_LABEL:-whim}
       POLL_INTERVAL: ${POLL_INTERVAL:-60000}
       ALLOWED_USERS: ${ALLOWED_USERS}
 

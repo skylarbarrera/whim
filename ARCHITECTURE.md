@@ -46,6 +46,12 @@ Whim is an autonomous AI development system that transforms GitHub issues into p
 - Clones target repo, writes SPEC.md
 - Spawns Ralph (Claude Code in autonomous mode)
 - Reports progress via heartbeats, creates PR on completion
+- Verification worker validates PRs after creation
+
+### Harness (`packages/harness`)
+- Abstraction layer for AI execution (Claude Code, Codex, OpenCode)
+- Common interface for spawning and streaming events
+- Handles timeouts and error normalization
 
 ## Data Flow
 
@@ -175,24 +181,27 @@ packages/
 │       ├── workers.ts    # Worker lifecycle
 │       ├── rate-limits.ts # Rate limiting
 │       └── conflicts.ts  # File locks
-├── worker/           # Task executor
+├── worker/           # Task executor (runs Ralph/Claude)
 │   └── src/
-│       ├── index.ts      # Worker entry
+│       ├── index.ts      # Execution worker entry
+│       ├── verification-worker.ts  # Verification worker entry
 │       ├── ralph.ts      # Claude runner
-│       └── setup.ts      # Repo setup
-├── intake/           # GitHub poller
-├── shared/           # Shared types
-└── cli/              # Command-line interface
+│       └── setup.ts      # Repo setup, PR creation
+├── intake/           # GitHub issue poller
+├── harness/          # AI harness abstraction (Claude, Codex, OpenCode)
+├── shared/           # Shared types and utilities
+└── cli/              # Terminal dashboard and commands
 ```
 
 ## API Endpoints
 
-### Queue Management
+### Work Items
 - `POST /api/work` - Add work item
 - `GET /api/work/:id` - Get work item
-- `DELETE /api/work/:id` - Cancel work item
-- `GET /api/queue` - List queue
-- `GET /api/queue/stats` - Queue statistics
+- `POST /api/work/:id/cancel` - Cancel work item
+- `POST /api/work/:id/requeue` - Requeue failed/completed item
+- `GET /api/work/:id/verification` - Get linked verification item
+- `GET /api/queue` - List queue with stats
 
 ### Worker Protocol
 - `POST /api/worker/register` - Worker self-registration
@@ -201,9 +210,11 @@ packages/
 - `POST /api/worker/:id/unlock` - Release file locks
 - `POST /api/worker/:id/complete` - Report success
 - `POST /api/worker/:id/fail` - Report failure
+- `POST /api/worker/:id/stuck` - Report stuck state
 
 ### Monitoring
 - `GET /health` - Health check
+- `GET /api/status` - System status overview
 - `GET /api/workers` - List workers
-- `GET /api/workers/stats` - Worker statistics
 - `GET /api/metrics` - System metrics
+- `GET /api/learnings` - Browse learnings

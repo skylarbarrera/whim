@@ -97,14 +97,14 @@ This is intentional - Whim prioritizes throughput. A 36-task spec might complete
 
 ## Spec Creation Flows
 
-The factory supports two ways to create specifications:
+Whim supports two ways to create specifications:
 
 ### 1. Autonomous Spec Generation (Default)
 
 The intake service uses Ralph CLI to convert GitHub issues into specifications:
 
 ```bash
-ralph spec --headless "<issue description>"
+ralphie spec --headless "<issue description>"
 ```
 
 Ralph's spec generator includes:
@@ -120,7 +120,7 @@ For manual spec creation with guided prompts, use Ralph's interactive mode:
 
 ```bash
 cd your-project
-ralph spec "Brief description of what you want to build"
+ralphie spec "Brief description of what you want to build"
 ```
 
 Ralph will:
@@ -129,7 +129,7 @@ Ralph will:
 3. **Validate** against spec conventions
 4. **Save** the spec to your project
 
-**Submitting your spec to the factory:**
+**Submitting your spec to Whim:**
 
 Once you have a SPEC.md, submit it via the API:
 
@@ -177,7 +177,7 @@ Secure API endpoints with JWT-based authentication
   - Returns 401 on missing/invalid token
 ```
 
-See [Ralph's create-spec skill documentation](https://github.com/skylarbarrera/ralph#creating-a-good-spec) for more details.
+See [Ralphie's spec guide](https://github.com/skylarbarrera/ralphie/blob/main/docs/spec-guide.md) for more details.
 
 ## Project Structure
 
@@ -187,6 +187,7 @@ whim/
 │   ├── orchestrator/     # Central brain - queue, workers, rate limits
 │   ├── worker/           # Docker container - runs Ralph + Claude Code
 │   ├── intake/           # GitHub adapter - polls issues, generates specs
+│   ├── harness/          # AI abstraction layer (Claude, Codex, OpenCode)
 │   ├── shared/           # Shared types and utilities
 │   └── cli/              # Terminal dashboard (Ink) for monitoring
 ├── docker/
@@ -273,24 +274,45 @@ curl -X POST http://localhost:3002/api/work \
 
 ## Configuration
 
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | GitHub PAT with repo permissions |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `REPOS` | Comma-separated: `owner/repo1,owner/repo2` |
+| `POSTGRES_PASSWORD` | Database password (no default for security) |
+| `ALLOWED_USERS` | Comma-separated GitHub usernames authorized to trigger work |
+
+### Ports & URLs
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GITHUB_TOKEN` | required | GitHub PAT with repo permissions |
-| `ANTHROPIC_API_KEY` | required | Anthropic API key (used by Ralph for spec generation) |
-| `REPOS` | required | Comma-separated: `owner/repo1,owner/repo2` |
-| `DATABASE_URL` | `postgres://factory:factory@localhost:5432/factory` | PostgreSQL connection |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection |
+| `POSTGRES_PORT` | `5433` | PostgreSQL host port |
+| `REDIS_PORT` | `6380` | Redis host port |
+| `ORCHESTRATOR_PORT` | `3002` | Orchestrator API port |
+| `DATABASE_URL` | derived | `postgres://whim:<password>@localhost:<port>/whim` |
+| `REDIS_URL` | derived | `redis://localhost:<port>` |
+
+### Rate Limiting
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `MAX_WORKERS` | `2` | Maximum concurrent workers |
-| `DAILY_BUDGET` | `200` | Max iterations per day (Claude Max) |
+| `DAILY_BUDGET` | `200` | Max iterations per day |
 | `COOLDOWN_SECONDS` | `60` | Seconds between worker spawns |
 | `STALE_THRESHOLD` | `300` | Seconds before worker marked stale |
+
+### Intake & Workers
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `INTAKE_LABEL` | `whim` | GitHub label to watch |
 | `POLL_INTERVAL` | `60000` | GitHub poll interval (ms) |
-| `ALLOWED_USERS` | required | Comma-separated GitHub usernames authorized to trigger work |
-| `VERIFICATION_ENABLED` | `true` | Global default for verification |
-| `SPEC_MAX_ATTEMPTS` | `3` | Max spec generation retries |
-| `HARNESS` | `claude` | AI harness for workers: `claude` or `codex` |
+| `HARNESS` | `claude` | AI harness: `claude`, `codex`, or `opencode` |
 | `OPENAI_API_KEY` | - | Required when `HARNESS=codex` |
+| `VERIFICATION_MAX_RETRIES` | `3` | Max verification retries before failure |
+| `SPEC_MAX_ATTEMPTS` | `3` | Max spec generation retries |
 
 ## API Endpoints
 
@@ -304,6 +326,7 @@ curl -X POST http://localhost:3002/api/work \
 ### Workers (Management)
 - `GET /api/workers` - List all workers
 - `POST /api/workers/:id/kill` - Kill worker
+- `GET /api/workers/:id/logs` - Get worker container logs
 
 ### Workers (Internal - used by workers)
 - `POST /api/worker/register` - Worker self-registration
@@ -319,6 +342,9 @@ curl -X POST http://localhost:3002/api/work \
 - `GET /api/queue` - Queue contents and stats
 - `GET /api/metrics` - Performance metrics
 - `GET /api/learnings` - Browse learnings
+- `GET /api/reviews` - List PR reviews
+- `GET /api/reviews/work-item/:id` - Reviews for work item
+- `GET /api/reviews/pr/:number` - Review for PR
 - `GET /health` - Health check
 
 ## Worker Protocol
@@ -402,7 +428,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md#security-model) for details.
 bun run build
 
 # Run specific package
-bun run --filter @factory/orchestrator dev
+bun run --filter @whim/orchestrator dev
 
 # Run tests
 bun test
@@ -494,14 +520,17 @@ The interactive dashboard shows:
 - `q` - Quit dashboard
 - `r` - Force refresh
 - `?` - Show help overlay
-- Navigation keys (coming soon)
+- `w` - Focus workers section
+- `u` - Focus queue section
+- `l` - View logs for selected worker
+- `↑/↓` - Navigate within focused section
 
-Service ports:
-| Service | Port |
-|---------|------|
-| Orchestrator API | 3002 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
+Default ports (configurable via env):
+| Service | Env Var | Default |
+|---------|---------|---------|
+| Orchestrator API | `ORCHESTRATOR_PORT` | 3002 |
+| PostgreSQL | `POSTGRES_PORT` | 5433 |
+| Redis | `REDIS_PORT` | 6380 |
 
 ## Troubleshooting
 

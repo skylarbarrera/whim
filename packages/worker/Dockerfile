@@ -1,4 +1,4 @@
-# Factory Worker Dockerfile
+# Whim Worker Dockerfile
 # Runs Claude Code autonomously to complete tasks from SPEC.md
 
 FROM oven/bun:1-debian AS builder
